@@ -31,7 +31,12 @@
 - `day_start` / `day_end`：24 小时制 `"HH:MM"`，必须带引号
 - `[weights]` 四个值建议之和为 1.0，不强制
 - `[interest_alias]`：左边是用户可能输入的词，右边是 `data/pois.csv` 里 `tags` 列出现的值
+- `[pace_factor]`：节奏 → **每天**站数系数。`relaxed = 0.7` 表示"轻松"时只排 70% 的站。
+  实测（`--top-n 3`）：relaxed 出 2 站 / normal 出 3 站 / packed 出 4 站。
+  不写这一段时引擎按 `1.0` 处理（= 节奏不生效），不会报错
+- `max_poi_per_day`：**每天**站数上限，同时也是界面滑块的**最大值**。改成 1 会让滑块只剩一格
 - `default_strategy`：用哪个算法，可选值见 `engine/strategies.py` 的 `STRATEGIES` 字典
+- 注意 `template.toml` 也在这个目录，所以它会作为一个叫 `template` 的场景出现在下拉框和 `--scenario` 帮助里 —— 它是模板，不是真场景，别选它
 
 ---
 

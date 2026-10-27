@@ -69,9 +69,27 @@
 
 ## 四、文档索引
 
+**先看这三份**（新增的执行手册，按顺序读）：
+
 | 文档 | 什么时候看 |
 |---|---|
-| `docs/使用手册.md` | **第一次上手先看这个**：怎么跑、改东西在哪改、报错怎么修 |
+| `docs/00-总纲与路线图.md` | **每次开工前 2 分钟**：现在在哪、下一步做什么、分支清单 |
+| `docs/03-分阶段操作手册.md` | **每条分支开工时**：一步步怎么做（命令权威源） |
+| `docs/04-验收清单.md` | **每次 AI 交活后**：怎么判断能不能收（验收权威源） |
+
+**配套三份**：
+
+| 文档 | 什么时候看 |
+|---|---|
+| `docs/02-提示词手册.md` | 给 AI 说什么话（T00～T15 可复制任务卡） |
+| `docs/01-环境与工具.md` | 环境/IDE/插件/报错（换电脑、装插件时） |
+| `docs/05-LearnBuddy协作节奏.md` | 什么时候开新对话、开场怎么写 |
+
+**参考文档**：
+
+| 文档 | 什么时候看 |
+|---|---|
+| `docs/使用手册.md` | 第一次上手：怎么跑、改东西在哪改、报错怎么修 |
 | `docs/接口契约.md` | 要动数据结构时看（改字段必须同步这里） |
 | `docs/分工与所有权.md` | 分活、避免两人改同一个文件 |
 | `docs/需求说明书.md` | 待定 —— 等助教答复评分细则后填 |
@@ -86,12 +104,15 @@
 
 ## 六、当前进度
 
-- [x] 工程骨架：目录、依赖、gitignore、git 本地仓库
+- [x] 工程骨架：目录、依赖、gitignore、git 仓库
 - [x] 接口契约 v1（冻结）
 - [x] 数据层 + 占位数据
 - [x] 规划引擎 + 策略注册表（stub / random）
 - [x] Streamlit 端到端跑通
 - [x] 基线对比 + 文档
+- [x] **已推送到 GitHub**：https://github.com/Haloha-Alt/ai-trip-planning
+- [x] **9 处死链与硬点已修复**（UI 覆盖语义、多天、pace、起点、cfg 传递、测试硬断言、GBK 兜底、弃用参数、多天统计）
+- [x] 43 个 unittest 全绿，评测结果可复现
 - [ ] **等助教答复后**：锁定场景 → 填 `config/scenarios/` + `data/` → 写真实算法进 `strategies.py`
 
 ---
@@ -109,14 +130,17 @@
 
 ---
 
-## 八、以后怎么接 GitHub（现在还没接）
+## 八、GitHub 仓库（已接通）
 
-当前只有本地 git 提交，没有远程仓库。等你建好 GitHub 仓库后执行：
+远端：`https://github.com/Haloha-Alt/ai-trip-planning`，本地 `main` 跟踪 `origin/main`。
+
+日常三条命令：
 
 ```bash
-git remote add origin https://github.com/<你的用户名>/<仓库名>.git
-git branch -M main
-git push -u origin main
+git pull                 # 开工先同步
+git push                 # 收工就推（每完成一条分支立刻推，不要攒）
+git log --oneline -5     # 看最近做了什么
 ```
 
-如果提示要登录，用 GitHub Desktop 登录一次，或配 Personal Access Token。
+分支 / 冲突 / PR / 回滚的完整流程见 `docs/03-分阶段操作手册.md` 第十二章。
+认证已配好（Git Credential Manager + GitHub Desktop），正常 push 不会反复弹登录。
