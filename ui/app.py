@@ -59,7 +59,7 @@ def _reset_inputs() -> None:
     Streamlit 的规则：一旦给控件加了 key，后续 rerun 里 value= 会被忽略。
     所以换场景时必须手动把 session_state 里的旧值清掉，否则会残留上一个场景的值。
     """
-    for k in ("in_start", "in_end", "in_budget", "in_top_n", "in_pace"):
+    for k in ("in_start", "in_end", "in_budget", "in_top_n", "in_pace", "in_strategy"):
         st.session_state.pop(k, None)
     for k in ("start", "end", "budget", "top_n", "pace"):
         st.session_state.pop(_TOUCH_PREFIX + k, None)
@@ -93,8 +93,14 @@ def sidebar_inputs(cfg):
 with st.sidebar:
     scenario = st.selectbox("场景", list_scenarios(), index=0,
                             key="in_scenario", on_change=_reset_inputs)
-    strategy = st.selectbox("算法", available(), index=0, key="in_strategy")
     cfg = load_scenario(scenario)
+
+    # 默认算法取场景配置的 default_strategy（demo.toml 里是 stub），
+    # 不能用 index=0 —— available() 是字母序，第一个是 random（故意做笨的对照组）。
+    _names = available()
+    _default = cfg.default_strategy if cfg.default_strategy in _names else _names[0]
+    strategy = st.selectbox("算法", _names, index=_names.index(_default), key="in_strategy")
+
     start_time, end_time, budget, top_n, pace = sidebar_inputs(cfg)
     st.divider()
     if st.button("清空数据缓存（改了 CSV 后点）"):

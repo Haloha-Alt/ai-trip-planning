@@ -92,9 +92,9 @@ def _extract_days(text: str) -> int | None:
 
 
 def _extract_pace(text: str) -> str | None:
-    if any(k in text for k in ("轻松", "悠闲", "别太累", "慢一点")):
+    if any(k in text for k in ("轻松", "悠闲", "别太累", "慢一点", "别太赶", "不赶", "宽松")):
         return "relaxed"
-    if any(k in text for k in ("紧凑", "多逛", "充实", "尽可能多")):
+    if any(k in text for k in ("紧凑", "多逛", "充实", "尽可能多", "赶一点")):
         return "packed"
     return None
 
