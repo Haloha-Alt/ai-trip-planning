@@ -1,0 +1,15 @@
+{
+  "request": {
+    "city": "",
+    "days": 1,
+    "start_time": "09:00",
+    "end_time": "11:00",
+    "daily_budget": 10,
+    "interests": ["人文"],
+    "avoid": [],
+    "pace": "packed",
+    "start_poi_id": null,
+    "top_n": 5,
+    "raw_query": "占位示例请求（紧约束）：时间很短、预算很紧，还要求人文类 —— 用来验证降级与 warnings"
+  }
+}

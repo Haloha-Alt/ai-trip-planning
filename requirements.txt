@@ -1,0 +1,23 @@
+# ===== 已在当前 .venv 中安装（无需再装）=====
+streamlit==1.66.1
+pandas==3.1.0
+numpy
+requests
+python-dotenv
+altair
+pyarrow
+pydeck
+uvicorn
+watchdog
+
+# ===== 标准库自带，无需安装 =====
+# tomllib     —— 读 TOML 配置（Python 3.11+）
+# dataclasses —— 接口契约数据结构
+# unittest    —— 单元测试
+# argparse    —— CLI 参数
+
+# ===== 骨架阶段【故意不装】=====
+# pytest   —— 用标准库 unittest，PyCharm 右键即可跑；助教明确要求时再装
+# plotly   —— 当前 altair + st.map 足够
+# folium   —— 同上
+# ortools  —— 将来做精确求解再说，装之前先确认有 cp314 wheel

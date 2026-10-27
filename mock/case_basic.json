@@ -1,0 +1,15 @@
+{
+  "request": {
+    "city": "",
+    "days": 1,
+    "start_time": "09:00",
+    "end_time": "18:00",
+    "daily_budget": 100,
+    "interests": ["自然"],
+    "avoid": [],
+    "pace": "normal",
+    "start_poi_id": null,
+    "top_n": 5,
+    "raw_query": "占位示例请求：想走走自然类的地方，别太赶"
+  }
+}

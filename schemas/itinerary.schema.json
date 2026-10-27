@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "itinerary.schema.json",
+  "title": "AI 出行与规划 · 接口契约 v1",
+  "description": "PlanResponse 的文档版。给人看，不参与运行时校验 —— 运行时的事实来源是 engine/models.py。",
+  "type": "object",
+  "required": ["request"],
+  "properties": {
+    "request": {
+      "type": "object",
+      "description": "PlanRequest：引擎唯一输入，所有字段都有默认值",
+      "properties": {
+        "city": { "type": "string", "default": "" },
+        "days": { "type": "integer", "minimum": 1, "default": 1 },
+        "start_time": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$", "default": "09:00" },
+        "end_time": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$", "default": "18:00" },
+        "daily_budget": { "type": ["number", "null"], "description": "null 或 <=0 = 不限制预算", "default": null },
+        "interests": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "avoid": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "pace": { "type": "string", "enum": ["relaxed", "normal", "packed"], "default": "normal" },
+        "start_poi_id": { "type": ["string", "null"], "default": null },
+        "top_n": { "type": "integer", "minimum": 1, "default": 6 },
+        "raw_query": { "type": "string", "default": "" }
+      }
+    },
+    "days": {
+      "type": "array",
+      "description": "DayPlan 列表",
+      "items": {
+        "type": "object",
+        "properties": {
+          "day_index": { "type": "integer", "minimum": 1, "default": 1 },
+          "items": { "type": "array", "items": { "$ref": "#/definitions/ItineraryItem" } },
+          "total_cost": { "type": "number" },
+          "total_stay_min": { "type": "integer" },
+          "total_travel_min": { "type": "number" },
+          "total_distance_km": { "type": "number" }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "人类可读的降级/违规说明。硬约束违规只写这里，绝不抛异常。",
+      "items": { "type": "string" }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "四维指标，全部 0~1，越大越好",
+      "properties": {
+        "satisfaction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "cost": { "type": "number", "minimum": 0, "maximum": 1 },
+        "time": { "type": "number", "minimum": 0, "maximum": 1 },
+        "distance": { "type": "number", "minimum": 0, "maximum": 1 },
+        "feasibility": { "type": "number", "minimum": 0, "maximum": 1, "description": "1.0 = 零违规" }
+      }
+    },
+    "strategy": { "type": "string", "description": "使用的算法名，便于复现" },
+    "scenario": { "type": "string", "description": "使用的场景配置名" },
+    "generated_at": { "type": "string", "description": "ISO 时间字符串" }
+  },
+  "definitions": {
+    "ItineraryItem": {
+      "type": "object",
+      "required": ["seq", "poi_id", "name"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 1 },
+        "poi_id": { "type": "string" },
+        "name": { "type": "string" },
+        "lat": { "type": "number" },
+        "lon": { "type": "number" },
+        "arrive": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+        "leave": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+        "stay_min": { "type": "integer", "minimum": 0 },
+        "cost": { "type": "number", "minimum": 0 },
+        "transport": { "$ref": "#/definitions/Transport" },
+        "reason": { "type": "string", "description": "可解释性输出：为什么选它/为什么排这时" }
+      }
+    },
+    "Transport": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "description": "当天第一项固定为 start" },
+        "minutes": { "type": "number", "minimum": 0 },
+        "distance_km": { "type": "number", "minimum": 0 },
+        "cost": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

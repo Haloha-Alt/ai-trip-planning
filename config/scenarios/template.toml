@@ -1,0 +1,58 @@
+# 场景模板（复制本文件 → 改名 → 填值 → 用 --scenario 选中）
+
+# 场景名，会写进结果的 scenario 字段，便于复现
+name = "template"
+
+# ---- 时间窗：24 小时制 "HH:MM" ----
+day_start = "09:00"
+day_end = "18:00"
+
+# ---- 预算：填 0 或留空 = 不限制预算（不是"预算 0 元"）----
+daily_budget = 0.0
+
+# ---- 行程规模 ----
+days = 1
+max_poi_per_day = 5
+
+# ---- 默认节奏，取值范围：relaxed | normal | packed ----
+default_pace = "normal"
+
+# ---- 交通方式：速度（km/h），用于把距离换算成在途时间 ----
+[transport_speed_kmh]
+walk = 4.5
+bike = 12.0
+bus = 18.0
+metro = 30.0
+
+# ---- 交通方式：每公里费用 ----
+[transport_cost_per_km]
+walk = 0.0
+bike = 0.0
+bus = 0.0
+metro = 0.0
+
+# ---- 距离矩阵缺项时的估算方式 ----
+default_mode = "walk"
+
+# ---- 评分权重：四个维度，建议之和 = 1.0 ----
+[weights]
+satisfaction = 0.5
+cost = 0.2
+time = 0.2
+distance = 0.1
+
+# ---- 兴趣词 → POI 标签 的映射 ----
+# 左边：用户可能输入的词；右边：data/pois.csv 的 tags 列里出现的值
+# 这是全项目唯一允许写"业务语义"的地方
+[interest_alias]
+# 示例（按真实场景替换）：
+# "自然" = ["公园", "山"]
+# "美食" = ["餐饮"]
+
+# ---- 数据文件（相对 data/ 目录）----
+[data_files]
+pois = "pois.csv"
+matrix = "travel_matrix.csv"
+
+# ---- 默认算法策略（可选值见 engine/strategies.py 的 STRATEGIES）----
+default_strategy = "stub"

@@ -1,0 +1,37 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# ===== 虚拟环境 =====
+.venv/
+venv/
+env/
+
+# ===== PyCharm / IDE =====
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ===== Streamlit =====
+.streamlit/secrets.toml
+
+# ===== 环境变量与密钥 =====
+.env
+*.env
+!.env.example
+
+# ===== 项目输出与缓存 =====
+outputs/
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Jupyter（可选）=====
+.ipynb_checkpoints/

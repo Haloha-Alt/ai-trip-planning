@@ -1,0 +1,62 @@
+# 场景：demo —— 骨架占位场景，数值全部为中性占位，不绑定任何真实业务。
+#
+# TODO(scenario): 等助教答复评分细则/提交形式后，按锁定的场景整体替换数值；
+#                 替换范围仅限本目录 + data/，Python 代码零改动。
+#
+# 用法：改本文件即调参；或复制 template.toml 改名成 xxx.toml，
+#       然后 python main.py --scenario xxx，或在网页下拉框里选。
+
+name = "demo"
+
+# ---- 时间窗：24 小时制 "HH:MM" ----
+day_start = "09:00"
+day_end = "18:00"
+
+# ---- 预算：填 0 = 不限制预算（不是"预算 0 元"）----
+daily_budget = 0.0
+
+# ---- 行程规模 ----
+days = 1
+max_poi_per_day = 5
+
+# ---- 默认节奏：relaxed | normal | packed ----
+default_pace = "normal"
+
+# ---- 交通方式：速度（km/h），用于把距离换算成在途时间 ----
+[transport_speed_kmh]
+walk = 4.5
+bike = 12.0
+bus = 18.0
+metro = 30.0
+
+# ---- 交通方式：每公里费用 ----
+[transport_cost_per_km]
+walk = 0.0
+bike = 0.0
+bus = 0.0
+metro = 0.0
+
+# ---- 距离矩阵缺项时的估算方式 ----
+default_mode = "walk"
+
+# ---- 评分权重：建议之和 = 1.0 ----
+[weights]
+satisfaction = 0.5
+cost = 0.2
+time = 0.2
+distance = 0.1
+
+# ---- 兴趣词 -> POI 标签 的映射 ----
+# 左边是用户可能输入的词，右边是 data/pois.csv 的 tags 列里出现的值。
+# TODO(scenario): 按真实锁定场景填写。这是全项目唯一允许写业务语义的地方。
+[interest_alias]
+# "自然" = ["公园", "山"]
+# "美食" = ["餐饮"]
+
+# ---- 数据文件（相对 data/ 目录）----
+[data_files]
+pois = "pois.csv"
+matrix = "travel_matrix.csv"
+
+# ---- 默认算法策略（可选值见 engine/strategies.py 的 STRATEGIES）----
+default_strategy = "stub"
