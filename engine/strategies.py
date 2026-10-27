@@ -36,6 +36,9 @@ from engine.models import (
 
 PlannerFn = Callable[[PlanRequest, ScenarioConfig], PlanResponse]
 
+# random 基线的固定种子：只为让评测结果可复现，不是业务参数。
+RANDOM_SEED = 20261027
+
 
 # ---------------------------------------------------------------- 公共小工具
 
@@ -58,6 +61,24 @@ def _candidate_pool(req: PlanRequest, cfg: ScenarioConfig) -> tuple[list[POI], s
     return pool, wanted
 
 
+def _apply_start(pool: list[POI], req: PlanRequest, cfg: ScenarioConfig) -> list[POI]:
+    """把 start_poi_id 指定的点置顶。
+
+    起点是"硬指定"，所以允许突破兴趣过滤（即使它没命中也被排在第一个）。
+    填了不存在的 ID 就当没填 —— 不写 warning，避免为一个笔误扣掉可行性分。
+    """
+    sid = (req.start_poi_id or "").strip()
+    if not sid:
+        return pool
+    for i, p in enumerate(pool):
+        if p.poi_id == sid:
+            return [p] + pool[:i] + pool[i + 1:]
+    for p in load_pois(cfg):
+        if p.poi_id == sid:
+            return [p] + pool
+    return pool
+
+
 def _match_score(p: POI, wanted: set[str]) -> float:
     """单个 POI 与兴趣的匹配度；没填兴趣时用数据自带的静态分。"""
     if not wanted:
@@ -75,13 +96,13 @@ def _reason(p: POI, wanted: set[str]) -> str:
 
 
 def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
-              wanted: set[str]) -> DayPlan:
+              wanted: set[str], day_index: int = 1) -> DayPlan:
     """把选中的 POI 依次铺到时间轴上，产出 DayPlan。
 
     所有策略共用这段逻辑 —— 不同算法的区别只在"怎么挑、怎么排序"，
     铺时间轴的规则是一致的。
     """
-    day = DayPlan(day_index=1)
+    day = DayPlan(day_index=day_index)
     clock = to_minutes(req.start_time or cfg.day_start)
     limit = to_minutes(req.end_time or cfg.day_end)
     prev: POI | None = None
@@ -117,6 +138,35 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
     return day
 
 
+def _per_day_top_n(req: PlanRequest, cfg: ScenarioConfig) -> int:
+    """每天放几站。
+
+    节奏系数来自场景配置的 [pace_factor]，取不到就当 1.0（= 节奏不生效）。
+    代码里不写任何业务数值 —— 系数只准写在 config/scenarios/*.toml 里。
+    """
+    base = int(req.top_n or cfg.max_poi_per_day)
+    factor = 1.0
+    if cfg.pace_factor:
+        factor = float(cfg.pace_factor.get(req.pace, 1.0))
+    return max(1, min(int(round(base * factor)), cfg.max_poi_per_day))
+
+
+def _build_days(ranked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
+                wanted: set[str]) -> list[DayPlan]:
+    """按天数切段，每段独立铺一次时间轴。
+
+    切完不够就留空天 —— 空天会由 constraints.validate_day 产出 NO_CANDIDATE 提示，
+    而不是在这里静默吞掉。
+    """
+    n_days = max(1, int(req.days or 1))
+    per_day = _per_day_top_n(req, cfg)
+    ranked = _apply_start(ranked, req, cfg)      # 起点置顶必须放在排序之后
+    return [
+        _fill_day(ranked[i * per_day:(i + 1) * per_day], req, cfg, wanted, day_index=i + 1)
+        for i in range(n_days)
+    ]
+
+
 # ---------------------------------------------------------------- 策略实现
 
 
@@ -128,11 +178,10 @@ def stub_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
     """
     pool, wanted = _candidate_pool(req, cfg)
     pool.sort(key=lambda p: (-_match_score(p, wanted), p.poi_id))
-    top_n = min(req.top_n or cfg.max_poi_per_day, cfg.max_poi_per_day)
-    picked = pool[:top_n]
+    n_days = max(1, int(req.days or 1))
+    picked = pool[: _per_day_top_n(req, cfg) * n_days]
 
-    day = _fill_day(picked, req, cfg, wanted)
-    return PlanResponse(request=req, days=[day])
+    return PlanResponse(request=req, days=_build_days(picked, req, cfg, wanted))
 
 
 def random_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
@@ -140,15 +189,17 @@ def random_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
 
     故意做得"笨"，用来在 eval/baseline.py 里衬托正式策略 —— 没有差的对照，
     就没法证明你的算法真的有用。
+
+    注意：这里用**固定种子**，不是全局 random。否则同一份 eval/results.md
+    每跑一次都不一样，既没法比较算法，也没法用 git diff 判断有没有回归。
     """
     pool, wanted = _candidate_pool(req, cfg)
     shuffled = list(pool)
-    random.shuffle(shuffled)
-    top_n = min(req.top_n or cfg.max_poi_per_day, cfg.max_poi_per_day)
-    picked = shuffled[:top_n]
+    random.Random(RANDOM_SEED).shuffle(shuffled)
+    n_days = max(1, int(req.days or 1))
+    picked = shuffled[: _per_day_top_n(req, cfg) * n_days]
 
-    day = _fill_day(picked, req, cfg, wanted)
-    return PlanResponse(request=req, days=[day])
+    return PlanResponse(request=req, days=_build_days(picked, req, cfg, wanted))
 
 
 # ---------------------------------------------------------------- 注册表

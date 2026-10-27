@@ -41,13 +41,37 @@ def _resolve(cfg: ScenarioConfig | None) -> ScenarioConfig:
     return cfg if cfg is not None else load_scenario()
 
 
+_ENCODINGS = ("utf-8-sig", "gbk")      # 顺序不能反：utf-8-sig 也能读无 BOM 的 UTF-8
+
+
 def _read_csv(name: str) -> pd.DataFrame:
-    """统一以 utf-8-sig 读取，兼容 Excel 另存的带 BOM 文件。"""
+    """按 utf-8-sig -> gbk 依次尝试；全失败时打印可读错误并返回空表（绝不崩）。
+
+    为什么不让异常抛出去：data/README.md 承诺"不会让整个程序崩掉"，
+    抛异常会让 Streamlit 页面直接白屏。所以兜底成空表，但错误信息要够响，
+    并且在 load_pois / load_matrix 里再补一条"解析出 0 行"的提醒。
+    """
     path = DATA_DIR / name
     if not path.exists():
-        print("[warn] data file not found: %s" % path)
+        print("[error] 找不到数据文件：%s" % path)
         return pd.DataFrame()
-    return pd.read_csv(path, encoding="utf-8-sig")
+
+    last_err: Exception | None = None
+    for enc in _ENCODINGS:
+        try:
+            return pd.read_csv(path, encoding=enc)
+        except UnicodeDecodeError as e:
+            last_err = e
+            print("[warn] %s 用 %s 解码失败，换下一种编码重试" % (path.name, enc))
+        except pd.errors.EmptyDataError:
+            print("[warn] %s 是空文件，按空表处理" % path.name)
+            return pd.DataFrame()
+
+    print("[error] %s 无法解码（已尝试 %s）。请用 Excel「另存为 → CSV UTF-8（带 BOM）」后重试。"
+          % (path.name, "、".join(_ENCODINGS)))
+    if last_err is not None:
+        print("[error] 最后一次解码错误：%s" % last_err)
+    return pd.DataFrame()
 
 
 def _is_empty(v) -> bool:
@@ -79,6 +103,12 @@ def load_pois(cfg: ScenarioConfig | None = None) -> list[POI]:
             pois.append(POI.from_dict(d))
         except Exception as e:                      # 坏行跳过，不拖垮整张表
             print("[warn] skip bad POI row %s: %s" % (d.get("poi_id"), e))
+
+    if not pois:
+        # 解析出 0 条通常不是"数据为空"，而是编码错了或列名被改过。
+        # 这里不缓存，方便你改完 CSV 直接重跑就生效。
+        print("[error] %s 解析出 0 条 POI，请检查编码与列名（对照 data/README.md）" % cfg.poi_file)
+        return pois
 
     _POI_CACHE[key] = pois
     return pois

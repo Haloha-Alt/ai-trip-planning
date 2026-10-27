@@ -48,3 +48,13 @@ def plan(req: PlanRequest,
 
     resp.metrics = constraints.score(resp, cfg)
     return resp
+
+
+def clear_caches() -> None:
+    """清空数据层缓存（改了 CSV 之后调用）。
+
+    放在这里是为了保持分层单向：UI 只允许 import engine，不允许直接 import data。
+    """
+    from data.loader import clear_cache
+
+    clear_cache()

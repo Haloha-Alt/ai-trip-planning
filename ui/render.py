@@ -56,14 +56,14 @@ def render_day(day) -> None:
         st.warning("这一天的行程是空的 —— 通常是时间窗太短，或候选被兴趣/排除条件过滤光了。")
         return
 
-    st.dataframe(_day_to_df(day), use_container_width=True, hide_index=True)
+    st.dataframe(_day_to_df(day), width="stretch", hide_index=True)
 
     # 路线图：坐标来自 ItineraryItem，UI 不直连数据层
     pts = pd.DataFrame(
         [{"lat": it.lat, "lon": it.lon} for it in day.items if it.lat or it.lon]
     )
     if not pts.empty:
-        st.map(pts, use_container_width=True)
+        st.map(pts, width="stretch")
 
 
 def render_warnings(resp: PlanResponse) -> None:

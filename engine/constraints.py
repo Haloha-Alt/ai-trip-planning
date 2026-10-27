@@ -109,7 +109,7 @@ def validate_day(day: DayPlan, cfg: ScenarioConfig, req: PlanRequest | None = No
         try:
             from data.loader import get_poi
 
-            poi = get_poi(it.poi_id)
+            poi = get_poi(it.poi_id, cfg)
         except Exception:
             poi = None
         if poi is None:
@@ -145,9 +145,10 @@ def score(resp: PlanResponse, cfg: ScenarioConfig) -> PlanMetrics:
     try:
         from data.loader import load_pois
 
-        tag_of = {p.poi_id: set(p.tags) for p in load_pois()}
-        score_of = {p.poi_id: p.score for p in load_pois()}
-        max_cost = max([p.cost for p in load_pois()] + [0.0]) or 1.0
+        pois = load_pois(cfg)          # 必须传 cfg，否则换场景后仍按 demo 的 CSV 打分
+        tag_of = {p.poi_id: set(p.tags) for p in pois}
+        score_of = {p.poi_id: p.score for p in pois}
+        max_cost = max([p.cost for p in pois] + [0.0]) or 1.0
     except Exception:
         tag_of, score_of, max_cost = {}, {}, 1.0
 

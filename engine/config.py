@@ -30,6 +30,7 @@ class ScenarioConfig:
     days: int = 1
     max_poi_per_day: int = 6
     default_pace: str = "normal"
+    pace_factor: dict[str, float] = field(default_factory=dict)   # 节奏 -> 每天站数系数
     transport_speed_kmh: dict[str, float] = field(default_factory=dict)
     transport_cost_per_km: dict[str, float] = field(default_factory=dict)
     default_mode: str = "walk"
@@ -78,6 +79,7 @@ def load_scenario(name: str | None = None) -> ScenarioConfig:
         days=int(raw.get("days", 1)),
         max_poi_per_day=int(raw.get("max_poi_per_day", 6)),
         default_pace=raw.get("default_pace", "normal"),
+        pace_factor={k: float(v) for k, v in (raw.get("pace_factor") or {}).items()},
         transport_speed_kmh=dict(raw.get("transport_speed_kmh", {})),
         transport_cost_per_km=dict(raw.get("transport_cost_per_km", {})),
         default_mode=raw.get("default_mode", "walk"),

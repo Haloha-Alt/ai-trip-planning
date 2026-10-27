@@ -61,16 +61,16 @@ def run(scenario: str | None, case_dir: Path) -> list[list]:
     for case_name, req in cases:
         for strategy in available():
             resp = plan(req, scenario=scenario, strategy=strategy)
-            d = resp.days[0] if resp.days else None
+            days = resp.days or []
             m = resp.metrics
             rows.append([
                 case_name,
                 strategy,
-                len(d.items) if d else 0,
-                round(d.total_cost, 2) if d else 0.0,
-                d.total_stay_min if d else 0,
-                round(d.total_travel_min, 1) if d else 0.0,
-                round(d.total_distance_km, 2) if d else 0.0,
+                sum(len(d.items) for d in days),
+                round(sum(d.total_cost for d in days), 2),
+                sum(d.total_stay_min for d in days),
+                round(sum(d.total_travel_min for d in days), 1),
+                round(sum(d.total_distance_km for d in days), 2),
                 "%.2f" % m.satisfaction,
                 "%.2f" % m.cost,
                 "%.2f" % m.time,

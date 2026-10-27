@@ -26,9 +26,8 @@ if str(ROOT) not in sys.path:
 
 import streamlit as st  # noqa: E402
 
-from data.loader import clear_cache               # noqa: E402
 from engine.config import list_scenarios, load_scenario  # noqa: E402
-from engine.planner import plan                   # noqa: E402
+from engine.planner import clear_caches, plan     # noqa: E402
 from engine.strategies import available           # noqa: E402
 from llm.parser import parse                      # noqa: E402
 from ui.render import render_plan                 # noqa: E402
@@ -41,32 +40,65 @@ st.caption("工程骨架 · 场景与数据均为占位，可整体替换")
 
 # ---------------------------------------------------------------- 侧边栏
 
+_TOUCH_PREFIX = "touched_"
+
+
+def _mark_touched(name: str) -> None:
+    """控件回调：只有用户真的操作了这个控件才会触发，程序赋值不会。"""
+    st.session_state[_TOUCH_PREFIX + name] = True
+
+
+def _touched(name: str) -> bool:
+    """这个控件当前的值，是"用户手动设过"还是"还是默认值"。"""
+    return bool(st.session_state.get(_TOUCH_PREFIX + name, False))
+
+
+def _reset_inputs() -> None:
+    """切场景时清空控件值与"动过"标记，让新场景的默认值重新生效。
+
+    Streamlit 的规则：一旦给控件加了 key，后续 rerun 里 value= 会被忽略。
+    所以换场景时必须手动把 session_state 里的旧值清掉，否则会残留上一个场景的值。
+    """
+    for k in ("in_start", "in_end", "in_budget", "in_top_n", "in_pace"):
+        st.session_state.pop(k, None)
+    for k in ("start", "end", "budget", "top_n", "pace"):
+        st.session_state.pop(_TOUCH_PREFIX + k, None)
+
 
 def sidebar_inputs(cfg):
     st.header("参数")
+    st.caption("默认全部「跟随需求文本」；你手动改过哪一项，才覆盖哪一项。")
     col1, col2 = st.columns(2)
     with col1:
-        start = st.text_input("出发时间", value=cfg.day_start)
+        start = st.text_input("出发时间", value=cfg.day_start, key="in_start",
+                              on_change=_mark_touched, args=("start",))
     with col2:
-        end = st.text_input("返回时间", value=cfg.day_end)
+        end = st.text_input("返回时间", value=cfg.day_end, key="in_end",
+                            on_change=_mark_touched, args=("end",))
 
-    budget = st.number_input("预算（0 = 不限制）", min_value=0.0, value=0.0, step=10.0)
-    top_n = st.slider("期望站点数", min_value=1, max_value=max(1, cfg.max_poi_per_day),
-                      value=min(cfg.max_poi_per_day, 5))
+    budget = st.number_input("预算（0 = 不限制；不动则跟随文本）", min_value=0.0,
+                             value=0.0, step=10.0, key="in_budget",
+                             on_change=_mark_touched, args=("budget",))
+    top_n = st.slider("每天站点数", min_value=1, max_value=max(1, cfg.max_poi_per_day),
+                      value=min(cfg.max_poi_per_day, 5), key="in_top_n",
+                      on_change=_mark_touched, args=("top_n",))
     pace = st.selectbox("节奏", ["relaxed", "normal", "packed"],
                         index=["relaxed", "normal", "packed"].index(cfg.default_pace)
-                        if cfg.default_pace in ("relaxed", "normal", "packed") else 1)
+                        if cfg.default_pace in ("relaxed", "normal", "packed") else 1,
+                        key="in_pace", on_change=_mark_touched, args=("pace",))
     return start, end, budget, top_n, pace
 
 
+
 with st.sidebar:
-    scenario = st.selectbox("场景", list_scenarios(), index=0)
-    strategy = st.selectbox("算法", available(), index=0)
+    scenario = st.selectbox("场景", list_scenarios(), index=0,
+                            key="in_scenario", on_change=_reset_inputs)
+    strategy = st.selectbox("算法", available(), index=0, key="in_strategy")
     cfg = load_scenario(scenario)
     start_time, end_time, budget, top_n, pace = sidebar_inputs(cfg)
     st.divider()
     if st.button("清空数据缓存（改了 CSV 后点）"):
-        clear_cache()
+        clear_caches()
         st.success("已清空，下次规划会重读 CSV")
 
 
@@ -82,12 +114,18 @@ query = st.text_area(
 if st.button("生成行程", type="primary"):
     req = parse(query, cfg)
 
-    # 侧边栏参数覆盖解析结果
-    req.start_time = start_time or cfg.day_start
-    req.end_time = end_time or cfg.day_end
-    req.daily_budget = None if not budget else float(budget)
-    req.top_n = top_n
-    req.pace = pace
+    # 只有「用户手动动过」的控件才覆盖解析结果。
+    # 以前这里是无条件覆盖，导致文本框里写"预算 100 元"被默认值 0 抹成"不限制"。
+    if _touched("start") and start_time:
+        req.start_time = start_time
+    if _touched("end") and end_time:
+        req.end_time = end_time
+    if _touched("budget"):
+        req.daily_budget = None if not budget else float(budget)
+    if _touched("top_n"):
+        req.top_n = int(top_n)
+    if _touched("pace"):
+        req.pace = pace
 
     with st.expander("解析出的请求（PlanRequest）"):
         st.json(req.to_dict())
