@@ -61,6 +61,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--interests", default=None, help="兴趣词，逗号分隔")
     p.add_argument("--avoid", default=None, help="排除词，逗号分隔")
     p.add_argument("--pace", default=None, choices=["relaxed", "normal", "packed"])
+    p.add_argument("--mobility", default=None, choices=["walk", "transit", "drive"],
+                   help="出行方式：影响在途时间估算（默认 walk，与改造前一致）")
     p.add_argument("--export", dest="export_fmt", default="json",
                    choices=["json", "md", "csv"], help="导出格式，默认 json")
     p.add_argument("--out", default=None, help="输出路径，默认 outputs/plan_<场景>_<策略>.<格式>")
@@ -92,6 +94,7 @@ def make_request(args) -> PlanRequest:
         ("top_n", args.top_n),
         ("pace", args.pace),
         ("city", args.city),
+        ("mobility", args.mobility),
     ):
         if value is not None:
             setattr(req, field, value)

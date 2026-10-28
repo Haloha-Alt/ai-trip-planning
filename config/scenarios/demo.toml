@@ -29,18 +29,21 @@ normal = 1.0
 packed = 1.3
 
 # ---- 交通方式：速度（km/h），用于把距离换算成在途时间 ----
+# key 名与 PlanRequest.mobility 的对应关系见 engine/geo.py 的 _MOBILITY_FALLBACKS
 [transport_speed_kmh]
 walk = 4.5
 bike = 12.0
 bus = 18.0
 metro = 30.0
+car = 35.0
 
 # ---- 交通方式：每公里费用 ----
 [transport_cost_per_km]
 walk = 0.0
 bike = 0.0
-bus = 0.0
-metro = 0.0
+bus = 2.0
+metro = 3.0
+car = 0.6
 
 # ---- 距离矩阵缺项时的估算方式 ----
 default_mode = "walk"

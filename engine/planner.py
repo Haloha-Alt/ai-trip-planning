@@ -14,18 +14,26 @@ from datetime import datetime
 
 from engine import constraints, strategies
 from engine.config import ScenarioConfig, load_scenario
+from engine.context import PlanContext
 from engine.models import PlanRequest, PlanResponse
 
 
 def plan(req: PlanRequest,
          scenario: str | None = None,
-         strategy: str | None = None) -> PlanResponse:
+         strategy: str | None = None,
+         ctx: "PlanContext | None" = None) -> PlanResponse:
     """生成一个行程方案。
 
     :param req:       请求（PlanRequest，字段全有默认值，空请求也能跑）
     :param scenario:  场景名，None 表示用环境变量或默认场景
     :param strategy:  策略名，None 表示用场景配置里的 default_strategy
+    :param ctx:       实时上下文（PlanContext）。**None = 完全离线行为**，
+                      传了才会把天气/闭馆信息写进结果，并在必要时重排一次。
     :return:          PlanResponse，**永不返回 None、永不抛业务异常**
+
+    ⚠️ 引擎内部**零 IO**：实时数据必须先由 `engine/realtime.py` 抓成快照，
+    再通过 ctx 注入。只有这样才能保证"同样的输入 → 同样的输出"，
+    评测能比、出问题能回放。
     """
     if req is None:
         req = PlanRequest()
@@ -47,6 +55,17 @@ def plan(req: PlanRequest,
             resp.warnings.append(str(v))
 
     resp.metrics = constraints.score(resp, cfg)
+
+    # 实时数据：只在这里统一生效一次，策略内部一律不碰它
+    if ctx is not None and getattr(ctx, "snapshot", None) is not None:
+        try:
+            from engine.replan import apply_snapshot
+
+            resp = apply_snapshot(resp, ctx.snapshot, ctx,
+                                  scenario=cfg.name, strategy=name)
+        except Exception as e:                  # noqa: BLE001 - 重排失败不能连累主结果
+            resp.warnings.append("[实时] 处理失败，已保留原方案：%s" % e)
+
     return resp
 
 

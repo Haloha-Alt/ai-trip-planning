@@ -24,7 +24,7 @@ from typing import Callable
 from data.loader import get_matrix_edge, load_pois
 from engine.config import ScenarioConfig
 from engine.constraints import expand_interests
-from engine.geo import estimate_edge, to_hhmm, to_minutes
+from engine.geo import estimate_edge, resolve_mode, to_hhmm, to_minutes
 from engine.models import (
     DayPlan,
     ItineraryItem,
@@ -112,7 +112,8 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
             edge = Transport(mode="start", minutes=0.0, distance_km=0.0, cost=0.0)
         else:
             edge = (get_matrix_edge(prev.poi_id, p.poi_id, cfg, req.city)
-                    or estimate_edge(prev, p, cfg))
+                    or estimate_edge(prev, p, cfg,
+                                     mode=resolve_mode(cfg, req.mobility)))
 
         arrive = clock + int(round(edge.minutes))
         leave = arrive + p.stay_min

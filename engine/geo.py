@@ -59,6 +59,35 @@ def estimate_cost(distance_km: float, mode: str, cfg: ScenarioConfig) -> float:
     return round(distance_km * (unit or 0.0), 2)
 
 
+# 出行方式 -> 具体交通方式的候选顺序。
+# 为什么是"候选顺序"：场景配置里不一定配了 metro / car，
+# 缺哪个就往下找，找不到才回退 default_mode。
+# 这里只有**键名**，没有任何速度/价格 —— 那些是业务数值，只准写在 config/scenarios/*.toml。
+_MOBILITY_FALLBACKS: dict[str, tuple[str, ...]] = {
+    "walk": ("walk",),
+    "transit": ("metro", "bus"),
+    "bike": ("bike",),
+    "drive": ("car",),
+}
+
+
+def resolve_mode(cfg: ScenarioConfig, mobility: str | None = None) -> str:
+    """把用户选的出行方式翻译成场景配置里确实存在的交通方式。
+
+    "transit" 这种说法本身不是一种交通方式，它得落到 metro / bus 上
+    才能查到速度。查不到就退回 cfg.default_mode —— 宁可慢一点，也不许报错。
+    """
+    key = (mobility or "").strip() or cfg.default_mode
+    speeds = cfg.transport_speed_kmh or {}
+    if key in speeds:
+        return key
+    for cand in _MOBILITY_FALLBACKS.get(key, ()):
+        if cand in speeds:
+            return cand
+    return cfg.default_mode if cfg.default_mode in speeds else (
+        next(iter(speeds), cfg.default_mode))
+
+
 def estimate_edge(a: POI, b: POI, cfg: ScenarioConfig, mode: str | None = None) -> Transport:
     """两个 POI 之间的一段行程（距离矩阵缺项时的兜底估算）。"""
     m = mode or cfg.default_mode

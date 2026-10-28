@@ -80,7 +80,7 @@ def apply_overrides(req: PlanRequest, overrides: dict[str, Any] | None) -> PlanR
         req.city = resolve_city(str(city)) or str(city)
 
     for field in ("days", "start_time", "end_time", "top_n", "pace", "origin",
-                  "date", "travelers", "budget_basis", "mobility"):
+                  "date", "travelers", "budget_basis", "mobility", "start_poi_id"):
         v = overrides.get(field)
         if v not in (None, ""):
             setattr(req, field, v)

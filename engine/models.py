@@ -49,7 +49,8 @@ class PlanRequest:
     travelers: int = 1                    # 出行人数，只用于预算换算，不参与排程
     budget_basis: str = "per_person"      # daily_budget 的口径：per_person | group
     must_visit: list[str] = field(default_factory=list)   # 必去点（名称或 poi_id），软约束
-    mobility: str = "transit"             # walk | transit | drive，影响在途时间估算
+    mobility: str = "walk"                # walk | transit | drive，影响在途时间估算。
+                                          # 默认 walk：与接这个字段之前的行为一致，保证历史基线可比
     seed: int | None = None               # 随机种子；None = 用策略内置种子
 
     @staticmethod
