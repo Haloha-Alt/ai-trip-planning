@@ -196,16 +196,21 @@ def get_poi(poi_id: str, cfg: ScenarioConfig | None = None, city: str = "") -> P
 
 
 def get_matrix_edge(a_id: str, b_id: str, cfg: ScenarioConfig | None = None,
-                    city: str = "") -> Transport | None:
+                    city: str = "", mode: str = "") -> Transport | None:
     """查两个 POI 之间的已知交通边。
 
     - 双向都能查（矩阵里只写了一边也能命中）
-    - 查不到返回 None，调用方应当回退到 engine/geo.py 的 estimate_edge()
+    - 查不到返回 None，调用方应当回退到 `engine/geo.py` 的 `estimate_edge()`
+    - `mode` 非空时只认该方式的边：矩阵里存的是"步行 112 分钟"，
+      就不能拿它去顶"公共交通"方案 —— 那是两套完全不同的时间尺度。
+      方式对不上时返回 None，让估算按用户选的方式重算。
     """
     if not a_id or not b_id or a_id == b_id:
         return None
     for e in load_matrix(cfg, city):
         if (e.from_id == a_id and e.to_id == b_id) or (e.from_id == b_id and e.to_id == a_id):
+            if mode and e.mode != mode:
+                continue
             return Transport(
                 mode=e.mode,
                 minutes=e.minutes,

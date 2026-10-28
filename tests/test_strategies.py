@@ -127,6 +127,53 @@ class TestBeatsBaseline(unittest.TestCase):
                              round(g.days[0].total_travel_min, 1) + 0.05)
 
 
+class TestOpenHours(unittest.TestCase):
+    """A 修复：早出发要"等开门"，而不是把还没开门的点排进去再报 CLOSED。"""
+
+    def _open_map(self):
+        from data.loader import load_pois
+        from engine.config import load_scenario
+
+        return {p.poi_id: p.open_time for p in load_pois(load_scenario(SCENARIO), CITY)}
+
+    def test_arrive_never_before_opening(self):
+        open_of = self._open_map()
+        for name in ("stub", "greedy"):
+            resp = plan(_req(start_time="06:00"), scenario=SCENARIO, strategy=name)
+            for d in resp.days:
+                for it in d.items:
+                    self.assertGreaterEqual(
+                        to_minutes(it.arrive), to_minutes(open_of[it.poi_id]),
+                        "%s 把 %s 排在开门前（%s）" % (name, it.name, it.arrive))
+
+    def test_no_closed_warning_when_leaving_early(self):
+        for name in ("stub", "greedy"):
+            resp = plan(_req(start_time="06:00"), scenario=SCENARIO, strategy=name)
+            self.assertFalse([w for w in resp.warnings if "CLOSED" in w],
+                             "%s 仍在报闭馆：%s" % (name, resp.warnings))
+
+    def test_wait_is_flagged_and_explained(self):
+        resp = plan(_req(start_time="06:00"), scenario=SCENARIO, strategy="stub")
+        waited = [it for d in resp.days for it in d.items if "wait_open" in it.flags]
+        self.assertTrue(waited, "早出发却没有一条 wait_open 标记")
+        self.assertIn("等开门", waited[0].reason)
+
+    def test_arrive_at_helper(self):
+        from data.loader import load_pois
+        from engine.config import load_scenario
+        from engine.models import Transport
+        from engine.strategies import _arrive_at
+
+        cfg = load_scenario(SCENARIO)
+        poi = next(p for p in load_pois(cfg, CITY)
+                   if to_minutes(p.open_time) > to_minutes("07:00"))
+        edge = Transport(mode="walk", minutes=1.0, distance_km=0.1, cost=0.0)
+        self.assertEqual(_arrive_at(to_minutes("06:00"), poi, edge), to_minutes(poi.open_time))
+        # 到得比开门晚时，不该被"提前"到开门时刻
+        late = to_minutes(poi.open_time) + 60
+        self.assertEqual(_arrive_at(late, poi, edge), late + 1)
+
+
 class TestTwoOpt(unittest.TestCase):
     def test_two_opt_never_makes_path_longer(self):
         from data.loader import load_pois

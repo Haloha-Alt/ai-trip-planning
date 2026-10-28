@@ -135,6 +135,20 @@ def _reason(p: POI, wanted: set[str]) -> str:
     return "按质量分 %.2f 选取" % p.score
 
 
+def _arrive_at(clock: int, p: POI, edge: Transport) -> int:
+    """几点到站：到早了要**等开门**。
+
+    不这么算就会出一个很蠢的结果：07:00 从宿舍出发，07:22 到了 07:30 才开门的图书馆，
+    然后约束层判定"到了闭馆/未开门的点"，整条方案被判不可行。
+    现实里你只会在门口站 8 分钟，而不是"博物馆没开门所以我不能去"。
+
+    所有策略共用这一条，选点（`_fits`）与铺时间轴（`_fill_day`）才不会各算各的。
+    """
+    arrive = clock + int(round(edge.minutes))
+    open_at = to_minutes(p.open_time or "00:00")
+    return max(arrive, open_at)
+
+
 def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
               wanted: set[str], day_index: int = 1) -> DayPlan:
     """把选中的 POI 依次铺到时间轴上，产出 DayPlan。
@@ -145,21 +159,22 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
     day = DayPlan(day_index=day_index)
     clock = to_minutes(req.start_time or cfg.day_start)
     limit = to_minutes(req.end_time or cfg.day_end)
+    mode = resolve_mode(cfg, req.mobility)
     prev: POI | None = None
 
     for seq, p in enumerate(picked, start=1):
         if prev is None:
             edge = Transport(mode="start", minutes=0.0, distance_km=0.0, cost=0.0)
         else:
-            edge = (get_matrix_edge(prev.poi_id, p.poi_id, cfg, req.city)
-                    or estimate_edge(prev, p, cfg,
-                                     mode=resolve_mode(cfg, req.mobility)))
+            edge = (get_matrix_edge(prev.poi_id, p.poi_id, cfg, req.city, mode=mode)
+                    or estimate_edge(prev, p, cfg, mode=mode))
 
-        arrive = clock + int(round(edge.minutes))
+        arrive = _arrive_at(clock, p, edge)
         leave = arrive + p.stay_min
         if leave > limit:                       # 装不下就停，越界是硬约束，不硬塞
             break
 
+        waited = arrive - (clock + int(round(edge.minutes)))
         day.items.append(ItineraryItem(
             seq=seq,
             poi_id=p.poi_id,
@@ -171,7 +186,13 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
             stay_min=p.stay_min,
             cost=p.cost,
             transport=edge,
-            reason=_reason(p, wanted),
+            reason=_reason(p, wanted) + ("；到早了等开门 %d 分钟" % waited if waited > 0 else ""),
+            flags=["wait_open"] if waited > 0 else [],
+            # 分类/地址跟着复制：前端要按分类上色、解说要按分类起标题，
+            # 让 UI 直连 data/ 去查又违反分层（UI 只允许 import engine）
+            category=p.category,
+            address=p.address,
+            url=p.url,
         ))
         clock, prev = leave, p
 
@@ -267,8 +288,9 @@ def _edge_between(prev: POI | None, p: POI, req: PlanRequest,
     """上一站到这一站怎么走。与 `_fill_day` 用的是同一套取边规则，否则贪心算的时间和真排出来会对不上。"""
     if prev is None:
         return Transport(mode="start", minutes=0.0, distance_km=0.0, cost=0.0)
-    return (get_matrix_edge(prev.poi_id, p.poi_id, cfg, req.city)
-            or estimate_edge(prev, p, cfg, mode=resolve_mode(cfg, req.mobility)))
+    mode = resolve_mode(cfg, req.mobility)
+    return (get_matrix_edge(prev.poi_id, p.poi_id, cfg, req.city, mode=mode)
+            or estimate_edge(prev, p, cfg, mode=mode))
 
 
 def _mandatory_head(req: PlanRequest, cfg: ScenarioConfig) -> list[POI]:
@@ -302,26 +324,33 @@ def _mandatory_head(req: PlanRequest, cfg: ScenarioConfig) -> list[POI]:
 
 
 def _utility(p: POI, e: Transport, wanted: set[str], w: dict[str, float],
-             day_len: int, budget: float | None, spent: float) -> float:
-    """这一步的"净收益"：满意度与停留时间算正，花钱与跑路算负。
+             day_len: int, budget: float | None, spent: float,
+             clock: int = 0) -> float:
+    """这一步的"净收益"：满意度与停留时间算正，花钱、跑路、干等算负。
 
     三项都归一到 0~1 再加权，所以量纲不会互相欺负。
     距离不单独扣分：它已经通过"在途时间"进了目标，再扣一次等于重复惩罚。
+    **干等也要扣**：06:30 出门却排一个 07:30 才开门的点，等于白等一小时。
     """
     sat = _match_score(p, wanted)
     cost_ratio = 0.0
     if budget:
         cost_ratio = min(1.0, (p.cost + e.cost) / max(budget - spent, 1e-6))
+    wait = _arrive_at(clock, p, e) - (clock + int(round(e.minutes)))
     return (w.get("satisfaction", 0.5) * sat
             + w.get("time", 0.2) * (p.stay_min / day_len)
             - w.get("cost", 0.2) * cost_ratio
-            - w.get("time", 0.2) * (e.minutes / day_len))
+            - w.get("time", 0.2) * ((e.minutes + max(0, wait)) / day_len))
 
 
 def _fits(clock: int, p: POI, e: Transport, limit: int, spent: float,
           budget: float | None) -> bool:
-    """硬约束：装得进时间窗、不超预算。贪心只在可行解里挑，不靠事后补救。"""
-    if clock + int(round(e.minutes)) + p.stay_min > limit:
+    """硬约束：装得进时间窗、不超预算。贪心只在可行解里挑，不靠事后补救。
+
+    注意用的是 `_arrive_at`（含"等开门"），与真正铺时间轴时同一套算法 ——
+    否则会出现"贪心觉得放得下、真排的时候被 `_fill_day` 截断"的错位。
+    """
+    if _arrive_at(clock, p, e) + p.stay_min > limit:
         return False
     if budget is not None and spent + p.cost + e.cost > budget + 1e-9:
         return False
@@ -349,7 +378,7 @@ def _greedy_one_day(req: PlanRequest, cfg: ScenarioConfig, wanted: set[str],
             e = _edge_between(prev, p, req, cfg)
             if _fits(clock, p, e, limit, spent, budget):
                 picked.append(p)
-                clock += int(round(e.minutes)) + p.stay_min
+                clock = _arrive_at(clock, p, e) + p.stay_min
                 spent += p.cost + e.cost
                 prev = p
             # 装不下就跳过：不静默塞进去，也不在这里编 warning（交给约束层统一报）
@@ -374,7 +403,7 @@ def _greedy_one_day(req: PlanRequest, cfg: ScenarioConfig, wanted: set[str],
         e = _edge_between(prev, best, req, cfg)
         picked.append(best)
         remaining.remove(best)
-        clock += int(round(e.minutes)) + best.stay_min
+        clock = _arrive_at(clock, best, e) + best.stay_min
         spent += best.cost + e.cost
         prev = best
 
