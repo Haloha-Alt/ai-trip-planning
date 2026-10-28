@@ -18,10 +18,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from service.bootstrap import WEB_DIR
+from service.bootstrap import WEB_DIR, load_dotenv
 from api.routes import dispatch
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# 先把 .env 灌进环境变量，再让别的模块去读 MAP_API_KEY / LLM_API_KEY。
+# 顺序不能反：有的模块在 import 阶段就会取一次环境变量。
+load_dotenv()
 
 
 def build_app():

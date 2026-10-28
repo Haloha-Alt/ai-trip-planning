@@ -34,6 +34,7 @@ sys.path.insert(0, str(ROOT))
 
 import streamlit as st  # noqa: E402
 
+from service.bootstrap import load_dotenv             # noqa: E402
 from service.exporters import export                 # noqa: E402
 from service.usecases import (                       # noqa: E402
     city_options,
@@ -43,6 +44,8 @@ from service.usecases import (                       # noqa: E402
     scenario_config,
 )
 from ui.render import render_plan                # noqa: E402
+
+load_dotenv()                                    # .env 里的 Key 必须先灌进环境变量
 
 st.set_page_config(page_title="AI 出行与规划", page_icon="🧭", layout="wide")
 

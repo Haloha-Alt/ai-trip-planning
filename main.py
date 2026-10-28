@@ -26,7 +26,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from service.exporters import export                  # noqa: E402
+from service.bootstrap import load_dotenv             # noqa: E402
 from service.usecases import save_plan                # noqa: E402
+
+load_dotenv()                                          # .env 里的 Key 必须先灌进环境变量
 from engine.config import list_scenarios, load_scenario  # noqa: E402
 from engine.models import PlanRequest             # noqa: E402
 from engine.planner import plan                   # noqa: E402
