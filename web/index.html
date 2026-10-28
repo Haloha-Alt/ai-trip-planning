@@ -9,8 +9,10 @@
     --bg:#f6f7f9; --card:#ffffff; --line:#e3e6ea; --ink:#1f2328;
     --sub:#6b7280; --accent:#2563eb; --accent-soft:#eaf1ff;
     --warn:#b45309; --warn-bg:#fff7ed; --ok:#15803d; --ok-bg:#f0fdf4;
+    --stay:#2563eb; --move:#9aa4b2; --best:#15803d; --best-bg:#f0fdf4;
   }
   *{box-sizing:border-box}
+  [hidden]{display:none !important}
   body{margin:0;background:var(--bg);color:var(--ink);
        font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
   header{padding:18px 24px;background:var(--card);border-bottom:1px solid var(--line)}
@@ -28,6 +30,7 @@
        background:var(--accent);color:#fff;font-size:14px;cursor:pointer}
   button:hover{filter:brightness(1.06)}
   button.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  button:disabled{opacity:.55;cursor:progress}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}
   @media (max-width:900px){.metrics{grid-template-columns:repeat(3,1fr)}}
@@ -37,6 +40,7 @@
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
   th{color:var(--sub);font-weight:600;font-size:12px}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   .day{margin-bottom:18px}
   .warn{background:var(--warn-bg);border:1px solid #fed7aa;color:var(--warn);
         border-radius:8px;padding:10px;margin-top:12px;font-size:13px}
@@ -48,12 +52,44 @@
   svg{width:100%;height:auto;background:#fbfcfe;border:1px solid var(--line);border-radius:8px}
   .pill{display:inline-block;padding:2px 8px;border-radius:99px;background:var(--accent-soft);
         color:var(--accent);font-size:12px;margin-right:6px}
+
+  /* ---- 页签 ---- */
+  .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  .tab{width:auto;margin:0;padding:8px 16px;background:#fff;color:var(--sub);
+       border:1px solid var(--line);font-size:13px}
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .pane{min-height:80px}
+
+  /* ---- 时间轴 ---- */
+  .legend{display:flex;gap:16px;align-items:center;font-size:12px;color:var(--sub);margin-bottom:8px}
+  .legend i{display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:5px}
+  .tl-day{margin-bottom:14px}
+  .tl-day h3{margin:0 0 6px;font-size:13px;font-weight:600}
+  .tl-day h3 span{color:var(--sub);font-weight:400;font-size:12px;margin-left:8px}
+
+  /* ---- 算法对比 ---- */
+  .cmp-summary{background:var(--best-bg);border:1px solid #bbf7d0;color:#14532d;
+       border-radius:8px;padding:10px 12px;font-size:13px;margin:0 0 12px}
+  tr.best td{background:var(--best-bg);font-weight:600}
+  tr.best td:first-child{color:var(--best)}
+  .bars{margin-top:14px}
+  .bar-row{display:grid;grid-template-columns:96px 1fr 62px;gap:10px;align-items:center;
+       margin-bottom:7px;font-size:12px}
+  .bar-track{background:#eef1f5;border-radius:99px;height:14px;overflow:hidden}
+  .bar-fill{height:14px;border-radius:99px;background:var(--accent)}
+  .bar-fill.dim{background:#9aa4b2}
+  .bar-val{text-align:right;font-variant-numeric:tabular-nums;color:var(--sub)}
+
+  details{margin-top:12px}
+  summary{cursor:pointer;color:var(--sub);font-size:13px}
+  pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;
+      font-size:12px;line-height:1.5;max-height:340px}
 </style>
 </head>
 <body>
 <header>
   <h1>AI 出行与规划</h1>
-  <p>多城市 · 可换算法 · 结果可导出（JSON / Markdown / CSV）</p>
+  <p>多城市 · 可换算法 · 时间轴 / 地图 / 算法对比 · 结果可导出（JSON / Markdown / CSV）</p>
 </header>
 
 <div class="wrap">
@@ -61,7 +97,7 @@
   <div class="card">
     <h2>出行需求</h2>
     <label>一句话需求</label>
-    <textarea id="q">想走走自然类的地方，预算 150，别太赶</textarea>
+    <textarea id="q">上午去图书馆自习，中午食堂吃饭，顺便取快递，别太赶</textarea>
 
     <div class="row">
       <div>
@@ -91,8 +127,8 @@
 
     <label>出行方式（影响在途时间估算）</label>
     <select id="mobility">
-      <option value="transit" selected>公共交通</option>
-      <option value="walk">步行</option>
+      <option value="transit">公共交通</option>
+      <option value="walk" selected>步行</option>
       <option value="drive">驾车</option>
     </select>
 
@@ -110,11 +146,11 @@
     <div class="row">
       <div>
         <label>出发</label>
-        <input id="start" type="time" value="09:00">
+        <input id="start" type="time" value="07:30">
       </div>
       <div>
         <label>返回</label>
-        <input id="end" type="time" value="18:00">
+        <input id="end" type="time" value="20:00">
       </div>
     </div>
 
@@ -125,28 +161,53 @@
       <input type="checkbox" id="rt" checked style="width:auto">
       使用实时天气（雨天自动改室内；抓不到自动降级）
     </label>
+    <p class="muted" style="margin:8px 0 0">参数默认「跟随需求文本」：只有你手动改过的那一项，才会覆盖文本解析的结果。</p>
 
     <button id="go">生成行程</button>
+    <button class="ghost" id="cmp">算法对比（同一份需求，各算法跑一遍）</button>
     <button class="ghost" id="reload">清空数据缓存（改了 CSV 后点）</button>
     <p class="muted" style="margin-top:10px">接口状态：<span id="health">…</span></p>
   </div>
 
   <!-- 右：结果 -->
   <div>
-    <div class="card" id="result">
-      <p class="muted">填好需求后点「生成行程」。</p>
+    <div id="summary"></div>
+
+    <nav class="tabs" id="tabs" hidden>
+      <button class="tab active" data-tab="list">行程表</button>
+      <button class="tab" data-tab="timeline">时间轴</button>
+      <button class="tab" data-tab="map">地图</button>
+      <button class="tab" data-tab="compare">算法对比</button>
+    </nav>
+
+    <div class="pane" id="pane-list">
+      <div class="card"><p class="muted">填好需求后点「生成行程」。</p></div>
     </div>
+    <div class="pane" id="pane-timeline" hidden></div>
+    <div class="pane" id="pane-map" hidden></div>
+    <div class="pane" id="pane-compare" hidden></div>
   </div>
 </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-let LAST = null;              // 最近的查询条件，导出时复用
+let LAST = null;        // 最近的查询条件，导出与对比复用
+let PLAN = null;        // 最近一次的规划结果
+let PTS = [];           // 地图点
+let CMP = null;         // 最近一次的算法对比结果
+
+/* 所有拼进 innerHTML 的外部文本都要过一遍 —— 站点名里出现 & 或 < 时页面不能崩 */
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 async function api(path, body) {
   const opt = body ? {method:'POST', headers:{'Content-Type':'application/json'},
                       body: JSON.stringify(body)} : {method:'GET'};
   const r = await fetch(path, opt);
+  if (!r.ok && r.status >= 500) throw new Error('服务端 ' + r.status);
   return await r.json();
 }
 
@@ -177,91 +238,112 @@ function fill(id, items, def, kv) {
   });
 }
 
+/* 哪些控件被用户**手动改过**。
+ *
+ * 不记这个就会踩一个很难发现的坑：文本写「别太赶」（解析成 relaxed，每天 2 站），
+ * 而下拉框默认是 normal，无条件当覆盖传上去 → 文本被静默抹掉，每天变 4 站。
+ * Streamlit 端早就有这层保护（`_touched`），网页端必须一致。
+ */
+const TOUCHED = {};
+
+function markTouched(field){
+  const el = $(field);
+  if (!el) return;
+  const set = () => { TOUCHED[field] = true; };
+  el.addEventListener('input', set);
+  el.addEventListener('change', set);
+}
+
+['start', 'end', 'budget', 'top_n', 'pace', 'mobility', 'days', 'city'].forEach(markTouched);
+
 function collect() {
+  const ov = {};
+  if (TOUCHED.city) ov.city = $('city').value;
+  if (TOUCHED.days) ov.days = Number($('days').value) || 1;
+  if (TOUCHED.top_n) ov.top_n = Number($('top_n').value) || 4;
+  if (TOUCHED.pace) ov.pace = $('pace').value;
+  if (TOUCHED.mobility) ov.mobility = $('mobility').value;
+  if (TOUCHED.start) ov.start_time = $('start').value;
+  if (TOUCHED.end) ov.end_time = $('end').value;
+  if (TOUCHED.budget) ov.daily_budget = Number($('budget').value) || 0;
+
   return {
     query: $('q').value.trim(),
     scenario: $('scenario').value,
     strategy: $('strategy').value,
     realtime: $('rt').checked,
-    overrides: {
-      city: $('city').value,
-      days: Number($('days').value) || 1,
-      top_n: Number($('top_n').value) || 4,
-      pace: $('pace').value,
-      mobility: $('mobility').value,
-      start_time: $('start').value,
-      end_time: $('end').value,
-      daily_budget: Number($('budget').value) || 0
-    }
+    overrides: ov
   };
 }
+
+/* ---------------------------------------------------------------- 页签 */
+
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.pane').forEach(p =>
+    p.hidden = (p.id !== 'pane-' + name));
+}
+
+document.querySelectorAll('.tab').forEach(b => {
+  b.onclick = () => showTab(b.dataset.tab);
+});
+
+/* ---------------------------------------------------------------- 规划 */
 
 async function plan() {
   const payload = collect();
   LAST = payload;
-  $('result').innerHTML = '<p class="muted">规划中…</p>';
+  $('go').disabled = true;
+  $('summary').innerHTML = '<div class="card"><p class="muted">规划中…</p></div>';
   let res;
   try {
     res = await api('/api/plan', payload);
   } catch (e) {
-    $('result').innerHTML = '<div class="warn">请求失败：' + e + '</div>';
+    $('summary').innerHTML = '<div class="card"><div class="warn">请求失败：' + esc(e.message || e) + '</div></div>';
+    $('go').disabled = false;
     return;
   }
+  $('go').disabled = false;
   if (!res.ok) {
-    $('result').innerHTML = '<div class="warn">' + res.error + '</div>';
+    $('summary').innerHTML = '<div class="card"><div class="warn">' + esc(res.error) + '</div></div>';
     return;
   }
-  draw(res.plan, res.map);
+  PLAN = res.plan;
+  PTS = res.map || [];
+  renderPlan();
+  showTab('list');
 }
 
-async function download(fmt) {
-  if (!LAST) return;
-  const res = await api('/api/export', Object.assign({}, LAST, {fmt: fmt}));
-  if (!res.ok) { alert(res.error); return; }
-  const blob = new Blob([res.content], {type: 'text/plain;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = res.filename;
-  a.click();
+function renderPlan(){
+  $('tabs').hidden = false;
+  $('summary').innerHTML = '<div class="card">' + metricsHtml(PLAN) + metaLine(PLAN)
+                         + realtimeNote(PLAN) + warningsHtml(PLAN) + exportBar() + '</div>';
+  $('pane-list').innerHTML = listHtml(PLAN);
+  $('pane-timeline').innerHTML = timelineHtml(PLAN);
+  $('pane-map').innerHTML = mapHtml(PTS);
+  if (CMP) $('pane-compare').innerHTML = compareHtml(CMP);
 }
 
-function draw(plan, pts) {
+function metricsHtml(plan){
   const m = plan.metrics;
-  let html = '<div class="metrics">'
+  return '<div class="metrics">'
     + metric('满意度', m.satisfaction) + metric('预算友好', m.cost)
     + metric('时间利用', m.time) + metric('路程紧凑', m.distance)
     + metric('可行性', m.feasibility) + metric('总分', m.overall)
     + '</div>';
-
-  html += '<p class="muted">场景 <span class="pill">' + plan.scenario + '</span>'
-        + '算法 <span class="pill">' + plan.strategy + '</span>'
-        + (plan.city ? '城市 <span class="pill">' + plan.city + '</span>' : '')
-        + '生成于 ' + plan.generated_at + '</p>';
-
-  html += realtimeNote(plan);
-
-  (plan.days || []).forEach(d => html += dayHtml(d));
-  html += mapHtml(pts);
-
-  if (plan.warnings && plan.warnings.length) {
-    html += '<div class="warn"><b>提示（' + plan.warnings.length + '）</b><br>'
-          + plan.warnings.map(w => '· ' + w).join('<br>') + '</div>';
-  } else {
-    html += '<div class="ok">无异常提示</div>';
-  }
-
-  html += '<div class="exp">'
-        + '<button class="ghost" onclick="download(\'json\')">下载 JSON</button>'
-        + '<button class="ghost" onclick="download(\'md\')">下载 Markdown</button>'
-        + '<button class="ghost" onclick="download(\'csv\')">下载 CSV</button>'
-        + '</div>';
-
-  $('result').innerHTML = html;
 }
 
 function metric(label, v) {
-  const n = (typeof v === 'number') ? v.toFixed(2) : v;
+  const n = (typeof v === 'number') ? v.toFixed(4) : esc(v);
   return '<div class="metric"><b>' + n + '</b><span>' + label + '</span></div>';
+}
+
+function metaLine(plan){
+  return '<p class="muted">场景 <span class="pill">' + esc(plan.scenario) + '</span>'
+       + '算法 <span class="pill">' + esc(plan.strategy) + '</span>'
+       + (plan.city ? '城市 <span class="pill">' + esc(plan.city) + '</span>' : '')
+       + '生成于 ' + esc(plan.generated_at) + '</p>';
 }
 
 /* 实时数据这一行：抓到了就报天气，没抓到就说清楚为什么 —— 不许假装知道天气 */
@@ -273,12 +355,40 @@ function realtimeNote(plan) {
     const txt = ws.slice(0, 3).map(w =>
       w.date + ' ' + (COND[w.condition] || w.condition)
       + (w.temp_c == null ? '' : ' ' + Math.round(w.temp_c) + '℃')).join(' ｜ ');
-    return '<p class="muted">🌤 实时天气：' + txt
-         + '（抓取于 ' + (rt.fetched_at || '').replace('T', ' ') + '）</p>';
+    return '<p class="muted">🌤 实时天气：' + esc(txt)
+         + '（抓取于 ' + esc((rt.fetched_at || '').replace('T', ' ')) + '）</p>';
   }
   const warn = rt.warnings || [];
   return '<p class="muted">🌤 未使用实时数据'
-       + (warn.length ? '：' + warn.join('；') : '') + '</p>';
+       + (warn.length ? '：' + esc(warn.join('；')) : '') + '</p>';
+}
+
+function warningsHtml(plan){
+  if (plan.warnings && plan.warnings.length) {
+    return '<div class="warn"><b>提示（' + plan.warnings.length + '）</b><br>'
+         + plan.warnings.map(w => '· ' + esc(w)).join('<br>') + '</div>';
+  }
+  return '<div class="ok">无异常提示</div>';
+}
+
+function exportBar(){
+  return '<div class="exp">'
+    + '<button class="ghost" onclick="download(\'json\')">下载 JSON</button>'
+    + '<button class="ghost" onclick="download(\'md\')">下载 Markdown</button>'
+    + '<button class="ghost" onclick="download(\'csv\')">下载 CSV</button>'
+    + '</div>';
+}
+
+/* 行程表：表格 + 原始 JSON */
+function listHtml(plan){
+  if (!plan.days || !plan.days.length) {
+    return '<div class="card"><p class="muted">（空行程）</p></div>';
+  }
+  let html = '<div class="card">';
+  plan.days.forEach(d => html += dayHtml(d));
+  html += '<details><summary>查看原始 JSON（接口契约 ' + esc(plan.contract || 'v1') + '）</summary>'
+        + '<pre>' + esc(JSON.stringify(plan, null, 2)) + '</pre></details>';
+  return html + '</div>';
 }
 
 function dayHtml(d) {
@@ -291,52 +401,291 @@ function dayHtml(d) {
   s += '<table><thead><tr><th>#</th><th>时间</th><th>站点</th><th>停留</th>'
      + '<th>花费</th><th>交通</th><th>理由</th></tr></thead><tbody>';
   d.items.forEach(it => {
-    s += '<tr><td>' + it.seq + '</td><td>' + it.arrive + '–' + it.leave + '</td>'
-       + '<td>' + it.name + '</td><td>' + it.stay_min + ' 分</td>'
+    s += '<tr><td>' + it.seq + '</td><td>' + esc(it.arrive) + '–' + esc(it.leave) + '</td>'
+       + '<td>' + esc(it.name) + '</td><td>' + it.stay_min + ' 分</td>'
        + '<td>' + it.cost.toFixed(0) + '</td>'
        + '<td>' + (it.transport.mode === 'start' ? '起点'
-                   : it.transport.mode + ' ' + it.transport.minutes.toFixed(0) + ' 分 / '
+                   : esc(it.transport.mode) + ' ' + it.transport.minutes.toFixed(0) + ' 分 / '
                      + it.transport.distance_km.toFixed(2) + ' km') + '</td>'
-       + '<td>' + (it.reason || '') + '</td></tr>';
+       + '<td class="muted">' + esc(it.reason) + '</td></tr>';
   });
   return s + '</tbody></table></div>';
 }
 
-/* 地图：内联 SVG，按 bbox 做等距投影 —— 不发任何外部请求，断网也能画 */
-function mapHtml(pts) {
-  if (!pts || pts.length < 2) {
-    return pts && pts.length === 1
-      ? '<div class="card" style="margin-top:12px"><p class="muted">只有 1 个站点，画不出路线。</p></div>'
-      : '';
-  }
-  const W = 900, H = 320, PAD = 36;
-  const lats = pts.map(p => p.lat), lons = pts.map(p => p.lon);
-  let minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  let minLon = Math.min(...lons), maxLon = Math.max(...lons);
-  // bbox 退化成一个点时撑开一点，避免除零
-  if (maxLat - minLat < 1e-6) { minLat -= 0.005; maxLat += 0.005; }
-  if (maxLon - minLon < 1e-6) { minLon -= 0.005; maxLon += 0.005; }
+/* ---------------------------------------------------------------- 时间轴 */
 
-  const X = lon => PAD + (lon - minLon) / (maxLon - minLon) * (W - 2 * PAD);
-  const Y = lat => H - PAD - (lat - minLat) / (maxLat - minLat) * (H - 2 * PAD);
+function toMin(hhmm){
+  const p = String(hhmm || '00:00').split(':');
+  return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0);
+}
+function hhmm(min){
+  const m = Math.max(0, Math.round(min));
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+}
 
-  let s = '<div class="card" style="margin-top:12px"><h2>路线图（离线绘制，不依赖地图瓦片）</h2><svg viewBox="0 0 '
-        + W + ' ' + H + '">';
-  s += '<polyline fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="5 4" points="'
-     + pts.map(p => X(p.lon).toFixed(1) + ',' + Y(p.lat).toFixed(1)).join(' ') + '"/>';
-  pts.forEach((p, i) => {
-    const x = X(p.lon), y = Y(p.lat);
-    s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="11" fill="#2563eb"/>';
-    s += '<text x="' + x.toFixed(1) + '" y="' + (y + 4).toFixed(1)
-       + '" fill="#fff" font-size="11" text-anchor="middle">' + (i + 1) + '</text>';
-    s += '<text x="' + x.toFixed(1) + '" y="' + (y - 16).toFixed(1)
-       + '" fill="#1f2328" font-size="11" text-anchor="middle">' + p.name + '</text>';
+function timelineHtml(plan){
+  const days = (plan && plan.days) || [];
+  if (!days.length) return '<div class="card"><p class="muted">（空行程）</p></div>';
+  let html = '<div class="card"><div class="legend">'
+           + '<span><i style="background:var(--stay)"></i>停留</span>'
+           + '<span><i style="background:var(--move)"></i>在途</span>'
+           + '<span>横轴按真实时刻排布，空白 = 空闲</span></div>';
+  days.forEach(d => html += dayTimeline(d));
+  return html + '</div>';
+}
+
+function dayTimeline(d){
+  const items = d.items || [];
+  let s = '<div class="tl-day"><h3>第 ' + d.day_index + ' 天'
+        + '<span>停留 ' + d.total_stay_min + ' 分 · 在途 ' + d.total_travel_min.toFixed(0)
+        + ' 分 · 花费 ' + d.total_cost.toFixed(0) + '</span></h3>';
+  if (!items.length) return s + '<p class="muted">（空行程，画不出时间轴）</p></div>';
+
+  // 时间范围：从第一段的"出发时刻"到最后一段的"离开时刻"，向外取整到整点
+  let lo = Infinity, hi = -Infinity;
+  items.forEach(it => {
+    const travel = (it.transport && it.transport.mode !== 'start') ? (it.transport.minutes || 0) : 0;
+    lo = Math.min(lo, toMin(it.arrive) - travel);
+    hi = Math.max(hi, toMin(it.leave));
   });
-  return s + '</svg><p class="muted" style="margin-top:8px">按经纬度等距投影，'
-          + '只表示相对位置，不能当导航用。</p></div>';
+  if (!isFinite(lo) || !isFinite(hi) || hi <= lo) { lo = toMin('08:00'); hi = lo + 60; }
+  lo = Math.floor(lo / 60) * 60;
+  hi = Math.ceil(hi / 60) * 60;
+  if (hi - lo < 60) hi = lo + 60;
+
+  const W = 900, BAR_H = 30, TOP = 14, AXIS = 26, H = TOP + BAR_H + AXIS + 6;
+  // 左右留 10px：否则 07:00 / 14:00 这种首尾刻度的文字会被 viewBox 裁掉一半
+  const PADL = 10, PADR = 10;
+  const x = m => PADL + (m - lo) / (hi - lo) * (W - PADL - PADR);
+
+  s += '<svg viewBox="0 0 ' + W + ' ' + H + '">';
+
+  // 整点刻度：竖线 + 底部标签（首尾改对齐方式，避免出框）
+  for (let m = lo; m <= hi; m += 60) {
+    const px = x(m);
+    const anchor = (m === lo) ? 'start' : (m === hi ? 'end' : 'middle');
+    s += '<line x1="' + px.toFixed(1) + '" y1="' + TOP + '" x2="' + px.toFixed(1)
+       + '" y2="' + (TOP + BAR_H) + '" stroke="#eef1f5" stroke-width="1"/>';
+    s += '<text x="' + px.toFixed(1) + '" y="' + (TOP + BAR_H + 16)
+       + '" fill="#6b7280" font-size="10" text-anchor="' + anchor + '">' + hhmm(m) + '</text>';
+  }
+
+  items.forEach(it => {
+    const arr = toMin(it.arrive), lv = toMin(it.leave);
+    const t = it.transport || {};
+    const travel = (t.mode && t.mode !== 'start') ? (t.minutes || 0) : 0;
+
+    if (travel > 0.5) {                       // 在途段：到达时刻往前推
+      const a = x(arr - travel), b = x(arr);
+      s += '<rect x="' + a.toFixed(1) + '" y="' + (TOP + 4) + '" width="' + Math.max(b - a, 0.8).toFixed(1)
+         + '" height="' + (BAR_H - 8) + '" rx="3" fill="#9aa4b2" fill-opacity="0.85">'
+         + '<title>' + esc(it.name) + ' 前在途 ' + travel.toFixed(0) + ' 分钟 / '
+         + (t.distance_km || 0).toFixed(2) + ' km</title></rect>';
+    }
+
+    const a = x(arr), b = x(lv);
+    s += '<rect x="' + a.toFixed(1) + '" y="' + TOP + '" width="' + Math.max(b - a, 1.2).toFixed(1)
+       + '" height="' + BAR_H + '" rx="4" fill="#2563eb">'
+       + '<title>' + esc(it.name) + ' ' + esc(it.arrive) + '–' + esc(it.leave)
+       + '（停留 ' + it.stay_min + ' 分钟）</title></rect>';
+
+    // 段够宽才写字，否则只留 tooltip —— 挤在一起反而看不清
+    if (b - a > 64) {
+      s += '<text x="' + ((a + b) / 2).toFixed(1) + '" y="' + (TOP + BAR_H / 2 + 4)
+         + '" fill="#fff" font-size="11" text-anchor="middle">'
+         + esc(it.seq + '. ' + it.name) + '</text>';
+    } else {
+      s += '<text x="' + ((a + b) / 2).toFixed(1) + '" y="' + (TOP - 3)
+         + '" fill="#1f2328" font-size="10" text-anchor="middle">' + it.seq + '</text>';
+    }
+  });
+
+  s += '</svg></div>';
+  return s;
+}
+
+/* ---------------------------------------------------------------- 地图 */
+
+const DAY_COLORS = ['#2563eb', '#0d9488', '#c2410c', '#7c3aed', '#db2777', '#0369a1'];
+
+/* 两个文本框是否相交（用于站名避让） */
+function boxesHit(a, b) {
+  return a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
+}
+
+/* 内联 SVG：等距投影 + cos(lat) 修正 + 等比缩放（不拉伸形状），不发任何外部请求 */
+function mapHtml(pts) {
+  if (!pts || !pts.length) {
+    return '<div class="card"><p class="muted">没有带坐标的站点，画不出地图。</p></div>';
+  }
+  if (pts.length === 1) {
+    return '<div class="card"><p class="muted">只有 1 个站点，画不出路线。</p></div>';
+  }
+
+  const W = 900, H = 420, PAD = 44;
+  const lats = pts.map(p => p.lat), lons = pts.map(p => p.lon);
+  let minLat = Math.min.apply(null, lats), maxLat = Math.max.apply(null, lats);
+  let minLon = Math.min.apply(null, lons), maxLon = Math.max.apply(null, lons);
+  if (maxLat - minLat < 1e-6) { minLat -= 0.002; maxLat += 0.002; }
+  if (maxLon - minLon < 1e-6) { minLon -= 0.002; maxLon += 0.002; }
+
+  // 经度方向按纬度余弦压缩，否则在中高纬度地图会横向变胖
+  const kx = Math.cos(((minLat + maxLat) / 2) * Math.PI / 180);
+  const spanX = (maxLon - minLon) * kx, spanY = (maxLat - minLat);
+  const scale = Math.min((W - 2 * PAD) / Math.max(spanX, 1e-9),
+                         (H - 2 * PAD) / Math.max(spanY, 1e-9));
+  const offX = (W - spanX * scale) / 2, offY = (H - spanY * scale) / 2;
+  const X = lon => offX + (lon - minLon) * kx * scale;
+  const Y = lat => H - offY - (lat - minLat) * scale;
+
+  const days = [];
+  pts.forEach(p => { if (days.indexOf(p.day) < 0) days.push(p.day); });
+  days.sort((a, b) => a - b);
+  const color = d => DAY_COLORS[(days.indexOf(d) < 0 ? 0 : days.indexOf(d)) % DAY_COLORS.length];
+
+  let s = '<div class="card"><h2>路线图（离线绘制，不依赖地图瓦片）</h2>';
+  s += '<div class="legend">';
+  days.forEach(d => {
+    s += '<span><i style="background:' + color(d) + '"></i>第 ' + d + ' 天</span>';
+  });
+  s += '</div>';
+  s += '<svg viewBox="0 0 ' + W + ' ' + H + '">';
+
+  days.forEach(d => {
+    const one = pts.filter(p => p.day === d);
+    if (one.length > 1) {
+      s += '<polyline fill="none" stroke="' + color(d) + '" stroke-opacity="0.55" '
+         + 'stroke-width="2" stroke-dasharray="6 5" points="'
+         + one.map(p => X(p.lon).toFixed(1) + ',' + Y(p.lat).toFixed(1)).join(' ') + '"/>';
+    }
+  });
+
+  // 站名不重叠：先试圆点上方，被占了就翻到下方（校园里食堂/教学楼挨得很近，不处理会糊成一团）
+  const labels = [];
+  pts.forEach(p => {
+    const x = X(p.lon), y = Y(p.lat), c = color(p.day);
+    const half = Math.max(24, String(p.name).length * 6);
+    const box = yy => ({x1: x - half, x2: x + half, y1: yy - 11, y2: yy + 3});
+    let ly = y - 18;
+    if (labels.some(b => boxesHit(b, box(ly)))) ly = y + 26;
+    labels.push(box(ly));
+
+    s += '<g>';
+    s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="13" fill="' + c
+       + '" fill-opacity="0.18"/>';
+    s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="10" fill="' + c + '">'
+       + '<title>' + esc(p.name) + ' · 第 ' + p.day + ' 天 · ' + esc(p.arrive || '') + '</title></circle>';
+    s += '<text x="' + x.toFixed(1) + '" y="' + (y + 4).toFixed(1)
+       + '" fill="#fff" font-size="11" text-anchor="middle" pointer-events="none">' + p.seq + '</text>';
+    s += '<text x="' + x.toFixed(1) + '" y="' + ly.toFixed(1)
+       + '" fill="#1f2328" font-size="11" text-anchor="middle" stroke="#fbfcfe" '
+       + 'stroke-width="3" paint-order="stroke" pointer-events="none">'
+       + esc(p.name) + '</text>';
+    s += '</g>';
+  });
+
+  return s + '</svg><p class="muted" style="margin-top:8px">'
+       + '等距投影 + 按纬度余弦压缩经度、等比缩放，只表示相对位置与先后顺序，不能当导航用。'
+       + '悬停任意圆点可看站名与到达时刻。</p></div>';
+}
+
+/* ---------------------------------------------------------------- 算法对比 */
+
+async function compare(){
+  const payload = collect();
+  LAST = payload;
+  $('cmp').disabled = true;
+  $('tabs').hidden = false;
+  $('pane-compare').innerHTML = '<div class="card"><p class="muted">正在用同一份需求跑各算法…</p></div>';
+  showTab('compare');
+  let res;
+  try {
+    res = await api('/api/compare', payload);
+  } catch (e) {
+    $('pane-compare').innerHTML = '<div class="card"><div class="warn">请求失败：'
+      + esc(e.message || e) + '</div></div>';
+    $('cmp').disabled = false;
+    return;
+  }
+  $('cmp').disabled = false;
+  if (!res.ok) {
+    $('pane-compare').innerHTML = '<div class="card"><div class="warn">' + esc(res.error) + '</div></div>';
+    return;
+  }
+  CMP = res;
+  $('pane-compare').innerHTML = compareHtml(CMP);
+  if (!PLAN) $('summary').innerHTML = '<div class="card"><p class="muted">'
+    + '还没生成行程 —— 先看「算法对比」，再点「生成行程」看具体路线。</p></div>';
+}
+
+function compareHtml(cmp){
+  const rows = cmp.rows || [];
+  if (!rows.length) return '<div class="card"><p class="muted">没有可对比的算法。</p></div>';
+
+  let html = '<div class="card">';
+  html += '<p class="cmp-summary">★ ' + esc(cmp.summary)
+        + '（基线：' + esc(cmp.baseline || '无') + '）</p>';
+
+  html += '<table><thead><tr>'
+        + '<th>算法</th><th class="num">站点</th><th class="num">花费</th>'
+        + '<th class="num">在途(分)</th><th class="num">距离(km)</th>'
+        + '<th class="num">满意度</th><th class="num">预算</th><th class="num">时间</th>'
+        + '<th class="num">路程</th><th class="num">可行性</th><th class="num">总分</th>'
+        + '<th class="num">vs 基线</th></tr></thead><tbody>';
+
+  rows.forEach(r => {
+    const d = r.vs_baseline || {};
+    const delta = (d.overall_pct == null) ? '—'
+                : (d.overall_pct > 0 ? '+' : '') + d.overall_pct.toFixed(1) + '%';
+    html += '<tr' + (r.is_best ? ' class="best"' : '') + '>'
+         + '<td>' + (r.is_best ? '★ ' : '') + esc(r.strategy) + '</td>'
+         + '<td class="num">' + r.items + '</td>'
+         + '<td class="num">' + r.cost.toFixed(1) + '</td>'
+         + '<td class="num">' + r.travel_min.toFixed(0) + '</td>'
+         + '<td class="num">' + r.distance_km.toFixed(1) + '</td>'
+         + '<td class="num">' + r.satisfaction.toFixed(2) + '</td>'
+         + '<td class="num">' + r.cost_score.toFixed(2) + '</td>'
+         + '<td class="num">' + r.time_score.toFixed(2) + '</td>'
+         + '<td class="num">' + r.distance_score.toFixed(2) + '</td>'
+         + '<td class="num">' + r.feasibility.toFixed(2) + '</td>'
+         + '<td class="num"><b>' + r.overall.toFixed(4) + '</b></td>'
+         + '<td class="num">' + delta + '</td></tr>';
+  });
+  html += '</tbody></table>';
+
+  // 总分条形图：以最高分为满格，差异才看得见（都以 1.0 为满格时几乎是平条）
+  const maxOverall = Math.max.apply(null, rows.map(r => r.overall)) || 1;
+  html += '<div class="bars">';
+  rows.forEach(r => {
+    const w = Math.max(2, Math.round(r.overall / maxOverall * 100));
+    html += '<div class="bar-row"><span>' + (r.is_best ? '★ ' : '') + esc(r.strategy) + '</span>'
+         + '<div class="bar-track"><div class="bar-fill' + (r.is_best ? '' : ' dim')
+         + '" style="width:' + w + '%"></div></div>'
+         + '<span class="bar-val">' + r.overall.toFixed(4) + '</span></div>';
+  });
+  html += '</div>';
+
+  html += '<p class="muted" style="margin-top:10px">'
+        + '总分 = 四维加权 × 可行性，权重取自当前场景配置；'
+        + '「vs 基线」是相对「' + esc(cmp.baseline || '—') + '」的总分变化。</p>';
+  return html + '</div>';
+}
+
+/* ---------------------------------------------------------------- 导出 */
+
+async function download(fmt) {
+  if (!LAST) return;
+  const res = await api('/api/export', Object.assign({}, LAST, {fmt: fmt}));
+  if (!res.ok) { alert(res.error); return; }
+  const blob = new Blob([res.content], {type: 'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = res.filename;
+  a.click();
 }
 
 $('go').onclick = plan;
+$('cmp').onclick = compare;
 $('reload').onclick = async () => { await api('/api/reload', {}); alert('已清空数据缓存'); };
 boot();
 </script>
