@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from service import exporters
+from service.compare import DEFAULT_BASELINE, compare_plans
 from service.dto import to_api_dict, to_map_points
 from service.usecases import (
     build_request,
@@ -83,11 +84,9 @@ def post_plan(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     return _ok({"plan": to_api_dict(r), "map": to_map_points(r)})
 
 
-def _run_plan(body: dict[str, Any], scenario: str | None, strategy: str | None,
-              use_realtime: bool):
-    """统一的「造请求 → 造上下文 → 规划」。三个接口都要用，抽出来避免口径漂移。
+def _prepare(body: dict[str, Any], scenario: str | None, use_realtime: bool):
+    """「造请求 → 造上下文」。顺序很重要：**先有请求（知道去哪个城市、几天），才抓天气**。
 
-    顺序很重要：**先有请求（知道去哪个城市、几天），才抓天气**。
     反过来的话就成了"排完行程再问天气预报"，重排也就无从谈起。
     """
     if body.get("request"):
@@ -97,6 +96,13 @@ def _run_plan(body: dict[str, Any], scenario: str | None, strategy: str | None,
                             overrides=body.get("overrides") or {})
 
     ctx = plan_context_for(req, enabled=bool(use_realtime))
+    return req, ctx
+
+
+def _run_plan(body: dict[str, Any], scenario: str | None, strategy: str | None,
+              use_realtime: bool):
+    """统一的「造请求 → 造上下文 → 规划」。三个接口都要用，抽出来避免口径漂移。"""
+    req, ctx = _prepare(body, scenario, use_realtime)
     return plan_from_request(req, scenario=scenario, strategy=strategy, ctx=ctx)
 
 
@@ -114,6 +120,36 @@ def post_export(req: HttpRequest) -> tuple[int, dict[str, Any]]:
                 "content": exporters.export(r, fmt)})
 
 
+def post_compare(req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """同一份需求，多个算法各跑一遍 —— 网页「算法对比」页签用。
+
+    body 形如：
+        {"query": "去图书馆自习，别太赶",
+         "strategies": ["stub", "random"],      # 不传 = 全部已注册算法
+         "baseline": "random",                  # 不传 = 默认基线 random
+         "scenario": "daily", "realtime": false}
+
+    `realtime` 同样默认 false：对比要的是"算法之间的差异"，
+    天气每次都变的话，测出来的差异就不全是算法造成的了。
+    """
+    body = req.get("body") or {}
+    try:
+        req_obj, ctx = _prepare(body, body.get("scenario"), body.get("realtime", False))
+        result = compare_plans(
+            req_obj,
+            scenario=body.get("scenario"),
+            strategies=body.get("strategies"),
+            baseline=body.get("baseline") or DEFAULT_BASELINE,
+            ctx=ctx,
+        )
+    except KeyError as e:                       # 未知算法名
+        return _err(str(e).strip('"'), 400)
+    except Exception as e:                      # noqa: BLE001 - 接口层兜底
+        return _err("对比失败：%s" % e, 500)
+
+    return _ok(result)
+
+
 def post_reload(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
     """改了 CSV / registry 之后调用，清缓存。"""
     reload_data()
@@ -126,6 +162,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("GET", "/api/health", health),
     ("GET", "/api/options", get_options),
     ("POST", "/api/plan", post_plan),
+    ("POST", "/api/compare", post_compare),
     ("POST", "/api/export", post_export),
     ("POST", "/api/reload", post_reload),
 ]
