@@ -1,6 +1,5 @@
 # ===== 已在当前 .venv 中安装（无需再装）=====
 streamlit==1.66.1
-pandas==3.1.0
 numpy
 requests
 python-dotenv
@@ -10,11 +9,18 @@ pydeck
 uvicorn
 watchdog
 
+# ===== 2026-10-28 移除：pandas =====
+# 数据层已改成标准库 csv（见 data/loader.py 顶部的说明），展示层只用 list[dict]。
+# 移除原因：pandas 的 timezones.pyd 会被"应用程序控制策略"拦截（DLL load failed），
+# 在不受控的答辩机器上属于高危项。少一个重依赖 = 少一类现场事故。
+# 注：pandas 仍留在 .venv 里，Streamlit 自己可能用到；这里只是**不再由本项目代码依赖**。
+
 # ===== 标准库自带，无需安装 =====
 # tomllib     —— 读 TOML 配置（Python 3.11+）
 # dataclasses —— 接口契约数据结构
 # unittest    —— 单元测试
 # argparse    —— CLI 参数
+# csv         —— 数据层读 data/*.csv（2026-10-28 起，替代 pandas）
 
 # ===== 骨架阶段【故意不装】=====
 # pytest   —— 用标准库 unittest，PyCharm 右键即可跑；助教明确要求时再装

@@ -8,7 +8,9 @@
 ## 一、环境要求
 
 - Python **≥ 3.11**（用到标准库 `tomllib`）；本项目开发用 **3.14.6**
-- 依赖：`streamlit`、`pandas`、`requests`、`python-dotenv`（见 `requirements.txt`）
+- 依赖：`streamlit`、`requests`、`python-dotenv`（见 `requirements.txt`）
+- **引擎与数据层零第三方依赖**：只用标准库（`csv` / `tomllib` / `dataclasses` / `unittest`）。
+  2026-10-28 起移除了 pandas —— 数据层改标准库 `csv`，换机器不会因为 DLL 被策略拦截而跑不起来。
 
 ---
 

@@ -1,0 +1,27 @@
+# 城市注册表 —— 城市是"数据路由"，不是代码分支。
+#
+# 设计原则（务必遵守）：
+#   1. 新增一个城市 = 在 data/cities/<key>/ 放一份 pois.csv，然后在这里加一段 [cities.<key>]。
+#      **engine/ 与 ui/ 里不许出现任何城市名**，改城市相关的东西只动这里和 data/cities.py。
+#   2. poi / matrix 是相对 data/ 目录的路径。文件不存在时自动回退到场景配置里的默认数据。
+#   3. aliases 用于把用户输入（"大连市"、"dalian"、"我想去大连"）解析到 key。
+#
+# 坐标是城市中心点，用于：地图初始视野、bbox 过滤、未知城市时的兜底。
+
+default = "dalian"
+
+[cities.dalian]
+name = "大连"
+aliases = ["大连市", "dalian", "dl"]
+lat = 38.9140
+lon = 121.6147
+poi = "cities/dalian/pois.csv"
+matrix = "cities/dalian/travel_matrix.csv"
+
+[cities.beijing]
+name = "北京"
+aliases = ["北京市", "beijing", "bj", "peking"]
+lat = 39.9042
+lon = 116.4074
+poi = "cities/beijing/pois.csv"
+matrix = "cities/beijing/travel_matrix.csv"

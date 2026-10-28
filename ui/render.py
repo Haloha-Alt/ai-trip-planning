@@ -9,10 +9,13 @@ app.py 只管交互，所有"怎么画"都在这里。这样两人可以并行�
 
 from __future__ import annotations
 
-import pandas as pd
 import streamlit as st
 
 from engine.models import PlanResponse
+
+# 这里**刻意不用第三方表格库**：数据层已经是标准库 csv 了（见 data/loader.py 的说明），
+# 展示层跟着只传 list[dict]，Streamlit 的 dataframe / map 都能直接吃。
+# 少一个重依赖，就少一类"答辩机器上装不上"的现场事故。
 
 
 def render_metrics(resp: PlanResponse) -> None:
@@ -27,7 +30,7 @@ def render_metrics(resp: PlanResponse) -> None:
     c6.metric("总分", "%.4f" % m.overall())
 
 
-def _day_to_df(day) -> pd.DataFrame:
+def _day_to_rows(day) -> list[dict]:
     rows = []
     for it in day.items:
         t = it.transport
@@ -43,7 +46,7 @@ def _day_to_df(day) -> pd.DataFrame:
             "距离(km)": 0 if t.mode == "start" else round(t.distance_km, 2),
             "理由": it.reason,
         })
-    return pd.DataFrame(rows)
+    return rows
 
 
 def render_day(day) -> None:
@@ -56,13 +59,11 @@ def render_day(day) -> None:
         st.warning("这一天的行程是空的 —— 通常是时间窗太短，或候选被兴趣/排除条件过滤光了。")
         return
 
-    st.dataframe(_day_to_df(day), width="stretch", hide_index=True)
+    st.dataframe(_day_to_rows(day), width="stretch", hide_index=True)
 
     # 路线图：坐标来自 ItineraryItem，UI 不直连数据层
-    pts = pd.DataFrame(
-        [{"lat": it.lat, "lon": it.lon} for it in day.items if it.lat or it.lon]
-    )
-    if not pts.empty:
+    pts = [{"lat": it.lat, "lon": it.lon} for it in day.items if it.lat or it.lon]
+    if pts:
         st.map(pts, width="stretch")
 
 

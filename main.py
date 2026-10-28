@@ -46,6 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--scenario", default=None, help="场景名，可选：%s" % list_scenarios())
     p.add_argument("--strategy", default=None, help="算法名，可选：%s" % available())
+    p.add_argument("--city", default=None,
+                   help="城市（数据路由）。填 data/cities/registry.toml 里的 key 或别名；"
+                        "未注册的城市回退到默认数据")
     p.add_argument("--request", default=None, help="请求 JSON 文件路径，例如 mock/case_basic.json")
     p.add_argument("--query", default=None, help="自然语言需求（骨架阶段仅留痕，不解析）")
     p.add_argument("--days", type=int, default=None)
@@ -84,6 +87,7 @@ def make_request(args) -> PlanRequest:
         ("end_time", args.end_time),
         ("top_n", args.top_n),
         ("pace", args.pace),
+        ("city", args.city),
     ):
         if value is not None:
             setattr(req, field, value)
@@ -98,8 +102,9 @@ def make_request(args) -> PlanRequest:
 
 def print_response(resp) -> None:
     print("=" * 60)
-    print("场景 %s | 策略 %s | 生成于 %s"
-          % (resp.scenario, resp.strategy, resp.generated_at))
+    city = (resp.request.city or "").strip()
+    print("场景 %s | 策略 %s | 城市 %s | 生成于 %s"
+          % (resp.scenario, resp.strategy, city or "默认", resp.generated_at))
     print("=" * 60)
 
     for d in resp.days:

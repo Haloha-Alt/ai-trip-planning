@@ -103,7 +103,7 @@ class POI:
         elif isinstance(raw_days, str):   # CSV 里写作 "1|3"
             raw_days = [x.strip() for x in raw_days.replace("|", ",").split(",") if x.strip()]
         elif not isinstance(raw_days, (list, tuple, set)):
-            raw_days = [raw_days]         # pandas 把单值读成 1.0
+            raw_days = [raw_days]         # CSV 里只填了一个数字（如 "0"）
         d["closed_weekdays"] = [int(float(x)) for x in raw_days]
 
         # 契约只增字段：数据里多出来的列在旧代码里应当被忽略，而不是让整行报废。

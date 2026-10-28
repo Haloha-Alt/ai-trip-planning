@@ -49,7 +49,7 @@ def _candidate_pool(req: PlanRequest, cfg: ScenarioConfig) -> tuple[list[POI], s
     返回 (候选池, 展开后的兴趣标签集合)。
     一个都匹配不上时**放宽**到全部 POI —— 宁可给个不完美的结果，也不返回空行程。
     """
-    pois = load_pois(cfg)
+    pois = load_pois(cfg, req.city)       # city 是数据路由：不同城市读不同的 CSV
     wanted = expand_interests(req.interests, cfg)
     avoid = set(req.avoid or [])
 
@@ -73,7 +73,7 @@ def _apply_start(pool: list[POI], req: PlanRequest, cfg: ScenarioConfig) -> list
     for i, p in enumerate(pool):
         if p.poi_id == sid:
             return [p] + pool[:i] + pool[i + 1:]
-    for p in load_pois(cfg):
+    for p in load_pois(cfg, req.city):
         if p.poi_id == sid:
             return [p] + pool
     return pool
@@ -111,7 +111,7 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
         if prev is None:
             edge = Transport(mode="start", minutes=0.0, distance_km=0.0, cost=0.0)
         else:
-            edge = (get_matrix_edge(prev.poi_id, p.poi_id, cfg)
+            edge = (get_matrix_edge(prev.poi_id, p.poi_id, cfg, req.city)
                     or estimate_edge(prev, p, cfg))
 
         arrive = clock + int(round(edge.minutes))
