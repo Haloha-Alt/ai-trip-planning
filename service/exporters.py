@@ -127,7 +127,8 @@ def dumps_meta(resp: PlanResponse) -> str:
     """给日志/提示条用的一行摘要。"""
     return "场景 %s | 策略 %s | 站点 %d | 总分 %.4f" % (
         resp.scenario, resp.strategy,
-        sum(len(d.items) for d in resp.days), resp.metrics.overall(),
+        sum(len(d.items) for d in resp.days),
+        resp.metrics.overall(resp.meta.get("weights") or None),
     )
 
 

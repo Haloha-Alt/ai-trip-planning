@@ -76,7 +76,7 @@ def run(scenario: str | None, case_dir: Path) -> list[list]:
                 "%.2f" % m.time,
                 "%.2f" % m.distance,
                 "%.2f" % m.feasibility,
-                "%.4f" % m.overall(),
+                "%.4f" % m.overall(resp.meta.get("weights") or None),
                 len(resp.warnings),
             ])
     return rows

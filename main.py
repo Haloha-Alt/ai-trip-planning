@@ -131,7 +131,7 @@ def print_response(resp) -> None:
     m = resp.metrics
     print("\n[指标] 满意度 %.2f | 预算友好 %.2f | 时间利用 %.2f | 路程紧凑 %.2f | 可行性 %.2f"
           % (m.satisfaction, m.cost, m.time, m.distance, m.feasibility))
-    print("[总分] %.4f" % m.overall())
+    print("[总分] %.4f" % m.overall(resp.meta.get("weights") or None))
 
     if resp.warnings:
         print("\n[提示] 共 %d 条：" % len(resp.warnings))

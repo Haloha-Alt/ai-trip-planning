@@ -27,7 +27,7 @@ def render_metrics(resp: PlanResponse) -> None:
     c3.metric("时间利用", "%.2f" % m.time)
     c4.metric("路程紧凑", "%.2f" % m.distance)
     c5.metric("可行性", "%.2f" % m.feasibility)
-    c6.metric("总分", "%.4f" % m.overall())
+    c6.metric("总分", "%.4f" % m.overall(resp.meta.get("weights") or None))
 
 
 def _day_to_rows(day) -> list[dict]:
