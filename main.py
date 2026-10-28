@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.exporters import export                  # noqa: E402
+from app.usecases import save_plan                # noqa: E402
 from engine.config import list_scenarios, load_scenario  # noqa: E402
 from engine.models import PlanRequest             # noqa: E402
 from engine.planner import plan                   # noqa: E402
@@ -59,7 +61,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--interests", default=None, help="兴趣词，逗号分隔")
     p.add_argument("--avoid", default=None, help="排除词，逗号分隔")
     p.add_argument("--pace", default=None, choices=["relaxed", "normal", "packed"])
-    p.add_argument("--out", default=None, help="输出 JSON 路径，默认 outputs/plan_<场景>_<策略>.json")
+    p.add_argument("--export", dest="export_fmt", default="json",
+                   choices=["json", "md", "csv"], help="导出格式，默认 json")
+    p.add_argument("--out", default=None, help="输出路径，默认 outputs/plan_<场景>_<策略>.<格式>")
     return p
 
 
@@ -146,13 +150,9 @@ def main(argv=None) -> int:
 
     print_response(resp)
 
-    out = Path(args.out) if args.out else Path("outputs") / (
-        "plan_%s_%s.json" % (resp.scenario, resp.strategy))
-    if not out.is_absolute():
-        out = ROOT / out
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(resp.to_json(), encoding="utf-8")
-    print("\n已保存：%s" % out)
+    # 落盘统一走 app/usecases.save_plan —— 与网页、API 同一套文件名与导出逻辑
+    saved = save_plan(resp, args.out, args.export_fmt)
+    print("\n已保存（%s）：%s" % (args.export_fmt, saved))
     return 0
 
 

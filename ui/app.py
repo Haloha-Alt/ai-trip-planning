@@ -1,9 +1,9 @@
 # @author: 乙
 # @reviewer: 甲
 # @since: 2026-10-27
-"""Streamlit 页面骨架：输入 -> 解析 -> 规划 -> 展示。
+"""Streamlit 页面：输入 -> 解析 -> 规划 -> 展示。
 
-启动方式（项目根目录，**不要**对ui/app.py 点绿色三角）：
+启动方式（项目根目录，**不要**对 ui/app.py 点绿色三角）：
 
     .venv\\Scripts\\python.exe -m streamlit run ui/app.py
 
@@ -12,7 +12,11 @@
     Parameters  = run ui/app.py
     Working directory = 项目根目录
 
-本文件只管交互，"怎么画"都在 ui/render.py 里。
+本文件只管交互：
+- "怎么画" 在 ui/render.py
+- "怎么算" 在 app/usecases.py（与命令行、API 共用同一份）
+
+所以这里出现的每一个业务动作，都应该能在命令行里用一条命令复现。
 """
 
 from __future__ import annotations
@@ -26,21 +30,28 @@ if str(ROOT) not in sys.path:
 
 import streamlit as st  # noqa: E402
 
-from engine.config import list_scenarios, load_scenario  # noqa: E402
-from engine.planner import clear_caches, plan     # noqa: E402
-from engine.strategies import available           # noqa: E402
-from llm.parser import parse                      # noqa: E402
-from ui.render import render_plan                 # noqa: E402
+from app.exporters import export                 # noqa: E402
+from app.usecases import (                       # noqa: E402
+    city_options,
+    options,
+    plan_from_text,
+    reload_data,
+    scenario_config,
+)
+from ui.render import render_plan                # noqa: E402
 
 st.set_page_config(page_title="AI 出行与规划", page_icon="🧭", layout="wide")
 
 st.title("🧭 AI 出行与规划")
-st.caption("工程骨架 · 场景与数据均为占位，可整体替换")
+st.caption("多城市 · 可换算法 · 结果可导出")
 
 
 # ---------------------------------------------------------------- 侧边栏
 
 _TOUCH_PREFIX = "touched_"
+_INPUT_KEYS = ("in_start", "in_end", "in_budget", "in_top_n", "in_pace",
+               "in_strategy", "in_city")
+_TOUCH_KEYS = ("start", "end", "budget", "top_n", "pace", "city")
 
 
 def _mark_touched(name: str) -> None:
@@ -59,13 +70,14 @@ def _reset_inputs() -> None:
     Streamlit 的规则：一旦给控件加了 key，后续 rerun 里 value= 会被忽略。
     所以换场景时必须手动把 session_state 里的旧值清掉，否则会残留上一个场景的值。
     """
-    for k in ("in_start", "in_end", "in_budget", "in_top_n", "in_pace", "in_strategy"):
+    for k in _INPUT_KEYS:
         st.session_state.pop(k, None)
-    for k in ("start", "end", "budget", "top_n", "pace"):
+    for k in _TOUCH_KEYS:
         st.session_state.pop(_TOUCH_PREFIX + k, None)
 
 
 def sidebar_inputs(cfg):
+    """返回 (start, end, budget, top_n, pace)。默认全部"跟随需求文本"。"""
     st.header("参数")
     st.caption("默认全部「跟随需求文本」；你手动改过哪一项，才覆盖哪一项。")
     col1, col2 = st.columns(2)
@@ -89,22 +101,42 @@ def sidebar_inputs(cfg):
     return start, end, budget, top_n, pace
 
 
+def city_picker(cities: list[dict], default_key: str) -> str:
+    """城市下拉框。返回的是 registry 里的 key（不是中文名）。"""
+    keys = [c["key"] for c in cities]
+    label = {c["key"]: c["name"] for c in cities}
+    idx = keys.index(default_key) if default_key in keys else 0
+    key = st.selectbox(
+        "城市",
+        keys,
+        index=idx,
+        format_func=lambda k: "%s（%s）" % (label.get(k, k), k),
+        key="in_city",
+        on_change=_mark_touched,
+        args=("city",),
+        help="城市只是数据路由：换城市就读那份城市的 POI 表，引擎代码一行都不用改。",
+    )
+    return key
+
 
 with st.sidebar:
-    scenario = st.selectbox("场景", list_scenarios(), index=0,
+    opts = options()
+    scenario = st.selectbox("场景", opts["scenarios"], index=0,
                             key="in_scenario", on_change=_reset_inputs)
-    cfg = load_scenario(scenario)
+    cfg = scenario_config(scenario)
 
     # 默认算法取场景配置的 default_strategy（demo.toml 里是 stub），
     # 不能用 index=0 —— available() 是字母序，第一个是 random（故意做笨的对照组）。
-    _names = available()
+    _names = opts["strategies"]
     _default = cfg.default_strategy if cfg.default_strategy in _names else _names[0]
     strategy = st.selectbox("算法", _names, index=_names.index(_default), key="in_strategy")
 
+    city_key = city_picker(opts["cities"], opts["default_city"])
     start_time, end_time, budget, top_n, pace = sidebar_inputs(cfg)
+
     st.divider()
     if st.button("清空数据缓存（改了 CSV 后点）"):
-        clear_caches()
+        reload_data()
         st.success("已清空，下次规划会重读 CSV")
 
 
@@ -114,34 +146,46 @@ query = st.text_area(
     "说说你想怎么玩",
     value="想走走自然类的地方，预算 100 元，别太赶",
     height=90,
-    help="骨架阶段走规则解析：能识别时间、预算、天数、节奏，以及数据里出现过的标签词。",
+    help="当前走规则解析：能识别时间、预算、天数、节奏，以及数据里出现过的标签词。",
 )
 
 if st.button("生成行程", type="primary"):
-    req = parse(query, cfg)
-
-    # 只有「用户手动动过」的控件才覆盖解析结果。
+    # 只有"用户手动动过"的控件才进 overrides —— 没动过的保持解析结果。
     # 以前这里是无条件覆盖，导致文本框里写"预算 100 元"被默认值 0 抹成"不限制"。
+    overrides = {}
     if _touched("start") and start_time:
-        req.start_time = start_time
+        overrides["start_time"] = start_time
     if _touched("end") and end_time:
-        req.end_time = end_time
+        overrides["end_time"] = end_time
     if _touched("budget"):
-        req.daily_budget = None if not budget else float(budget)
+        overrides["daily_budget"] = budget
     if _touched("top_n"):
-        req.top_n = int(top_n)
+        overrides["top_n"] = int(top_n)
     if _touched("pace"):
-        req.pace = pace
-
-    with st.expander("解析出的请求（PlanRequest）"):
-        st.json(req.to_dict())
+        overrides["pace"] = pace
+    if _touched("city") and city_key:
+        overrides["city"] = city_key
 
     try:
-        resp = plan(req, scenario=scenario, strategy=strategy)
-    except KeyError as e:
+        resp = plan_from_text(query, scenario=scenario, strategy=strategy,
+                              cfg=cfg, overrides=overrides)
+    except KeyError as e:                          # 未知算法名，plan_from_request 抛的
         st.error(str(e).strip('"'))
         st.stop()
 
+    with st.expander("解析出的请求（PlanRequest）"):
+        st.json(resp.request.to_dict())
+
     render_plan(resp)
+
+    st.divider()
+    st.subheader("导出")
+    d1, d2, d3 = st.columns(3)
+    d1.download_button("下载 JSON", export(resp, "json"),
+                       file_name="plan.json", mime="application/json")
+    d2.download_button("下载 Markdown 行程单", export(resp, "md"),
+                       file_name="plan.md", mime="text/markdown")
+    d3.download_button("下载 CSV 明细", export(resp, "csv"),
+                       file_name="plan.csv", mime="text/csv")
 else:
-    st.info("填好需求后点「生成行程」。左侧可切换场景与算法。")
+    st.info("填好需求后点「生成行程」。左侧可切换城市、场景与算法。")
