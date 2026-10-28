@@ -244,12 +244,259 @@ def random_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
     return PlanResponse(request=req, days=_build_days(picked, req, cfg, wanted))
 
 
+# ---------------------------------------------------------------- 真算法：贪心
+#
+# 与 stub 的区别，一句话：**stub 只挑"最想去的"，贪心挑"此刻最划算的"**。
+# 后者每放一站都算一次"满意度涨多少 / 多花钱多跑路值不值"，所以不会像 stub 那样
+# 在预算 60 的场景里排出 70 块钱的行程（对比页上 stub 输给随机基线就是这个原因）。
+
+
+def _weights(cfg: ScenarioConfig, req: PlanRequest) -> dict[str, float]:
+    """贪心的目标函数权重 = **评分函数同一套权重**。
+
+    这是刻意的：如果"优化的"和"打分的"是两套口径，就会出现
+    "算法觉得自己更好了、分数却更低"的荒唐局面。
+    """
+    if req.profile and cfg.weight_presets.get(req.profile):
+        return cfg.weight_presets[req.profile]
+    return cfg.weights or {"satisfaction": 0.5, "cost": 0.2, "time": 0.2, "distance": 0.1}
+
+
+def _edge_between(prev: POI | None, p: POI, req: PlanRequest,
+                  cfg: ScenarioConfig) -> Transport:
+    """上一站到这一站怎么走。与 `_fill_day` 用的是同一套取边规则，否则贪心算的时间和真排出来会对不上。"""
+    if prev is None:
+        return Transport(mode="start", minutes=0.0, distance_km=0.0, cost=0.0)
+    return (get_matrix_edge(prev.poi_id, p.poi_id, cfg, req.city)
+            or estimate_edge(prev, p, cfg, mode=resolve_mode(cfg, req.mobility)))
+
+
+def _mandatory_head(req: PlanRequest, cfg: ScenarioConfig) -> list[POI]:
+    """起点 + 途经点：用户指定的硬顺序，必须先落位。
+
+    从**全量数据**里找，不受兴趣过滤影响 —— "路过取个快递"是硬要求，不是偏好。
+    """
+    allp = load_pois(cfg, req.city)
+    by_id = {p.poi_id: p for p in allp}
+    by_name = {p.name: p for p in allp}
+
+    head: list[POI] = []
+    seen: set[str] = set()
+
+    sid = (req.start_poi_id or "").strip()
+    if sid:
+        p = by_id.get(sid) or by_name.get(sid)
+        if p is not None:
+            head.append(p)
+            seen.add(p.poi_id)
+
+    for w in (req.waypoints or []):
+        key = str(w).strip()
+        if not key:
+            continue
+        p = by_id.get(key) or by_name.get(key)
+        if p is not None and p.poi_id not in seen:
+            head.append(p)
+            seen.add(p.poi_id)
+    return head
+
+
+def _utility(p: POI, e: Transport, wanted: set[str], w: dict[str, float],
+             day_len: int, budget: float | None, spent: float) -> float:
+    """这一步的"净收益"：满意度与停留时间算正，花钱与跑路算负。
+
+    三项都归一到 0~1 再加权，所以量纲不会互相欺负。
+    距离不单独扣分：它已经通过"在途时间"进了目标，再扣一次等于重复惩罚。
+    """
+    sat = _match_score(p, wanted)
+    cost_ratio = 0.0
+    if budget:
+        cost_ratio = min(1.0, (p.cost + e.cost) / max(budget - spent, 1e-6))
+    return (w.get("satisfaction", 0.5) * sat
+            + w.get("time", 0.2) * (p.stay_min / day_len)
+            - w.get("cost", 0.2) * cost_ratio
+            - w.get("time", 0.2) * (e.minutes / day_len))
+
+
+def _fits(clock: int, p: POI, e: Transport, limit: int, spent: float,
+          budget: float | None) -> bool:
+    """硬约束：装得进时间窗、不超预算。贪心只在可行解里挑，不靠事后补救。"""
+    if clock + int(round(e.minutes)) + p.stay_min > limit:
+        return False
+    if budget is not None and spent + p.cost + e.cost > budget + 1e-9:
+        return False
+    return True
+
+
+def _greedy_one_day(req: PlanRequest, cfg: ScenarioConfig, wanted: set[str],
+                    remaining: list[POI], forced: list[POI], per_day: int,
+                    day_len: int, budget: float | None) -> list[POI]:
+    """排一天：先把硬顺序（起点/途经点）落位，再逐站挑净收益最高的。
+
+    `budget` 传 None = 今天不看预算（降级用）。
+    """
+    w = _weights(cfg, req)
+    clock = to_minutes(req.start_time or cfg.day_start)
+    limit = to_minutes(req.end_time or cfg.day_end)
+    spent = 0.0
+    prev: POI | None = None
+    picked: list[POI] = []
+    queue = list(forced)
+
+    while True:
+        if queue:
+            p = queue.pop(0)
+            e = _edge_between(prev, p, req, cfg)
+            if _fits(clock, p, e, limit, spent, budget):
+                picked.append(p)
+                clock += int(round(e.minutes)) + p.stay_min
+                spent += p.cost + e.cost
+                prev = p
+            # 装不下就跳过：不静默塞进去，也不在这里编 warning（交给约束层统一报）
+            continue
+
+        if len(picked) >= per_day or not remaining:
+            break
+
+        best: POI | None = None
+        best_u = 0.0
+        for p in remaining:
+            e = _edge_between(prev, p, req, cfg)
+            if not _fits(clock, p, e, limit, spent, budget):
+                continue
+            u = _utility(p, e, wanted, w, day_len, budget, spent)
+            if best is None or u > best_u:
+                best, best_u = p, u
+
+        if best is None:                            # 剩下的都装不下，今天到此为止
+            break
+
+        e = _edge_between(prev, best, req, cfg)
+        picked.append(best)
+        remaining.remove(best)
+        clock += int(round(e.minutes)) + best.stay_min
+        spent += best.cost + e.cost
+        prev = best
+
+    return picked
+
+
+def _greedy_days(req: PlanRequest, cfg: ScenarioConfig, wanted: set[str],
+                 pool: list[POI], head: list[POI]) -> list[list[POI]]:
+    """逐天贪心：每一步在"装得下"的候选里挑净收益最高的那个。
+
+    **降级**：预算卡得太死时（比如预算 5 元，候选全都要钱），硬约束过滤会筛出空行程。
+    空行程是最差的结果 —— 用户宁可看到"这一站略超预算，已提示"，
+    也不要看到"今天没地方去"。所以此时放开预算重排一次，超支由约束层如时报出。
+    """
+    day_len = max(1, to_minutes(req.end_time or cfg.day_end)
+                  - to_minutes(req.start_time or cfg.day_start))
+    per_day = _per_day_top_n(req, cfg)
+    budget = req.daily_budget if (req.daily_budget or 0) > 0 else None
+    n_days = max(1, int(req.days or 1))
+
+    head_ids = {p.poi_id for p in head}
+    remaining = [p for p in pool if p.poi_id not in head_ids]
+
+    days: list[list[POI]] = []
+    for di in range(n_days):
+        forced = list(head) if di == 0 else []      # 硬顺序只在第一天消耗
+        picked = _greedy_one_day(req, cfg, wanted, list(remaining), forced,
+                                 per_day, day_len, budget)
+
+        if not picked and budget is not None:
+            picked = _greedy_one_day(req, cfg, wanted, list(remaining), list(forced),
+                                     per_day, day_len, None)
+
+        for p in picked:                            # 不被跨天重复选中
+            if p in remaining:
+                remaining.remove(p)
+        days.append(picked)
+    return days
+
+
+def _fill_all(days: list[list[POI]], req: PlanRequest, cfg: ScenarioConfig,
+              wanted: set[str]) -> list[DayPlan]:
+    """把选好的点交给与其它策略共用的铺时间轴逻辑，保证统计口径一致。"""
+    return [_fill_day(picked, req, cfg, wanted, day_index=i + 1)
+            for i, picked in enumerate(days)]
+
+
+def greedy_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
+    """贪心：每小时刻都挑"净收益最高且装得下"的一站。
+
+    相比 stub 多了三件事：
+    1. **预算硬约束** —— 超预算的候选直接不入选，不会排完再报 BUDGET_OVER；
+    2. **在途惩罚** —— 同样的满意度，近的优先，避免为了一个点横穿校区；
+    3. **目标函数与评分同源** —— 优化什么就是评什么，权重取自场景配置。
+    """
+    pool, wanted = _candidate_pool(req, cfg)
+    pool.sort(key=lambda p: (-_match_score(p, wanted), p.poi_id))   # 同分时让结果稳定
+    head = _mandatory_head(req, cfg)
+    return PlanResponse(request=req, days=_fill_all(
+        _greedy_days(req, cfg, wanted, pool, head), req, cfg, wanted))
+
+
+# ---------------------------------------------------------------- 真算法：2-opt
+#
+# 贪心负责"选哪些点"，2-opt 负责"按什么顺序走"。
+# 选点错了只能整段重来，顺序错了翻一段就行 —— 所以两个问题分开治。
+
+
+def _path_minutes(path: list[POI], req: PlanRequest, cfg: ScenarioConfig) -> float:
+    """一条访问序列的总在途分钟数（不含停留）。"""
+    total = 0.0
+    prev: POI | None = None
+    for p in path:
+        total += _edge_between(prev, p, req, cfg).minutes
+        prev = p
+    return total
+
+
+def _two_opt(path: list[POI], req: PlanRequest, cfg: ScenarioConfig) -> list[POI]:
+    """经典 2-opt：反复翻转一段子路径，直到没有改进为止。
+
+    `max_rounds` 是安全阀 —— 局部搜索必须有明确上界，否则答辩现场卡住就难看了。
+    """
+    best = list(path)
+    if len(best) < 4:
+        return best
+    best_cost = _path_minutes(best, req, cfg)
+    max_rounds = 20
+    for _ in range(max_rounds):
+        improved = False
+        for i in range(len(best) - 2):
+            for j in range(i + 2, len(best)):
+                cand = best[:i + 1] + list(reversed(best[i + 1:j + 1])) + best[j + 1:]
+                c = _path_minutes(cand, req, cfg)
+                if c + 1e-9 < best_cost:
+                    best, best_cost, improved = cand, c, True
+        if not improved:
+            break
+    return best
+
+
+def two_opt_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
+    """贪心选点 + 2-opt 改序：通常比纯贪心少跑一点路，代价是慢几毫秒。"""
+    pool, wanted = _candidate_pool(req, cfg)
+    pool.sort(key=lambda p: (-_match_score(p, wanted), p.poi_id))
+    head = _mandatory_head(req, cfg)
+    days = _greedy_days(req, cfg, wanted, pool, head)
+    if head:                                  # 第一天的硬顺序前缀不能被翻乱
+        keep = min(len(head), len(days[0]))
+        days = [days[0][:keep] + _two_opt(days[0][keep:], req, cfg)] + days[1:]
+    else:
+        days = [_two_opt(d, req, cfg) for d in days]
+    return PlanResponse(request=req, days=_fill_all(days, req, cfg, wanted))
+
+
 # ---------------------------------------------------------------- 注册表
 
 STRATEGIES: dict[str, PlannerFn] = {
     "stub": stub_plan,
     "random": random_plan,
-    # 将来追加： "greedy": greedy_plan,  "dp": dp_plan,  "ilp": ilp_plan,
+    "greedy": greedy_plan,
+    "two_opt": two_opt_plan,
 }
 
 

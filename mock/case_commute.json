@@ -1,0 +1,15 @@
+{
+  "request": {
+    "city": "dalian",
+    "days": 1,
+    "start_time": "07:30",
+    "end_time": "12:00",
+    "daily_budget": 20,
+    "interests": ["上课", "自习"],
+    "avoid": [],
+    "pace": "normal",
+    "start_poi_id": null,
+    "top_n": 3,
+    "raw_query": "上午两节课，中间想找个地方自习，预算 20"
+  }
+}

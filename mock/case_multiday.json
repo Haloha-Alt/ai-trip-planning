@@ -1,0 +1,15 @@
+{
+  "request": {
+    "city": "dalian",
+    "days": 2,
+    "start_time": "08:00",
+    "end_time": "20:00",
+    "daily_budget": 40,
+    "interests": ["图书馆", "吃饭", "运动"],
+    "avoid": [],
+    "pace": "normal",
+    "start_poi_id": null,
+    "top_n": 4,
+    "raw_query": "周末两天：自习、吃饭、打球，每天 40 块"
+  }
+}
