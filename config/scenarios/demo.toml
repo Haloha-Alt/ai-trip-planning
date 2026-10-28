@@ -22,6 +22,11 @@ max_poi_per_day = 5
 # ---- 默认节奏：relaxed | normal | packed ----
 default_pace = "normal"
 
+# ---- 默认算法策略（可选值见 engine/strategies.py 的 STRATEGIES）----
+# ⚠️ 必须写在任何 [table] 之前：TOML 里表头之后的裸键会被归进那张表，
+#    写成 [data_files] 之后再写它，engine/config.py 永远读不到（曾经踩过）。
+default_strategy = "stub"
+
 # ---- 节奏 -> 每天站数系数（业务数值只准写在这里，代码里不出现）----
 [pace_factor]
 relaxed = 0.7
@@ -62,10 +67,7 @@ distance = 0.1
 # "自然" = ["公园", "山"]
 # "美食" = ["餐饮"]
 
-# ---- 默认算法策略（可选值见 engine/strategies.py 的 STRATEGIES）----
-# ⚠️ 必须写在任何 [table] 之前：TOML 里表头之后的裸键会被归进那张表，
-#    写成 [data_files] 之后再写它，engine/config.py 永远读不到（曾经踩过）。
-default_strategy = "stub"
+# ---- 默认算法策略已上移到文件头部（表头之前），此处不再重复 ----
 
 # ---- 数据文件（相对 data/ 目录）----
 [data_files]

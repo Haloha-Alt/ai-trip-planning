@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from engine.models import DayPlan, PlanResponse
+from engine.models import CONTRACT_VERSION, DayPlan, PlanResponse
 
 
 def item_to_api(it) -> dict[str, Any]:
@@ -70,6 +70,7 @@ def to_api_dict(resp: PlanResponse) -> dict[str, Any]:
     """
     m = resp.metrics
     return {
+        "contract": CONTRACT_VERSION,
         "strategy": resp.strategy,
         "scenario": resp.scenario,
         "generated_at": resp.generated_at,
@@ -83,7 +84,9 @@ def to_api_dict(resp: PlanResponse) -> dict[str, Any]:
             "time": m.time,
             "distance": m.distance,
             "feasibility": m.feasibility,
-            "overall": m.overall(),
+            # 总分必须用**本次生效的场景权重**（引擎写在 meta["weights"] 里），
+            # 否则换个场景后，页面上的总分和评测表里的总分就对不上了。
+            "overall": m.overall(resp.meta.get("weights") or None),
         },
         "meta": dict(resp.meta),
         "realtime": dict(resp.realtime),

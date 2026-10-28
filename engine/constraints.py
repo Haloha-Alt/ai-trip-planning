@@ -223,8 +223,12 @@ def score(resp: PlanResponse, cfg: ScenarioConfig) -> PlanMetrics:
     # --- cost ---
     total_cost = sum(d.total_cost for d in resp.days)
     budget = resp.request.daily_budget if resp.request.daily_budget is not None else cfg.daily_budget
+    n_days = max(1, len(resp.days))
     if budget and budget > 0:
-        cost = _clamp01(1.0 - total_cost / budget)
+        # 预算是**每天**的（与 validate_day 口径一致），所以先折成日均再比。
+        # 不折的话，两天的行程花掉 2 倍日均预算就会被判 0 分 ——
+        # 明明每天都合规，分数却像严重超支，多天场景会整片失真。
+        cost = _clamp01(1.0 - (total_cost / n_days) / budget)
     else:
         cost = _clamp01(1.0 - (total_cost / len(items)) / max_cost)
 

@@ -56,7 +56,8 @@ def to_markdown(resp: PlanResponse) -> str:
     out.append("- 生成时间：%s" % resp.generated_at)
     out.append("- 总分：**%.4f**（满意度 %.2f ｜ 预算友好 %.2f ｜ 时间利用 %.2f "
                "｜ 路程紧凑 %.2f ｜ 可行性 %.2f）"
-               % (m.overall(), m.satisfaction, m.cost, m.time, m.distance, m.feasibility))
+               % (m.overall(resp.meta.get("weights") or None),
+                  m.satisfaction, m.cost, m.time, m.distance, m.feasibility))
     out.append("")
 
     for d in resp.days:
