@@ -79,6 +79,23 @@ class TestDispatch(unittest.TestCase):
     def test_routes_declared(self):
         self.assertGreaterEqual(len(ROUTES), 5)
 
+    def test_realtime_off_by_default(self):
+        """接口默认不联网 —— 保证脚本与测试行为确定、可复现。"""
+        status, body = dispatch("POST", "/api/plan", {}, {
+            "query": "想看海", "overrides": {"city": "dalian", "top_n": 2},
+        })
+        self.assertEqual(status, 200)
+        self.assertEqual(body["plan"]["realtime"], {})
+
+    def test_realtime_on_degrades_gracefully(self):
+        """显式开实时也不许因为网络问题失败（抓不到就是空快照，不是报错）。"""
+        status, body = dispatch("POST", "/api/plan", {}, {
+            "query": "想看海", "realtime": True,
+            "overrides": {"city": "dalian", "top_n": 2},
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"])
+
 
 class TestAppObject(unittest.TestCase):
     def test_build_app_returns_callable(self):

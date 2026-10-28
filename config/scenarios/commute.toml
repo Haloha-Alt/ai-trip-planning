@@ -1,0 +1,73 @@
+# 场景：commute —— 赶课（早高峰一段路，重点是"几点前必须到"）
+#
+# 到达截止不写在场景里：它是请求字段 PlanRequest.deadline（如 "08:00"），
+# 途经点写在 PlanRequest.waypoints（如 ["菜鸟驿站(西山)"]），
+# 因为"今天几点到哪"是每天都不一样的东西，不该固化进场景。
+
+name = "commute"
+default_strategy = "stub"
+
+day_start = "07:00"
+day_end = "09:30"          # 只覆盖早间时段
+daily_budget = 15.0        # 早饭 + 打印，够用即可
+days = 1
+max_poi_per_day = 3
+default_pace = "packed"
+
+[pace_factor]
+relaxed = 0.6
+normal = 1.0
+packed = 1.4
+
+[transport_speed_kmh]
+walk = 4.5
+bike = 12.0
+bus = 18.0
+metro = 30.0
+car = 35.0
+
+[transport_cost_per_km]
+walk = 0.0
+bike = 0.0
+bus = 2.0
+metro = 3.0
+car = 0.6
+
+default_mode = "walk"
+
+# 赶课场景最怕迟到：时间权重最高
+[weights]
+satisfaction = 0.30
+cost = 0.10
+time = 0.50
+distance = 0.10
+
+[weight_presets.save]
+satisfaction = 0.25
+cost = 0.55
+time = 0.15
+distance = 0.05
+
+[weight_presets.fast]
+satisfaction = 0.25
+cost = 0.05
+time = 0.60
+distance = 0.10
+
+[weight_presets.comfort]
+satisfaction = 0.35
+cost = 0.15
+time = 0.35
+distance = 0.15
+
+[interest_alias]
+"上课" = ["上课", "教室"]
+"教学楼" = ["上课", "教室"]
+"早饭" = ["早餐", "食堂"]
+"取快递" = ["快递"]
+"打印" = ["打印", "复印"]
+"室内" = ["室内"]
+
+[data_files]
+pois = "pois.csv"
+matrix = "travel_matrix.csv"

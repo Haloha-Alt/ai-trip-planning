@@ -16,7 +16,13 @@ from typing import Any, Callable
 
 from app import exporters
 from app.dto import to_api_dict, to_map_points
-from app.usecases import options, plan_from_request, plan_from_text, reload_data
+from app.usecases import (
+    build_request,
+    options,
+    plan_context_for,
+    plan_from_request,
+    reload_data,
+)
 from engine.models import PlanRequest
 
 HttpRequest = dict[str, Any]
@@ -55,22 +61,20 @@ def post_plan(req: HttpRequest) -> tuple[int, dict[str, Any]]:
 
     body 形如：
         {"query": "想看海，预算150", "scenario": "demo", "strategy": "stub",
+         "realtime": true,
          "overrides": {"city": "dalian", "top_n": 3}}
 
     也可以直接给结构化请求：
         {"request": {...PlanRequest...}, "scenario": "demo", "strategy": "stub"}
+
+    `realtime` 默认 **false**：接口默认行为必须确定、可复现（也方便测试）。
+    前端会显式传 `true`，因为网页上"看一眼真实天气"才是卖点。
+    抓不到就降级成"没有实时数据"，绝不会因此报错。
     """
     body = req.get("body") or {}
-    scenario = body.get("scenario") or None
-    strategy = body.get("strategy") or None
-
     try:
-        if body.get("request"):
-            r = plan_from_request(PlanRequest.from_dict(body["request"]),
-                                  scenario=scenario, strategy=strategy)
-        else:
-            r = plan_from_text(body.get("query", ""), scenario=scenario,
-                               strategy=strategy, overrides=body.get("overrides") or {})
+        r = _run_plan(body, body.get("scenario"), body.get("strategy"),
+                      body.get("realtime", False))
     except KeyError as e:                       # 未知算法名
         return _err(str(e).strip('"'), 400)
     except Exception as e:                      # noqa: BLE001 - 接口层兜底，不能让 500 裸奔
@@ -79,19 +83,30 @@ def post_plan(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     return _ok({"plan": to_api_dict(r), "map": to_map_points(r)})
 
 
+def _run_plan(body: dict[str, Any], scenario: str | None, strategy: str | None,
+              use_realtime: bool):
+    """统一的「造请求 → 造上下文 → 规划」。三个接口都要用，抽出来避免口径漂移。
+
+    顺序很重要：**先有请求（知道去哪个城市、几天），才抓天气**。
+    反过来的话就成了"排完行程再问天气预报"，重排也就无从谈起。
+    """
+    if body.get("request"):
+        req = PlanRequest.from_dict(body["request"])
+    else:
+        req = build_request(text=body.get("query", ""), scenario=scenario,
+                            overrides=body.get("overrides") or {})
+
+    ctx = plan_context_for(req, enabled=bool(use_realtime))
+    return plan_from_request(req, scenario=scenario, strategy=strategy, ctx=ctx)
+
+
 def post_export(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     """把行程导出成 json / md / csv，直接返回文本，前端拿去下载。"""
     body = req.get("body") or {}
     fmt = (body.get("fmt") or "json").lower()
     try:
-        if body.get("request"):
-            r = plan_from_request(PlanRequest.from_dict(body["request"]),
-                                  scenario=body.get("scenario"),
-                                  strategy=body.get("strategy"))
-        else:
-            r = plan_from_text(body.get("query", ""), scenario=body.get("scenario"),
-                               strategy=body.get("strategy"),
-                               overrides=body.get("overrides") or {})
+        r = _run_plan(body, body.get("scenario"), body.get("strategy"),
+                      body.get("realtime", False))
     except Exception as e:                      # noqa: BLE001
         return _err("导出失败：%s" % e, 400)
 

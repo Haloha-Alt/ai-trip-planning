@@ -1,0 +1,76 @@
+# 场景：errand —— 办事链（取快递 → 打印 → 吃饭，顺序不能乱）
+#
+# 顺序由请求字段 PlanRequest.waypoints 表达，例如：
+#   waypoints = ["菜鸟驿站(西山)", "文印中心", "第二食堂"]
+# 场景只负责把时间窗与预算调到"办事模式"。
+
+name = "errand"
+default_strategy = "stub"
+
+day_start = "13:00"
+day_end = "19:00"
+daily_budget = 30.0
+days = 1
+max_poi_per_day = 6
+default_pace = "normal"
+
+[pace_factor]
+relaxed = 0.6
+normal = 1.0
+packed = 1.4
+
+[transport_speed_kmh]
+walk = 4.5
+bike = 12.0
+bus = 18.0
+metro = 30.0
+car = 35.0
+
+[transport_cost_per_km]
+walk = 0.0
+bike = 0.0
+bus = 2.0
+metro = 3.0
+car = 0.6
+
+default_mode = "walk"
+
+# 办事讲究别绕路：路程紧凑度权重提高
+[weights]
+satisfaction = 0.30
+cost = 0.20
+time = 0.25
+distance = 0.25
+
+[weight_presets.save]
+satisfaction = 0.25
+cost = 0.50
+time = 0.15
+distance = 0.10
+
+[weight_presets.fast]
+satisfaction = 0.25
+cost = 0.10
+time = 0.45
+distance = 0.20
+
+[weight_presets.comfort]
+satisfaction = 0.35
+cost = 0.20
+time = 0.25
+distance = 0.20
+
+[interest_alias]
+"取快递" = ["快递"]
+"快递" = ["快递"]
+"打印" = ["打印", "复印"]
+"吃饭" = ["食堂", "餐饮"]
+"超市" = ["超市", "购物"]
+"买东西" = ["超市", "购物", "便利店"]
+"理发" = ["理发", "生活服务"]
+"洗衣" = ["洗衣", "生活服务"]
+"室内" = ["室内"]
+
+[data_files]
+pois = "pois.csv"
+matrix = "travel_matrix.csv"

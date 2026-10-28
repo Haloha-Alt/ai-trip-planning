@@ -66,6 +66,22 @@ def plan(req: PlanRequest,
     if weights:
         resp.meta["weights"] = dict(weights)
 
+    # 待确认清单：数据里没填"来源适用日期"的点，明确列出来 —— 任务要求"区分核实与待确认"，
+    # 与其在报告里说"数据可能有误"，不如让应用自己说出来。
+    pending: list[str] = []
+    try:
+        from data.loader import get_poi
+
+        for d in resp.days:
+            for it in d.items:
+                p = get_poi(it.poi_id, cfg, req.city)
+                if p is not None and not (p.source_date or "").strip():
+                    pending.append("%s（%s，%s）" % (p.name, p.category or "未分类", p.cost_unit))
+    except Exception:                       # 数据层异常不能连累主结果
+        pending = []
+    if pending:
+        resp.meta["pending"] = sorted(set(pending))
+
     # 实时数据：只在这里统一生效一次，策略内部一律不碰它
     if ctx is not None and getattr(ctx, "snapshot", None) is not None:
         try:

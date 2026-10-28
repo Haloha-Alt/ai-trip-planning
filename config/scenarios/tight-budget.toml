@@ -1,0 +1,72 @@
+# 场景：tight-budget —— 预算紧（一天只给 20 元）
+#
+# 这个场景本身就是"可判定的冲突"演示素材：
+# 若用户偏好的点人均消费超过预算，应用必须指出具体金额，而不是笼统说"排不下"。
+
+name = "tight-budget"
+default_strategy = "stub"
+
+day_start = "08:00"
+day_end = "20:00"
+daily_budget = 20.0
+days = 1
+max_poi_per_day = 4
+default_pace = "relaxed"
+
+[pace_factor]
+relaxed = 0.6
+normal = 1.0
+packed = 1.4
+
+[transport_speed_kmh]
+walk = 4.5
+bike = 12.0
+bus = 18.0
+metro = 30.0
+car = 35.0
+
+[transport_cost_per_km]
+walk = 0.0
+bike = 0.0
+bus = 2.0
+metro = 3.0
+car = 0.6
+
+default_mode = "walk"
+
+# 省钱优先：成本权重最高
+[weights]
+satisfaction = 0.25
+cost = 0.50
+time = 0.15
+distance = 0.10
+
+[weight_presets.save]
+satisfaction = 0.20
+cost = 0.65
+time = 0.10
+distance = 0.05
+
+[weight_presets.fast]
+satisfaction = 0.25
+cost = 0.35
+time = 0.30
+distance = 0.10
+
+[weight_presets.comfort]
+satisfaction = 0.35
+cost = 0.35
+time = 0.15
+distance = 0.15
+
+[interest_alias]
+"自习" = ["自习", "图书馆"]
+"上课" = ["上课", "教室"]
+"吃饭" = ["食堂", "餐饮"]
+"早饭" = ["早餐", "食堂"]
+"运动" = ["运动", "跑步", "篮球"]
+"免费" = ["免费"]
+
+[data_files]
+pois = "pois.csv"
+matrix = "travel_matrix.csv"

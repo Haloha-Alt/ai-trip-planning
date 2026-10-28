@@ -95,6 +95,10 @@ class POI:
     url: str = ""                         # 详情链接，前端可点
     closed_weekdays: list[int] = field(default_factory=list)   # 每周固定闭馆日，0=周一 … 6=周日
 
+    # ---- v1.4 追加 ----
+    cost_unit: str = "per_person"         # 计价单位：per_person 人均 | per_trip 单次 | per_night 每晚
+    source_date: str = ""                 # 来源适用/核对日期 "YYYY-MM-DD"；空 = 尚未核实（进待确认清单）
+
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "POI":
         d = dict(d or {})

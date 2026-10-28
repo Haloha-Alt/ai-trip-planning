@@ -1,0 +1,97 @@
+# 场景：daily —— 日常出行基座场景（学生的一天：上课、自习、吃饭、办事）
+#
+# 这是"日常出行"的主场景。业务数值只准写在这里，Python 代码里不出现。
+# 想看某一类情形怎么配，见 commute / errand / rainy / tight-budget 四个文件。
+
+name = "daily"
+
+# 默认算法策略（可选值见 engine/strategies.py 的 STRATEGIES）
+# ⚠️ 必须写在任何 [table] 之前，否则会被 TOML 归进上面的表
+default_strategy = "stub"
+
+# ---- 时间窗：一天从早到晚，不是"旅游一天" ----
+day_start = "07:00"
+day_end = "22:00"
+
+# ---- 预算：填 0 = 不限制；这里按学生一天的常规开销 ----
+daily_budget = 60.0
+
+# ---- 行程规模 ----
+days = 1
+max_poi_per_day = 8
+default_pace = "normal"
+
+# ---- 节奏 -> 每天站数系数 ----
+[pace_factor]
+relaxed = 0.6
+normal = 1.0
+packed = 1.4
+
+# ---- 交通方式：速度（km/h）----
+[transport_speed_kmh]
+walk = 4.5
+bike = 12.0
+bus = 18.0
+metro = 30.0
+car = 35.0
+
+# ---- 交通方式：每公里费用 ----
+[transport_cost_per_km]
+walk = 0.0
+bike = 0.0
+bus = 2.0
+metro = 3.0
+car = 0.6
+
+# ---- 距离矩阵缺项时的估算方式 ----
+default_mode = "walk"
+
+# ---- 默认权重（各档位都没选时用它）----
+[weights]
+satisfaction = 0.45
+cost = 0.25
+time = 0.20
+distance = 0.10
+
+# ---- 三档权重：由 PlanRequest.profile 选（save / fast / comfort）----
+[weight_presets.save]
+satisfaction = 0.30
+cost = 0.50
+time = 0.15
+distance = 0.05
+
+[weight_presets.fast]
+satisfaction = 0.30
+cost = 0.15
+time = 0.45
+distance = 0.10
+
+[weight_presets.comfort]
+satisfaction = 0.45
+cost = 0.20
+time = 0.20
+distance = 0.15
+
+# ---- 兴趣词 -> POI 标签（左边是用户口语，右边必须是 tags 列里真实出现的词）----
+[interest_alias]
+"上课" = ["上课", "教室"]
+"教学楼" = ["上课", "教室"]
+"自习" = ["自习", "图书馆"]
+"图书馆" = ["图书馆", "自习"]
+"吃饭" = ["食堂", "餐饮"]
+"早饭" = ["早餐", "食堂"]
+"午饭" = ["食堂", "餐饮"]
+"取快递" = ["快递"]
+"快递" = ["快递"]
+"打印" = ["打印", "复印"]
+"超市" = ["超市", "购物"]
+"买东西" = ["超市", "购物", "便利店"]
+"运动" = ["运动", "跑步", "篮球"]
+"看病" = ["医疗", "药店"]
+"室内" = ["室内"]
+"户外" = ["户外"]
+
+# ---- 数据文件（相对 data/ 目录）----
+[data_files]
+pois = "pois.csv"
+matrix = "travel_matrix.csv"

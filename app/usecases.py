@@ -103,30 +103,90 @@ def apply_overrides(req: PlanRequest, overrides: dict[str, Any] | None) -> PlanR
     return req
 
 
-def plan_from_request(req: PlanRequest,
-                      scenario: str | None = None,
-                      strategy: str | None = None) -> PlanResponse:
-    """结构化请求 → 行程。未知算法名会抛 KeyError，由调用方转成友好提示。"""
-    return plan(req, scenario=scenario, strategy=strategy)
+def build_request(text: str = "",
+                  cfg: ScenarioConfig | None = None,
+                  scenario: str | None = None,
+                  overrides: dict[str, Any] | None = None) -> PlanRequest:
+    """文本 + 控件值 → 一个确定可用的 PlanRequest（不规划，只解析）。
 
-
-def plan_from_text(text: str,
-                   scenario: str | None = None,
-                   strategy: str | None = None,
-                   cfg: ScenarioConfig | None = None,
-                   overrides: dict[str, Any] | None = None) -> PlanResponse:
-    """一句自然语言 → 行程。
-
-    解析走 `llm/parser.parse`（当前是规则解析，步 4 会接大模型）；
-    之后用 overrides 覆盖"用户手动设过"的那些值。
+    单独抽出来是因为**实时数据要用它**：抓天气得先知道去哪个城市、几天。
+    如果先规划再抓天气，就等于"排完了才问天气预报"，顺序反了。
     """
     from llm.parser import parse
 
     cfg = cfg or load_scenario(scenario)
     req = parse(text or "", cfg)
     req.raw_query = text or req.raw_query
-    apply_overrides(req, overrides)
-    return plan_from_request(req, scenario=scenario, strategy=strategy)
+    return apply_overrides(req, overrides)
+
+
+def plan_context_for(req: PlanRequest,
+                     enabled: bool = True,
+                     timeout: float = 6.0):
+    """按请求去抓一份实时快照，包成 PlanContext。
+
+    **任何失败都只是"没有实时数据"**，不会让规划失败：
+    没开 / 城市没坐标 / 断网 —— 一律返回不含快照的 PlanContext，
+    引擎行为退回完全离线的老路径。
+    """
+    from engine.context import PlanContext
+
+    if not enabled:
+        return PlanContext(snapshot=None)
+
+    try:
+        from data.cities import city_info
+        from data.loader import load_pois
+        from engine.realtime import fetch_snapshot
+
+        info = city_info(req.city)
+        if info is None or not info.lat or not info.lon:
+            return PlanContext(snapshot=None)
+
+        start = None
+        if req.date:
+            from datetime import date
+
+            try:
+                start = date.fromisoformat(req.date)
+            except (ValueError, TypeError):
+                start = None
+
+        cfg = load_scenario()
+        snap = fetch_snapshot(
+            city=info.key, lat=info.lat, lon=info.lon,
+            days=max(1, int(req.days or 1)), start=start,
+            pois=load_pois(cfg, info.key), timeout=timeout,
+        )
+        return PlanContext(snapshot=snap)
+    except Exception:                                  # noqa: BLE001 - 实时数据永远可选
+        return PlanContext(snapshot=None)
+
+
+def plan_from_request(req: PlanRequest,
+                      scenario: str | None = None,
+                      strategy: str | None = None,
+                      ctx=None) -> PlanResponse:
+    """结构化请求 → 行程。未知算法名会抛 KeyError，由调用方转成友好提示。"""
+    return plan(req, scenario=scenario, strategy=strategy, ctx=ctx)
+
+
+def plan_from_text(text: str,
+                   scenario: str | None = None,
+                   strategy: str | None = None,
+                   cfg: ScenarioConfig | None = None,
+                   overrides: dict[str, Any] | None = None,
+                   realtime: bool = False,
+                   ctx=None) -> PlanResponse:
+    """一句自然语言 → 行程。
+
+    :param realtime: 是否顺带抓实时天气/闭馆（会多花 1 秒左右；断网自动降级）
+    :param ctx:      已经准备好的 PlanContext（传了就不再自己抓）
+    """
+    req = build_request(text, cfg, scenario, overrides)
+    if ctx is None and realtime:
+        ctx = plan_context_for(req, enabled=True)
+    return plan_from_request(req, scenario=scenario, strategy=strategy, ctx=ctx)
 
 
 # ---------------------------------------------------------------- 落盘与缓存

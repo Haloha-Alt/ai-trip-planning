@@ -121,6 +121,11 @@
     <label>每日预算（0 = 不限制）</label>
     <input id="budget" type="number" min="0" step="10" value="0">
 
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--ink)">
+      <input type="checkbox" id="rt" checked style="width:auto">
+      使用实时天气（雨天自动改室内；抓不到自动降级）
+    </label>
+
     <button id="go">生成行程</button>
     <button class="ghost" id="reload">清空数据缓存（改了 CSV 后点）</button>
     <p class="muted" style="margin-top:10px">接口状态：<span id="health">…</span></p>
@@ -177,6 +182,7 @@ function collect() {
     query: $('q').value.trim(),
     scenario: $('scenario').value,
     strategy: $('strategy').value,
+    realtime: $('rt').checked,
     overrides: {
       city: $('city').value,
       days: Number($('days').value) || 1,
@@ -232,6 +238,8 @@ function draw(plan, pts) {
         + (plan.city ? '城市 <span class="pill">' + plan.city + '</span>' : '')
         + '生成于 ' + plan.generated_at + '</p>';
 
+  html += realtimeNote(plan);
+
   (plan.days || []).forEach(d => html += dayHtml(d));
   html += mapHtml(pts);
 
@@ -254,6 +262,23 @@ function draw(plan, pts) {
 function metric(label, v) {
   const n = (typeof v === 'number') ? v.toFixed(2) : v;
   return '<div class="metric"><b>' + n + '</b><span>' + label + '</span></div>';
+}
+
+/* 实时数据这一行：抓到了就报天气，没抓到就说清楚为什么 —— 不许假装知道天气 */
+const COND = {clear:'晴', cloudy:'多云', rain:'雨', snow:'雪', storm:'雷雨'};
+function realtimeNote(plan) {
+  const rt = plan.realtime || {};
+  const ws = rt.weather || [];
+  if (ws.length) {
+    const txt = ws.slice(0, 3).map(w =>
+      w.date + ' ' + (COND[w.condition] || w.condition)
+      + (w.temp_c == null ? '' : ' ' + Math.round(w.temp_c) + '℃')).join(' ｜ ');
+    return '<p class="muted">🌤 实时天气：' + txt
+         + '（抓取于 ' + (rt.fetched_at || '').replace('T', ' ') + '）</p>';
+  }
+  const warn = rt.warnings || [];
+  return '<p class="muted">🌤 未使用实时数据'
+       + (warn.length ? '：' + warn.join('；') : '') + '</p>';
 }
 
 function dayHtml(d) {
