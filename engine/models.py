@@ -1,12 +1,16 @@
 # @author: 甲
 # @reviewer: 乙
 # @since: 2026-10-27
-"""接口契约 v1 —— 全项目唯一的数据结构定义。
+"""接口契约 v1（当前修订 v1.2）—— 全项目唯一的数据结构定义。
 
 改字段的规矩（见 docs/接口契约.md）：
 1. 谁都不许单方面改；要改先在项目消息里说，双方同意后 v1 -> v2。
 2. 改完必须同步：docs/接口契约.md、schemas/itinerary.schema.json、mock/*.json。
 3. 只增字段、不改语义、不改字段名；新字段必须给默认值。
+
+v1.2 的边界（2026-10-27）：只在每个 dataclass **末尾**追加带默认值的字段，
+用于承载多城市 / 实时数据 / LLM 解说 / 导出这几件事，`CONTRACT_VERSION` 因此仍为 "v1"。
+`PlanMetrics` 一个字段都没动 —— 保证 AC-31 的历史评分口径可比。
 
 本文件只允许 import 标准库，保证零依赖。
 """
@@ -39,6 +43,15 @@ class PlanRequest:
     top_n: int = 6                        # 期望站点数（软目标，不是硬约束）
     raw_query: str = ""                   # 用户原始输入，留痕用，不参与计算
 
+    # ---- v1.2 追加（全部带默认值，旧 JSON 不受影响）----
+    origin: str = ""                      # 出发地名称（酒店/家/车站）；空 = 由策略决定起点
+    date: str = ""                        # "YYYY-MM-DD"；空 = 今天。天气与闭馆判断用
+    travelers: int = 1                    # 出行人数，只用于预算换算，不参与排程
+    budget_basis: str = "per_person"      # daily_budget 的口径：per_person | group
+    must_visit: list[str] = field(default_factory=list)   # 必去点（名称或 poi_id），软约束
+    mobility: str = "transit"             # walk | transit | drive，影响在途时间估算
+    seed: int | None = None               # 随机种子；None = 用策略内置种子
+
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "PlanRequest":
         """只取认识的字段，未知的忽略 —— 保证旧 JSON 不会被新字段搞崩。"""
@@ -69,6 +82,13 @@ class POI:
     tags: list[str] = field(default_factory=list)   # 兴趣标签，与 request.interests 匹配
     score: float = 0.5                    # 静态质量分 0~1，由数据给出
 
+    # ---- v1.2 追加 ----
+    city: str = ""                        # 所属城市 key；多城市数据合并时用于区分
+    address: str = ""                     # 人类可读地址，UI 展示用
+    source: str = "seed"                  # 数据来源：seed | amap | osm | llm
+    url: str = ""                         # 详情链接，前端可点
+    closed_weekdays: list[int] = field(default_factory=list)   # 每周固定闭馆日，0=周一 … 6=周日
+
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "POI":
         d = dict(d or {})
@@ -76,6 +96,21 @@ class POI:
         if isinstance(tags, str):         # CSV 里写作 "海景|拍照"
             tags = [t for t in tags.split("|") if t]
         d["tags"] = list(tags)
+
+        raw_days = d.pop("closed_weekdays", [])
+        if raw_days is None:
+            raw_days = []
+        elif isinstance(raw_days, str):   # CSV 里写作 "1|3"
+            raw_days = [x.strip() for x in raw_days.replace("|", ",").split(",") if x.strip()]
+        elif not isinstance(raw_days, (list, tuple, set)):
+            raw_days = [raw_days]         # pandas 把单值读成 1.0
+        d["closed_weekdays"] = [int(float(x)) for x in raw_days]
+
+        # 契约只增字段：数据里多出来的列在旧代码里应当被忽略，而不是让整行报废。
+        # （与 PlanRequest.from_dict 同一套哲学）
+        known = set(POI.__dataclass_fields__)
+        d = {k: v for k, v in d.items() if k in known}
+
         for k in ("lat", "lon", "stay_min", "cost", "score"):
             if k in d and d[k] is not None and d[k] != "":
                 d[k] = float(d[k]) if k in ("lat", "lon", "cost", "score") else int(float(d[k]))
@@ -126,6 +161,13 @@ class ItineraryItem:
     transport: Transport = field(default_factory=Transport)   # 从上一站到本站
     reason: str = ""                      # 可解释性输出：为什么选它 / 为什么排这时
 
+    # ---- v1.2 追加 ----
+    category: str = ""                    # 分类，UI 按类型上色用
+    address: str = ""                     # 人类可读地址
+    tips: str = ""                        # 解说/贴士（LLM narrate 生成，可为空）
+    flags: list[str] = field(default_factory=list)   # 风险标记：rain_risk / closed_today / queue_long
+    url: str = ""                         # 详情链接
+
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "ItineraryItem":
         d = dict(d or {})
@@ -146,6 +188,11 @@ class DayPlan:
     total_stay_min: int = 0
     total_travel_min: float = 0.0
     total_distance_km: float = 0.0
+
+    # ---- v1.2 追加 ----
+    date: str = ""                        # "YYYY-MM-DD"
+    weather: str = ""                     # 天气摘要，人类可读
+    theme: str = ""                       # 当天主题（如"老城漫步"）
 
     def refresh_stats(self) -> None:
         """由 items 汇总当天统计。引擎生成完必须调一次。"""
@@ -205,6 +252,10 @@ class PlanResponse:
     scenario: str = ""                    # 用了哪个场景配置
     generated_at: str = ""                # ISO 时间字符串
 
+    # ---- v1.2 追加 ----
+    meta: dict[str, Any] = field(default_factory=dict)      # 扩展口袋：数据来源/耗时/降级链留痕
+    realtime: dict[str, Any] = field(default_factory=dict)  # 本次使用的实时快照，便于回放
+
     # ---- 序列化 ----
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -223,6 +274,8 @@ class PlanResponse:
             strategy=d.get("strategy", ""),
             scenario=d.get("scenario", ""),
             generated_at=d.get("generated_at", ""),
+            meta=dict(d.get("meta") or {}),
+            realtime=dict(d.get("realtime") or {}),
         )
 
     @staticmethod

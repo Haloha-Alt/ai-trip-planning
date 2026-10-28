@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "itinerary.schema.json",
-  "title": "AI 出行与规划 · 接口契约 v1",
+  "title": "AI 出行与规划 · 接口契约 v1（修订 v1.2）",
   "description": "PlanResponse 的文档版。给人看，不参与运行时校验 —— 运行时的事实来源是 engine/models.py。",
   "type": "object",
   "required": ["request"],
@@ -20,7 +20,14 @@
         "pace": { "type": "string", "enum": ["relaxed", "normal", "packed"], "default": "normal" },
         "start_poi_id": { "type": ["string", "null"], "default": null },
         "top_n": { "type": "integer", "minimum": 1, "default": 6 },
-        "raw_query": { "type": "string", "default": "" }
+        "raw_query": { "type": "string", "default": "" },
+        "origin": { "type": "string", "default": "", "description": "v1.2 出发地名称，空 = 由策略决定起点" },
+        "date": { "type": "string", "default": "", "description": "v1.2 YYYY-MM-DD，空 = 今天" },
+        "travelers": { "type": "integer", "minimum": 1, "default": 1, "description": "v1.2 出行人数，仅用于预算换算" },
+        "budget_basis": { "type": "string", "enum": ["per_person", "group"], "default": "per_person", "description": "v1.2 daily_budget 的口径" },
+        "must_visit": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.2 必去点，软约束" },
+        "mobility": { "type": "string", "enum": ["walk", "transit", "drive"], "default": "transit", "description": "v1.2 出行方式偏好" },
+        "seed": { "type": ["integer", "null"], "default": null, "description": "v1.2 随机种子，null = 用策略内置种子" }
       }
     },
     "days": {
@@ -34,7 +41,10 @@
           "total_cost": { "type": "number" },
           "total_stay_min": { "type": "integer" },
           "total_travel_min": { "type": "number" },
-          "total_distance_km": { "type": "number" }
+          "total_distance_km": { "type": "number" },
+          "date": { "type": "string", "description": "v1.2 YYYY-MM-DD" },
+          "weather": { "type": "string", "description": "v1.2 天气摘要" },
+          "theme": { "type": "string", "description": "v1.2 当天主题" }
         }
       }
     },
@@ -56,7 +66,9 @@
     },
     "strategy": { "type": "string", "description": "使用的算法名，便于复现" },
     "scenario": { "type": "string", "description": "使用的场景配置名" },
-    "generated_at": { "type": "string", "description": "ISO 时间字符串" }
+    "generated_at": { "type": "string", "description": "ISO 时间字符串" },
+    "meta": { "type": "object", "description": "v1.2 自由扩展口袋：数据来源/耗时/降级链留痕。前端不许依赖内部结构" },
+    "realtime": { "type": "object", "description": "v1.2 本次使用的实时快照，落盘即可回放" }
   },
   "definitions": {
     "ItineraryItem": {
@@ -73,7 +85,12 @@
         "stay_min": { "type": "integer", "minimum": 0 },
         "cost": { "type": "number", "minimum": 0 },
         "transport": { "$ref": "#/definitions/Transport" },
-        "reason": { "type": "string", "description": "可解释性输出：为什么选它/为什么排这时" }
+        "reason": { "type": "string", "description": "可解释性输出：为什么选它/为什么排这时" },
+        "category": { "type": "string", "description": "v1.2 分类，前端按类型上色" },
+        "address": { "type": "string", "description": "v1.2 地址" },
+        "tips": { "type": "string", "description": "v1.2 解说/贴士，可为空" },
+        "flags": { "type": "array", "items": { "type": "string" }, "description": "v1.2 风险标记" },
+        "url": { "type": "string", "description": "v1.2 详情链接" }
       }
     },
     "Transport": {

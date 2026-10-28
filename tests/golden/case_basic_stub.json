@@ -1,0 +1,52 @@
+{
+  "strategy": "stub",
+  "scenario": "demo",
+  "metrics": {
+    "satisfaction": 1.0,
+    "cost": 1.0,
+    "time": 0.287,
+    "distance": 0.7349,
+    "feasibility": 1.0
+  },
+  "days": [
+    {
+      "day_index": 1,
+      "total_cost": 0.0,
+      "total_stay_min": 155,
+      "total_travel_min": 55.9,
+      "total_distance_km": 4.17,
+      "items": [
+        {
+          "seq": 1,
+          "poi_id": "P005",
+          "name": "占位点05",
+          "arrive": "09:00",
+          "leave": "09:45",
+          "stay_min": 45,
+          "cost": 0.0,
+          "transport_mode": "start"
+        },
+        {
+          "seq": 2,
+          "poi_id": "P001",
+          "name": "占位点01",
+          "arrive": "10:00",
+          "leave": "11:00",
+          "stay_min": 60,
+          "cost": 0.0,
+          "transport_mode": "walk"
+        },
+        {
+          "seq": 3,
+          "poi_id": "P008",
+          "name": "占位点08",
+          "arrive": "11:41",
+          "leave": "12:31",
+          "stay_min": 50,
+          "cost": 0.0,
+          "transport_mode": "walk"
+        }
+      ]
+    }
+  ]
+}
