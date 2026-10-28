@@ -189,6 +189,35 @@ def plan_from_text(text: str,
     return plan_from_request(req, scenario=scenario, strategy=strategy, ctx=ctx)
 
 
+# ---------------------------------------------------------------- 解说与局部调整
+
+
+def llm_client():
+    """取大模型客户端。没有 Key 时返回 NullClient（调用方不用判断）。"""
+    from llm.client import get_client
+
+    return get_client()
+
+
+def narrate_plan(resp: PlanResponse, enabled: bool = True) -> PlanResponse:
+    """给行程补上主题 / 每站解说 / 一句话汇总。
+
+    `enabled=False` 或没有 Key 时走规则模板 —— **永远有解说，不会因为模型失败就空白**。
+    """
+    from llm.narrate import narrate
+
+    return narrate(resp, client=llm_client() if enabled else None, use_llm=enabled)
+
+
+def adjust_plan(resp: PlanResponse, instruction: str,
+                enabled: bool = True) -> PlanResponse:
+    """按一句话局部调整行程（只动被点名的那一站，其余不变）。"""
+    from llm.adjust import adjust
+
+    return adjust(resp, instruction, client=llm_client() if enabled else None,
+                  use_llm=enabled)
+
+
 # ---------------------------------------------------------------- 落盘与缓存
 
 

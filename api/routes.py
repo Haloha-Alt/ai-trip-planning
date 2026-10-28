@@ -18,7 +18,9 @@ from service import exporters
 from service.compare import DEFAULT_BASELINE, compare_plans
 from service.dto import to_api_dict, to_map_points
 from service.usecases import (
+    adjust_plan,
     build_request,
+    narrate_plan,
     options,
     plan_context_for,
     plan_from_request,
@@ -43,12 +45,16 @@ def _err(message: str, status: int = 400) -> tuple[int, dict[str, Any]]:
 
 def health(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
     """健康检查：回答"为什么跑不起来"最快的入口。"""
+    from data import amap
     from data.cities import list_cities
 
+    a = amap.status()
     return _ok({
         "service": "ai-trip-planner",
         "cities": len(list_cities()),
         "strategies": options()["strategies"],
+        # 只暴露"配没配/缓存多少条"，不暴露 Key 本身
+        "amap": {"configured": a["configured"], "cached_points": a["cached_points"]},
     })
 
 
@@ -71,17 +77,60 @@ def post_plan(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     `realtime` 默认 **false**：接口默认行为必须确定、可复现（也方便测试）。
     前端会显式传 `true`，因为网页上"看一眼真实天气"才是卖点。
     抓不到就降级成"没有实时数据"，绝不会因此报错。
+
+    `narrate` 默认 **false**：解说写进 `theme/tips/meta.narrative`；
+    没配 LLM Key 时用规则模板（同样确定），配了才多一次模型调用。
     """
     body = req.get("body") or {}
     try:
         r = _run_plan(body, body.get("scenario"), body.get("strategy"),
                       body.get("realtime", False))
+        if body.get("narrate"):
+            r = narrate_plan(r)
     except KeyError as e:                       # 未知算法名
         return _err(str(e).strip('"'), 400)
     except Exception as e:                      # noqa: BLE001 - 接口层兜底，不能让 500 裸奔
         return _err("规划失败：%s" % e, 500)
 
     return _ok({"plan": to_api_dict(r), "map": to_map_points(r)})
+
+
+def post_adjust(req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """局部调整：同一份需求 + 一句话，只改被点名的那一站。
+
+    body 与 `/api/plan` 一样，额外多一个 `instruction`：
+
+        {"query": "去图书馆自习，中午食堂吃饭", "scenario": "daily",
+         "strategy": "greedy", "instruction": "第2站太贵了，换个便宜的"}
+
+    为什么"重新生成再打补丁"而不是"把整份 plan 传回来"：
+    `/api/plan` 在 `realtime=false` 时是确定性的，同一份 body 必然得到同一份行程，
+    所以两者等价，但请求体小得多，也不用担心前后端契约版本不一致。
+    """
+    body = req.get("body") or {}
+    text = str(body.get("instruction") or "").strip()
+    if not text:
+        return _err("缺少 instruction（例如：第2站太贵了换一个）", 400)
+
+    try:
+        base = _run_plan(body, body.get("scenario"), body.get("strategy"),
+                         body.get("realtime", False))
+        if body.get("narrate"):
+            base = narrate_plan(base)
+        new = adjust_plan(base, text)
+    except KeyError as e:
+        return _err(str(e).strip('"'), 400)
+    except Exception as e:                      # noqa: BLE001
+        return _err("调整失败：%s" % e, 500)
+
+    changed = new.meta.get("adjust") or {}
+    return _ok({
+        "plan": to_api_dict(new),
+        "map": to_map_points(new),
+        "before": to_api_dict(base),
+        "adjust": {"instruction": text, "note": changed.get("note", ""),
+                   "changed_days": changed.get("changed_days", 0)},
+    })
 
 
 def _prepare(body: dict[str, Any], scenario: str | None, use_realtime: bool):
@@ -162,6 +211,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("GET", "/api/health", health),
     ("GET", "/api/options", get_options),
     ("POST", "/api/plan", post_plan),
+    ("POST", "/api/adjust", post_adjust),
     ("POST", "/api/compare", post_compare),
     ("POST", "/api/export", post_export),
     ("POST", "/api/reload", post_reload),

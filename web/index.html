@@ -52,6 +52,9 @@
   svg{width:100%;height:auto;background:#fbfcfe;border:1px solid var(--line);border-radius:8px}
   .pill{display:inline-block;padding:2px 8px;border-radius:99px;background:var(--accent-soft);
         color:var(--accent);font-size:12px;margin-right:6px}
+  .narr{background:#f8fafc;border-left:3px solid var(--accent);border-radius:6px;
+        padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.7}
+  .tip{color:var(--sub);font-size:12px;line-height:1.5;margin-top:2px}
 
   /* ---- 页签 ---- */
   .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
@@ -161,6 +164,10 @@
       <input type="checkbox" id="rt" checked style="width:auto">
       使用实时天气（雨天自动改室内；抓不到自动降级）
     </label>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--ink)">
+      <input type="checkbox" id="narrate" checked style="width:auto">
+      生成解说（没配大模型 Key 时用规则模板）
+    </label>
     <p class="muted" style="margin:8px 0 0">参数默认「跟随需求文本」：只有你手动改过的那一项，才会覆盖文本解析的结果。</p>
 
     <button id="go">生成行程</button>
@@ -172,6 +179,18 @@
   <!-- 右：结果 -->
   <div>
     <div id="summary"></div>
+
+    <div class="card" id="adjustBar" hidden style="margin-bottom:14px">
+      <h2>一句话调整</h2>
+      <div class="row" style="grid-template-columns:1fr auto;align-items:end">
+        <div>
+          <label>只改被点名的那一站，其余保持不动</label>
+          <input id="adjText" placeholder="第2站太贵了换一个 / 删掉第3站 / 再加一站 / 太赶了">
+        </div>
+        <button id="adjGo" style="margin:0;width:auto;padding:9px 16px">应用调整</button>
+      </div>
+      <p class="muted" id="adjNote" style="margin:8px 0 0"></p>
+    </div>
 
     <nav class="tabs" id="tabs" hidden>
       <button class="tab active" data-tab="list">行程表</button>
@@ -214,7 +233,10 @@ async function api(path, body) {
 async function boot() {
   try {
     const h = await api('/api/health');
-    $('health').textContent = h.ok ? ('正常 · 城市 ' + h.cities + ' 个') : ('异常：' + h.error);
+    $('health').textContent = h.ok
+      ? ('正常 · 城市 ' + h.cities + ' 个 · 高德'
+         + ((h.amap && h.amap.configured) ? ('已接入（' + h.amap.cached_points + ' 条真实路线）') : '未配置'))
+      : ('异常：' + h.error);
   } catch (e) {
     $('health').textContent = '连不上后端（用 python -m api.server 启动）';
   }
@@ -272,6 +294,7 @@ function collect() {
     scenario: $('scenario').value,
     strategy: $('strategy').value,
     realtime: $('rt').checked,
+    narrate: $('narrate').checked,
     overrides: ov
   };
 }
@@ -317,12 +340,21 @@ async function plan() {
 
 function renderPlan(){
   $('tabs').hidden = false;
-  $('summary').innerHTML = '<div class="card">' + metricsHtml(PLAN) + metaLine(PLAN)
-                         + realtimeNote(PLAN) + warningsHtml(PLAN) + exportBar() + '</div>';
+  $('adjustBar').hidden = false;
+  $('summary').innerHTML = '<div class="card">' + narrativeHtml(PLAN) + metricsHtml(PLAN)
+                         + metaLine(PLAN) + realtimeNote(PLAN) + warningsHtml(PLAN)
+                         + exportBar() + '</div>';
   $('pane-list').innerHTML = listHtml(PLAN);
   $('pane-timeline').innerHTML = timelineHtml(PLAN);
   $('pane-map').innerHTML = mapHtml(PTS);
   if (CMP) $('pane-compare').innerHTML = compareHtml(CMP);
+}
+
+/* 解说：模型写的就标「模型」，规则拼的标「规则」—— 不假装哪句是模型说的 */
+function narrativeHtml(plan){
+  const n = (plan.meta && plan.meta.narrative) || null;
+  if (!n || !n.summary) return '';
+  return '<div class="narr"><b>一句话概括</b><br>' + esc(n.summary) + '</div>';
 }
 
 function metricsHtml(plan){
@@ -393,16 +425,19 @@ function listHtml(plan){
 
 function dayHtml(d) {
   let s = '<div class="day"><h2>第 ' + d.day_index + ' 天'
+        + (d.theme ? ' <span class="pill">' + esc(d.theme) + '</span>' : '')
         + ' <span class="muted">站点 ' + d.items.length + ' · 花费 '
         + d.total_cost.toFixed(2) + ' · 停留 ' + d.total_stay_min + ' 分钟 · 在途 '
         + d.total_travel_min.toFixed(1) + ' 分钟 · ' + d.total_distance_km.toFixed(2)
         + ' km</span></h2>';
   if (!d.items.length) return s + '<p class="muted">（空行程）</p></div>';
-  s += '<table><thead><tr><th>#</th><th>时间</th><th>站点</th><th>停留</th>'
+  s += '<table><thead><tr><th>#</th><th>时间</th><th>站点 / 解说</th><th>停留</th>'
      + '<th>花费</th><th>交通</th><th>理由</th></tr></thead><tbody>';
   d.items.forEach(it => {
     s += '<tr><td>' + it.seq + '</td><td>' + esc(it.arrive) + '–' + esc(it.leave) + '</td>'
-       + '<td>' + esc(it.name) + '</td><td>' + it.stay_min + ' 分</td>'
+       + '<td><b>' + esc(it.name) + '</b>'
+       + (it.tips ? '<div class="tip">' + esc(it.tips) + '</div>' : '')
+       + '</td><td>' + it.stay_min + ' 分</td>'
        + '<td>' + it.cost.toFixed(0) + '</td>'
        + '<td>' + (it.transport.mode === 'start' ? '起点'
                    : esc(it.transport.mode) + ' ' + it.transport.minutes.toFixed(0) + ' 分 / '
@@ -684,8 +719,40 @@ async function download(fmt) {
   a.click();
 }
 
+/* ---------------------------------------------------------------- 局部调整 */
+
+async function adjustPlan(){
+  const text = $('adjText').value.trim();
+  if (!text) { $('adjNote').textContent = '先写一句要改什么，例如「第2站太贵了换一个」。'; return; }
+  if (!LAST) { $('adjNote').textContent = '先生成一份行程，再调整。'; return; }
+
+  $('adjGo').disabled = true;
+  $('adjNote').textContent = '正在按「' + text + '」调整…';
+  let res;
+  try {
+    res = await api('/api/adjust', Object.assign({}, LAST, {instruction: text}));
+  } catch (e) {
+    $('adjNote').textContent = '请求失败：' + (e.message || e);
+    $('adjGo').disabled = false;
+    return;
+  }
+  $('adjGo').disabled = false;
+  if (!res.ok) { $('adjNote').textContent = res.error; return; }
+
+  PLAN = res.plan;
+  PTS = res.map || [];
+  renderPlan();
+  showTab('list');
+  const a = res.adjust || {};
+  $('adjNote').textContent = a.changed_days
+    ? ('已调整：' + (a.note || a.instruction)) + '（改了 ' + a.changed_days + ' 天的行程）'
+    : ('没有改动：' + (a.note || '没听懂要改什么'));
+}
+
 $('go').onclick = plan;
 $('cmp').onclick = compare;
+$('adjGo').onclick = adjustPlan;
+$('adjText').addEventListener('keydown', e => { if (e.key === 'Enter') adjustPlan(); });
 $('reload').onclick = async () => { await api('/api/reload', {}); alert('已清空数据缓存'); };
 boot();
 </script>
