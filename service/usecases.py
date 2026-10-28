@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.bootstrap import OUTPUT_DIR
+from service.bootstrap import OUTPUT_DIR
 from engine.config import ScenarioConfig, list_scenarios, load_scenario
 from engine.models import PlanRequest, PlanResponse
 from engine.planner import clear_caches, plan
@@ -197,7 +197,7 @@ def save_plan(resp: PlanResponse, out_path: str | None = None,
     """导出并落盘，返回写入的绝对路径。目录不存在会自动建。"""
     from pathlib import Path
 
-    from app.exporters import default_name, export
+    from service.exporters import default_name, export
 
     path = Path(out_path) if out_path else (OUTPUT_DIR / default_name(resp, fmt))
     if not path.is_absolute():

@@ -16,7 +16,7 @@ import json
 import mimetypes
 from pathlib import Path
 
-from app.bootstrap import WEB_DIR
+from service.bootstrap import WEB_DIR
 from api.routes import ROUTES, dispatch
 
 _ROOT = Path(__file__).resolve().parent.parent

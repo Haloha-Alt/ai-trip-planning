@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.bootstrap import WEB_DIR
+from service.bootstrap import WEB_DIR
 from api.routes import dispatch
 
 ROOT = Path(__file__).resolve().parent.parent

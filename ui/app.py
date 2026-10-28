@@ -14,7 +14,7 @@
 
 本文件只管交互：
 - "怎么画" 在 ui/render.py
-- "怎么算" 在 app/usecases.py（与命令行、API 共用同一份）
+- "怎么算" 在 service/usecases.py（与命令行、API 共用同一份）
 
 所以这里出现的每一个业务动作，都应该能在命令行里用一条命令复现。
 """
@@ -25,13 +25,17 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+# 必须先把自己所在目录（ui/）从 sys.path 里摘掉，再把项目根放到最前面。
+# 否则 `ui/app.py` 会以模块名 `app` 抢先命中，把同名的包挡住 ——
+# 这正是之前 `No module named 'app.exporters'; 'app' is not a package` 的成因。
+_HERE = str(Path(__file__).resolve().parent)
+sys.path[:] = [p for p in sys.path if Path(p or ".").resolve() != Path(_HERE)]
+sys.path.insert(0, str(ROOT))
 
 import streamlit as st  # noqa: E402
 
-from app.exporters import export                 # noqa: E402
-from app.usecases import (                       # noqa: E402
+from service.exporters import export                 # noqa: E402
+from service.usecases import (                       # noqa: E402
     city_options,
     options,
     plan_from_text,

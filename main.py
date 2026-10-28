@@ -25,8 +25,8 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.exporters import export                  # noqa: E402
-from app.usecases import save_plan                # noqa: E402
+from service.exporters import export                  # noqa: E402
+from service.usecases import save_plan                # noqa: E402
 from engine.config import list_scenarios, load_scenario  # noqa: E402
 from engine.models import PlanRequest             # noqa: E402
 from engine.planner import plan                   # noqa: E402
@@ -153,7 +153,7 @@ def main(argv=None) -> int:
 
     print_response(resp)
 
-    # 落盘统一走 app/usecases.save_plan —— 与网页、API 同一套文件名与导出逻辑
+    # 落盘统一走 service/usecases.save_plan —— 与网页、API 同一套文件名与导出逻辑
     saved = save_plan(resp, args.out, args.export_fmt)
     print("\n已保存（%s）：%s" % (args.export_fmt, saved))
     return 0

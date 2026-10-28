@@ -15,8 +15,8 @@
 import unittest
 from pathlib import Path
 
-from app.exporters import default_name, export, to_csv, to_markdown
-from app.usecases import apply_overrides, options, plan_from_text, save_plan
+from service.exporters import default_name, export, to_csv, to_markdown
+from service.usecases import apply_overrides, options, plan_from_text, save_plan
 from engine.models import PlanRequest, PlanResponse
 
 
