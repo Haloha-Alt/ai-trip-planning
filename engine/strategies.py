@@ -79,6 +79,46 @@ def _apply_start(pool: list[POI], req: PlanRequest, cfg: ScenarioConfig) -> list
     return pool
 
 
+def _apply_waypoints(pool: list[POI], req: PlanRequest, cfg: ScenarioConfig) -> list[POI]:
+    """把途经点按用户给的先后顺序排进去。
+
+    语义（与 docs/场景定义.md 一致）：
+    - 指定了起点（start_poi_id）时：起点 → 途经点（按顺序）→ 其余
+    - 没指定起点时：途经点 → 其余
+    - 途经点被兴趣过滤掉时，从全量数据里补回来 —— "路上顺便取快递"是硬要求，不是偏好
+    - 一个都匹配不上就原样返回，由 constraints 报 WAYPOINT_MISS，策略层不静默兜底
+    """
+    wanted_seq = [str(w).strip() for w in (req.waypoints or []) if str(w).strip()]
+    if not wanted_seq:
+        return pool
+
+    rest = list(pool)
+    prefix: list[POI] = []
+    sid = (req.start_poi_id or "").strip()
+    if sid and rest and rest[0].poi_id == sid:      # _apply_start 已经把它置顶了
+        prefix, rest = [rest[0]], rest[1:]
+
+    by_id = {p.poi_id: p for p in rest}
+    by_name = {p.name: p for p in rest}
+    all_pois: list[POI] | None = None
+
+    head: list[POI] = []
+    head_ids: set[str] = set()
+    for w in wanted_seq:
+        p = by_id.get(w) or by_name.get(w)
+        if p is None:
+            if all_pois is None:
+                all_pois = load_pois(cfg, req.city)
+            p = next((x for x in all_pois if x.poi_id == w or x.name == w), None)
+        if p is not None and p.poi_id not in head_ids:
+            head.append(p)
+            head_ids.add(p.poi_id)
+
+    if not head:
+        return pool
+    return prefix + head + [p for p in rest if p.poi_id not in head_ids]
+
+
 def _match_score(p: POI, wanted: set[str]) -> float:
     """单个 POI 与兴趣的匹配度；没填兴趣时用数据自带的静态分。"""
     if not wanted:
@@ -162,6 +202,7 @@ def _build_days(ranked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
     n_days = max(1, int(req.days or 1))
     per_day = _per_day_top_n(req, cfg)
     ranked = _apply_start(ranked, req, cfg)      # 起点置顶必须放在排序之后
+    ranked = _apply_waypoints(ranked, req, cfg)  # 途经点紧跟起点，保持用户给的先后
     return [
         _fill_day(ranked[i * per_day:(i + 1) * per_day], req, cfg, wanted, day_index=i + 1)
         for i in range(n_days)

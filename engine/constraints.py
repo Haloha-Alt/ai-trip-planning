@@ -7,9 +7,12 @@
 引擎在任何输入下都必须返回一个结果对象；问题写进 resp.warnings 让用户看见。
 
 违规码：BUDGET_OVER / TIME_WINDOW / CLOSED / DUPLICATE / NO_CANDIDATE / BAD_REQUEST
+        ／ DEADLINE_MISS（v1.3，赶不上到达截止）／ WAYPOINT_MISS（v1.3，途经点漏排或被插队）
 """
 
 from __future__ import annotations
+
+from datetime import datetime
 
 from engine.config import ScenarioConfig
 from engine.models import (
@@ -20,6 +23,8 @@ from engine.models import (
     Violation,
 )
 from engine.geo import to_minutes
+
+_WEEKDAY_CN = ("一", "二", "三", "四", "五", "六", "日")
 
 
 def expand_interests(interests: list[str], cfg: ScenarioConfig) -> set[str]:
@@ -63,6 +68,17 @@ def validate_request(req: PlanRequest, cfg: ScenarioConfig) -> list[Violation]:
         vs.append(Violation("BAD_REQUEST", "期望站点数必须 >= 1，当前 %s" % req.top_n))
     if req.pace not in ("relaxed", "normal", "packed"):
         vs.append(Violation("BAD_REQUEST", "未知节奏 '%s'，可用 relaxed/normal/packed" % req.pace))
+    if req.profile and req.profile not in (cfg.weight_presets or {}):
+        vs.append(Violation("BAD_REQUEST",
+                            "未知权重档位 '%s'，本场景可用：%s"
+                            % (req.profile, "/".join(sorted(cfg.weight_presets or {})) or "（无）")))
+    if req.deadline:
+        try:                                  # to_minutes 解析失败会静默返回 0，这里单独判格式
+            hh, mm = str(req.deadline).strip().split(":")
+            int(hh)
+            int(mm)
+        except Exception:
+            vs.append(Violation("BAD_REQUEST", "到达截止时刻 '%s' 不是合法的 HH:MM" % req.deadline))
     return vs
 
 
@@ -98,6 +114,12 @@ def validate_day(day: DayPlan, cfg: ScenarioConfig, req: PlanRequest | None = No
                             day_index=day.day_index))
 
     # 4) 逐站校验
+    weekday = None                            # 0=周一 … 6=周日；只有给了 date 才知道今天周几
+    if req and req.date:
+        try:
+            weekday = datetime.strptime(str(req.date).strip(), "%Y-%m-%d").weekday()
+        except Exception:
+            weekday = None
     seen: set[str] = set()
     for it in day.items:
         if it.poi_id in seen:
@@ -121,6 +143,42 @@ def validate_day(day: DayPlan, cfg: ScenarioConfig, req: PlanRequest | None = No
         if leave > to_minutes(poi.close_time):
             vs.append(Violation("CLOSED", "%s 离开时已闭馆（%s 关门）" % (it.name, poi.close_time),
                                 day_index=day.day_index, poi_id=it.poi_id))
+        if weekday is not None and weekday in (poi.closed_weekdays or []):
+            vs.append(Violation("CLOSED", "%s 当天固定闭馆（周%s）" % (it.name, _WEEKDAY_CN[weekday]),
+                                day_index=day.day_index, poi_id=it.poi_id))
+
+    # 5) 途经点：必须都排进来，且先后顺序与用户给的一致
+    if req and req.waypoints:
+        pos: dict[str, int] = {}
+        for idx, it in enumerate(day.items):
+            for w in req.waypoints:
+                if it.poi_id == w or it.name == w:
+                    pos.setdefault(w, idx)
+        missing = [w for w in req.waypoints if w not in pos]
+        if missing:
+            vs.append(Violation("WAYPOINT_MISS", "途经点未排入行程：%s" % "、".join(missing),
+                                day_index=day.day_index))
+        placed = [pos[w] for w in req.waypoints if w in pos]
+        if placed != sorted(placed):
+            vs.append(Violation("WAYPOINT_MISS", "途经点顺序被插队，期望 %s"
+                                % " → ".join(w for w in req.waypoints if w in pos),
+                                day_index=day.day_index))
+
+    # 6) 到达截止：有途经点看最后一个途经点（"必须先到哪"），没有就看当天末站
+    if req and req.deadline:
+        target = None
+        if req.waypoints:
+            for it in reversed(day.items):
+                if any(it.poi_id == w or it.name == w for w in req.waypoints):
+                    target = it
+                    break
+        elif day.items:
+            target = day.items[-1]
+        if target is not None and to_minutes(target.arrive) > to_minutes(req.deadline):
+            vs.append(Violation("DEADLINE_MISS",
+                                "%s 于 %s 抵达，晚于截止 %s"
+                                % (target.name, target.arrive, req.deadline),
+                                day_index=day.day_index, poi_id=target.poi_id))
     return vs
 
 

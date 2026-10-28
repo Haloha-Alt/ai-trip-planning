@@ -56,6 +56,16 @@ def plan(req: PlanRequest,
 
     resp.metrics = constraints.score(resp, cfg)
 
+    # 权重档位：profile 优先 → 场景 [weights] → 都没有就交给 PlanMetrics.overall 的内置默认值。
+    # 写进 meta 是为了让 UI / 导出 / 评测用同一套权重算总分，不各算各的。
+    weights = None
+    if req.profile and cfg.weight_presets.get(req.profile):
+        weights = cfg.weight_presets[req.profile]
+    elif cfg.weights:
+        weights = cfg.weights
+    if weights:
+        resp.meta["weights"] = dict(weights)
+
     # 实时数据：只在这里统一生效一次，策略内部一律不碰它
     if ctx is not None and getattr(ctx, "snapshot", None) is not None:
         try:

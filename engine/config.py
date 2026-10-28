@@ -35,6 +35,8 @@ class ScenarioConfig:
     transport_cost_per_km: dict[str, float] = field(default_factory=dict)
     default_mode: str = "walk"
     weights: dict[str, float] = field(default_factory=dict)
+    # 权重档位：{"save": {...}, "fast": {...}, "comfort": {...}}，由 PlanRequest.profile 选
+    weight_presets: dict[str, dict[str, float]] = field(default_factory=dict)
     interest_alias: dict[str, list[str]] = field(default_factory=dict)
     poi_file: str = "pois.csv"
     matrix_file: str = "travel_matrix.csv"
@@ -84,6 +86,8 @@ def load_scenario(name: str | None = None) -> ScenarioConfig:
         transport_cost_per_km=dict(raw.get("transport_cost_per_km", {})),
         default_mode=raw.get("default_mode", "walk"),
         weights=dict(raw.get("weights", {})),
+        weight_presets={k: {kk: float(vv) for kk, vv in (v or {}).items()}
+                        for k, v in (raw.get("weight_presets") or {}).items()},
         interest_alias={k: list(v) for k, v in (raw.get("interest_alias") or {}).items()},
         poi_file=dfs.get("pois", "pois.csv"),
         matrix_file=dfs.get("matrix", "travel_matrix.csv"),

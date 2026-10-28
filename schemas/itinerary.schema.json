@@ -26,8 +26,11 @@
         "travelers": { "type": "integer", "minimum": 1, "default": 1, "description": "v1.2 出行人数，仅用于预算换算" },
         "budget_basis": { "type": "string", "enum": ["per_person", "group"], "default": "per_person", "description": "v1.2 daily_budget 的口径" },
         "must_visit": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.2 必去点，软约束" },
-        "mobility": { "type": "string", "enum": ["walk", "transit", "drive"], "default": "transit", "description": "v1.2 出行方式偏好" },
-        "seed": { "type": ["integer", "null"], "default": null, "description": "v1.2 随机种子，null = 用策略内置种子" }
+        "mobility": { "type": "string", "enum": ["walk", "transit", "drive"], "default": "walk", "description": "v1.2 出行方式偏好；默认 walk 与接该字段前的行为一致" },
+        "seed": { "type": ["integer", "null"], "default": null, "description": "v1.2 随机种子，null = 用策略内置种子" },
+        "deadline": { "type": "string", "default": "", "description": "v1.3 HH:MM，该时刻前必须抵达最后一个途经点（无途经点则末站）" },
+        "waypoints": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.3 途经点（名称或 poi_id），按给出顺序强制先后" },
+        "profile": { "type": "string", "enum": ["", "save", "fast", "comfort"], "default": "", "description": "v1.3 权重档位，空 = 用场景 [weights]" }
       }
     },
     "days": {

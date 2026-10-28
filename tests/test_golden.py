@@ -61,6 +61,7 @@ EXPECT_TOP_KEYS = {
 }
 EXPECT_REQUEST_KEYS = {
     "avoid", "budget_basis", "city", "daily_budget", "date", "days",
+    "deadline", "profile", "waypoints",            # v1.3 追加
     "end_time", "interests", "mobility", "must_visit", "origin", "pace",
     "raw_query", "seed", "start_poi_id", "start_time", "top_n", "travelers",
 }

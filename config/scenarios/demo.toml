@@ -62,10 +62,12 @@ distance = 0.1
 # "自然" = ["公园", "山"]
 # "美食" = ["餐饮"]
 
+# ---- 默认算法策略（可选值见 engine/strategies.py 的 STRATEGIES）----
+# ⚠️ 必须写在任何 [table] 之前：TOML 里表头之后的裸键会被归进那张表，
+#    写成 [data_files] 之后再写它，engine/config.py 永远读不到（曾经踩过）。
+default_strategy = "stub"
+
 # ---- 数据文件（相对 data/ 目录）----
 [data_files]
 pois = "pois.csv"
 matrix = "travel_matrix.csv"
-
-# ---- 默认算法策略（可选值见 engine/strategies.py 的 STRATEGIES）----
-default_strategy = "stub"

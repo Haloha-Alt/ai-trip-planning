@@ -39,3 +39,6 @@ desktop.ini
 
 # ===== Jupyter（可选）=====
 .ipynb_checkpoints/
+
+# ===== LearnBuddy 工作区记忆（本机协作上下文，不参与版本控制）=====
+.learnbuddy/

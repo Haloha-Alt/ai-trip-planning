@@ -53,6 +53,11 @@ class PlanRequest:
                                           # 默认 walk：与接这个字段之前的行为一致，保证历史基线可比
     seed: int | None = None               # 随机种子；None = 用策略内置种子
 
+    # ---- v1.3 追加（全部带默认值，旧 JSON 不受影响）----
+    deadline: str = ""                    # "HH:MM"：该时刻前必须抵达最后一个途经点（无途经点则末站）
+    waypoints: list[str] = field(default_factory=list)   # 途经点（名称或 poi_id），按给出的先后强制顺序
+    profile: str = ""                     # 权重档位：save | fast | comfort；空 = 用场景 [weights]
+
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "PlanRequest":
         """只取认识的字段，未知的忽略 —— 保证旧 JSON 不会被新字段搞崩。"""
