@@ -30,7 +30,14 @@
 
 # 4) 跑基线对比（所有算法 × 所有用例，结果写入 eval/results.md）
 .venv\Scripts\python.exe -m eval.baseline
+
+# 5) 启动新版网页（FastAPI/Starlette 后端 + 无构建前端）
+.venv\Scripts\python.exe -m api.server        # 然后打开 http://127.0.0.1:8000/
 ```
+
+> 三种入口用的是**同一份**业务逻辑（`app/usecases.py`）：
+> 命令行 `main.py` ｜ Streamlit `ui/app.py` ｜ 网页 `api.server` + `web/index.html`。
+> 所以"网页上看到的结果"和"命令行跑出来的"必然一致，不会出现两套口径。
 
 > ⚠️ **不要用终端裸跑 `pip install`**，很可能装到别的 Python 上，然后 PyCharm 里依然报 `ModuleNotFoundError`。
 > 装库一律走：`Settings (Ctrl+Alt+S) → Project → Python Interpreter → "+" → Install Package`。

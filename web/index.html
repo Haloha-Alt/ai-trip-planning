@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 出行与规划</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --line:#e3e6ea; --ink:#1f2328;
+    --sub:#6b7280; --accent:#2563eb; --accent-soft:#eaf1ff;
+    --warn:#b45309; --warn-bg:#fff7ed; --ok:#15803d; --ok-bg:#f0fdf4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{padding:18px 24px;background:var(--card);border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:19px}
+  header p{margin:4px 0 0;color:var(--sub);font-size:13px}
+  .wrap{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px 24px 40px}
+  @media (max-width:900px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:15px}
+  label{display:block;margin:10px 0 4px;color:var(--sub);font-size:12px}
+  input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);
+       border-radius:7px;background:#fff;color:var(--ink);font-size:13px}
+  textarea{resize:vertical;min-height:76px}
+  button{width:100%;padding:10px;margin-top:14px;border:0;border-radius:7px;
+       background:var(--accent);color:#fff;font-size:14px;cursor:pointer}
+  button:hover{filter:brightness(1.06)}
+  button.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}
+  @media (max-width:900px){.metrics{grid-template-columns:repeat(3,1fr)}}
+  .metric{background:var(--accent-soft);border-radius:8px;padding:10px;text-align:center}
+  .metric b{display:block;font-size:17px}
+  .metric span{font-size:11px;color:var(--sub)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--sub);font-weight:600;font-size:12px}
+  .day{margin-bottom:18px}
+  .warn{background:var(--warn-bg);border:1px solid #fed7aa;color:var(--warn);
+        border-radius:8px;padding:10px;margin-top:12px;font-size:13px}
+  .ok{background:var(--ok-bg);border:1px solid #bbf7d0;color:var(--ok);
+      border-radius:8px;padding:10px;margin-top:12px;font-size:13px}
+  .muted{color:var(--sub);font-size:12px}
+  .exp{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .exp button{width:auto;padding:7px 12px;margin:0;font-size:13px}
+  svg{width:100%;height:auto;background:#fbfcfe;border:1px solid var(--line);border-radius:8px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:99px;background:var(--accent-soft);
+        color:var(--accent);font-size:12px;margin-right:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>AI 出行与规划</h1>
+  <p>多城市 · 可换算法 · 结果可导出（JSON / Markdown / CSV）</p>
+</header>
+
+<div class="wrap">
+  <!-- 左：输入 -->
+  <div class="card">
+    <h2>出行需求</h2>
+    <label>一句话需求</label>
+    <textarea id="q">想走走自然类的地方，预算 150，别太赶</textarea>
+
+    <div class="row">
+      <div>
+        <label>城市</label>
+        <select id="city"></select>
+      </div>
+      <div>
+        <label>场景</label>
+        <select id="scenario"></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>算法</label>
+        <select id="strategy"></select>
+      </div>
+      <div>
+        <label>节奏</label>
+        <select id="pace">
+          <option value="relaxed">轻松</option>
+          <option value="normal" selected>正常</option>
+          <option value="packed">紧凑</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>天数</label>
+        <input id="days" type="number" min="1" max="7" value="1">
+      </div>
+      <div>
+        <label>每天站点数</label>
+        <input id="top_n" type="number" min="1" max="8" value="4">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>出发</label>
+        <input id="start" type="time" value="09:00">
+      </div>
+      <div>
+        <label>返回</label>
+        <input id="end" type="time" value="18:00">
+      </div>
+    </div>
+
+    <label>每日预算（0 = 不限制）</label>
+    <input id="budget" type="number" min="0" step="10" value="0">
+
+    <button id="go">生成行程</button>
+    <button class="ghost" id="reload">清空数据缓存（改了 CSV 后点）</button>
+    <p class="muted" style="margin-top:10px">接口状态：<span id="health">…</span></p>
+  </div>
+
+  <!-- 右：结果 -->
+  <div>
+    <div class="card" id="result">
+      <p class="muted">填好需求后点「生成行程」。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let LAST = null;              // 最近的查询条件，导出时复用
+
+async function api(path, body) {
+  const opt = body ? {method:'POST', headers:{'Content-Type':'application/json'},
+                      body: JSON.stringify(body)} : {method:'GET'};
+  const r = await fetch(path, opt);
+  return await r.json();
+}
+
+async function boot() {
+  try {
+    const h = await api('/api/health');
+    $('health').textContent = h.ok ? ('正常 · 城市 ' + h.cities + ' 个') : ('异常：' + h.error);
+  } catch (e) {
+    $('health').textContent = '连不上后端（用 python -m api.server 启动）';
+  }
+  try {
+    const o = await api('/api/options');
+    fill('city', o.cities, o.default_city, c => [c.key, c.name + '（' + c.key + '）']);
+    fill('scenario', o.scenarios, o.default_scenario, s => [s, s]);
+    fill('strategy', o.strategies, o.default_strategy, s => [s, s]);
+  } catch (e) { /* 选项拉不到就用空下拉，页面不至于打不开 */ }
+}
+
+function fill(id, items, def, kv) {
+  const sel = $(id);
+  sel.innerHTML = '';
+  (items || []).forEach(it => {
+    const [v, label] = kv(it);
+    const op = document.createElement('option');
+    op.value = v; op.textContent = label;
+    if (v === def) op.selected = true;
+    sel.appendChild(op);
+  });
+}
+
+function collect() {
+  return {
+    query: $('q').value.trim(),
+    scenario: $('scenario').value,
+    strategy: $('strategy').value,
+    overrides: {
+      city: $('city').value,
+      days: Number($('days').value) || 1,
+      top_n: Number($('top_n').value) || 4,
+      pace: $('pace').value,
+      start_time: $('start').value,
+      end_time: $('end').value,
+      daily_budget: Number($('budget').value) || 0
+    }
+  };
+}
+
+async function plan() {
+  const payload = collect();
+  LAST = payload;
+  $('result').innerHTML = '<p class="muted">规划中…</p>';
+  let res;
+  try {
+    res = await api('/api/plan', payload);
+  } catch (e) {
+    $('result').innerHTML = '<div class="warn">请求失败：' + e + '</div>';
+    return;
+  }
+  if (!res.ok) {
+    $('result').innerHTML = '<div class="warn">' + res.error + '</div>';
+    return;
+  }
+  draw(res.plan, res.map);
+}
+
+async function download(fmt) {
+  if (!LAST) return;
+  const res = await api('/api/export', Object.assign({}, LAST, {fmt: fmt}));
+  if (!res.ok) { alert(res.error); return; }
+  const blob = new Blob([res.content], {type: 'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = res.filename;
+  a.click();
+}
+
+function draw(plan, pts) {
+  const m = plan.metrics;
+  let html = '<div class="metrics">'
+    + metric('满意度', m.satisfaction) + metric('预算友好', m.cost)
+    + metric('时间利用', m.time) + metric('路程紧凑', m.distance)
+    + metric('可行性', m.feasibility) + metric('总分', m.overall)
+    + '</div>';
+
+  html += '<p class="muted">场景 <span class="pill">' + plan.scenario + '</span>'
+        + '算法 <span class="pill">' + plan.strategy + '</span>'
+        + (plan.city ? '城市 <span class="pill">' + plan.city + '</span>' : '')
+        + '生成于 ' + plan.generated_at + '</p>';
+
+  (plan.days || []).forEach(d => html += dayHtml(d));
+  html += mapHtml(pts);
+
+  if (plan.warnings && plan.warnings.length) {
+    html += '<div class="warn"><b>提示（' + plan.warnings.length + '）</b><br>'
+          + plan.warnings.map(w => '· ' + w).join('<br>') + '</div>';
+  } else {
+    html += '<div class="ok">无异常提示</div>';
+  }
+
+  html += '<div class="exp">'
+        + '<button class="ghost" onclick="download(\'json\')">下载 JSON</button>'
+        + '<button class="ghost" onclick="download(\'md\')">下载 Markdown</button>'
+        + '<button class="ghost" onclick="download(\'csv\')">下载 CSV</button>'
+        + '</div>';
+
+  $('result').innerHTML = html;
+}
+
+function metric(label, v) {
+  const n = (typeof v === 'number') ? v.toFixed(2) : v;
+  return '<div class="metric"><b>' + n + '</b><span>' + label + '</span></div>';
+}
+
+function dayHtml(d) {
+  let s = '<div class="day"><h2>第 ' + d.day_index + ' 天'
+        + ' <span class="muted">站点 ' + d.items.length + ' · 花费 '
+        + d.total_cost.toFixed(2) + ' · 停留 ' + d.total_stay_min + ' 分钟 · 在途 '
+        + d.total_travel_min.toFixed(1) + ' 分钟 · ' + d.total_distance_km.toFixed(2)
+        + ' km</span></h2>';
+  if (!d.items.length) return s + '<p class="muted">（空行程）</p></div>';
+  s += '<table><thead><tr><th>#</th><th>时间</th><th>站点</th><th>停留</th>'
+     + '<th>花费</th><th>交通</th><th>理由</th></tr></thead><tbody>';
+  d.items.forEach(it => {
+    s += '<tr><td>' + it.seq + '</td><td>' + it.arrive + '–' + it.leave + '</td>'
+       + '<td>' + it.name + '</td><td>' + it.stay_min + ' 分</td>'
+       + '<td>' + it.cost.toFixed(0) + '</td>'
+       + '<td>' + (it.transport.mode === 'start' ? '起点'
+                   : it.transport.mode + ' ' + it.transport.minutes.toFixed(0) + ' 分 / '
+                     + it.transport.distance_km.toFixed(2) + ' km') + '</td>'
+       + '<td>' + (it.reason || '') + '</td></tr>';
+  });
+  return s + '</tbody></table></div>';
+}
+
+/* 地图：内联 SVG，按 bbox 做等距投影 —— 不发任何外部请求，断网也能画 */
+function mapHtml(pts) {
+  if (!pts || pts.length < 2) {
+    return pts && pts.length === 1
+      ? '<div class="card" style="margin-top:12px"><p class="muted">只有 1 个站点，画不出路线。</p></div>'
+      : '';
+  }
+  const W = 900, H = 320, PAD = 36;
+  const lats = pts.map(p => p.lat), lons = pts.map(p => p.lon);
+  let minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  let minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  // bbox 退化成一个点时撑开一点，避免除零
+  if (maxLat - minLat < 1e-6) { minLat -= 0.005; maxLat += 0.005; }
+  if (maxLon - minLon < 1e-6) { minLon -= 0.005; maxLon += 0.005; }
+
+  const X = lon => PAD + (lon - minLon) / (maxLon - minLon) * (W - 2 * PAD);
+  const Y = lat => H - PAD - (lat - minLat) / (maxLat - minLat) * (H - 2 * PAD);
+
+  let s = '<div class="card" style="margin-top:12px"><h2>路线图（离线绘制，不依赖地图瓦片）</h2><svg viewBox="0 0 '
+        + W + ' ' + H + '">';
+  s += '<polyline fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="5 4" points="'
+     + pts.map(p => X(p.lon).toFixed(1) + ',' + Y(p.lat).toFixed(1)).join(' ') + '"/>';
+  pts.forEach((p, i) => {
+    const x = X(p.lon), y = Y(p.lat);
+    s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="11" fill="#2563eb"/>';
+    s += '<text x="' + x.toFixed(1) + '" y="' + (y + 4).toFixed(1)
+       + '" fill="#fff" font-size="11" text-anchor="middle">' + (i + 1) + '</text>';
+    s += '<text x="' + x.toFixed(1) + '" y="' + (y - 16).toFixed(1)
+       + '" fill="#1f2328" font-size="11" text-anchor="middle">' + p.name + '</text>';
+  });
+  return s + '</svg><p class="muted" style="margin-top:8px">按经纬度等距投影，'
+          + '只表示相对位置，不能当导航用。</p></div>';
+}
+
+$('go').onclick = plan;
+$('reload').onclick = async () => { await api('/api/reload', {}); alert('已清空数据缓存'); };
+boot();
+</script>
+</body>
+</html>
