@@ -128,12 +128,16 @@ def city_picker(cities: list[dict], default_key: str) -> str:
 
 with st.sidebar:
     opts = options()
-    scenario = st.selectbox("场景", opts["scenarios"], index=0,
+    # 默认场景必须取后端给的 default_scenario（daily），不能用 index=0 ——
+    # 列表是字母序，第一项是 commute，一打开界面就站在"通勤"场景上了。
+    _sc = opts["scenarios"]
+    _sidx = _sc.index(opts["default_scenario"]) if opts["default_scenario"] in _sc else 0
+    scenario = st.selectbox("场景", _sc, index=_sidx,
                             key="in_scenario", on_change=_reset_inputs)
     cfg = scenario_config(scenario)
 
-    # 默认算法取场景配置的 default_strategy（demo.toml 里是 stub），
-    # 不能用 index=0 —— available() 是字母序，第一个是 random（故意做笨的对照组）。
+    # 默认算法取场景配置的 default_strategy，不能用 index=0 ——
+    # available() 是字母序，第一个是 greedy（真算法），会让页面悄悄换掉算法。
     _names = opts["strategies"]
     _default = cfg.default_strategy if cfg.default_strategy in _names else _names[0]
     strategy = st.selectbox("算法", _names, index=_names.index(_default), key="in_strategy")

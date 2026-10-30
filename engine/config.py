@@ -16,7 +16,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCENARIO_DIR = ROOT / "config" / "scenarios"
-DEFAULT_SCENARIO = "demo"
+# 场景已锁定为「日常出行」（2026-10-28），所以默认场景是 daily。
+# demo 只保留两个用途：骨架/占位数据和 `tests/test_golden.py` 的黄金样例——
+# 它是 09:00–18:00 的"游客一日游"口径，与日常出行的时间窗不是一回事，
+# 默认值若还指向 demo，网页/命令行打开时看到的会是"日常的点 + 游客的窗口"。
+DEFAULT_SCENARIO = "daily"
 
 
 @dataclass

@@ -36,6 +36,26 @@ class TestOptions(unittest.TestCase):
         o = options()
         self.assertIn(o["default_city"], [c["key"] for c in o["cities"]])
 
+    def test_default_strategy_comes_from_scenario_not_alphabet(self):
+        """AC-44：默认算法必须是场景配置里的值，不能是 `available()` 的第一个。
+
+        `available()` 是字母序（greedy / random / stub / two_opt），
+        前端如果拿第一个当默认，页面就悄悄换成了 greedy，站点顺序与命令行对不上。
+        """
+        from engine.config import load_scenario
+
+        o = options()
+        cfg = load_scenario(o["default_scenario"])
+        self.assertEqual(o["default_strategy"], cfg.default_strategy)
+        self.assertNotEqual(o["default_strategy"], sorted(o["strategies"])[0])
+
+    def test_every_scenario_reports_its_own_default(self):
+        """切场景时前端要跟着切算法，所以每个场景都得有一份默认值。"""
+        o = options()
+        self.assertEqual(sorted(o["scenario_strategies"]), sorted(o["scenarios"]))
+        self.assertEqual(o["scenario_strategies"][o["default_scenario"]],
+                         o["default_strategy"])
+
 
 class TestOverrides(unittest.TestCase):
     def test_empty_overrides_changes_nothing(self):
@@ -86,6 +106,26 @@ class TestPlanFromText(unittest.TestCase):
         """未知算法必须抛 KeyError —— 由入口层转成友好提示，不能静默换算法。"""
         with self.assertRaises(KeyError):
             plan_from_text("随便", scenario="demo", strategy="not_exist")
+
+    def test_city_falls_back_to_registry_default(self):
+        """文本不提城市时不能留空：空城市会掉回 8 条占位数据（data/pois.csv）。"""
+        from data.cities import default_city
+        from service.usecases import build_request
+
+        req = build_request("上午自习，中午吃饭", scenario="daily")
+        self.assertEqual(req.city, default_city())
+
+        resp = plan_from_text("上午自习，中午吃饭", scenario="daily", strategy="stub")
+        names = [i.name for i in resp.days[0].items]
+        self.assertTrue(names)
+        self.assertFalse([n for n in names if n.startswith("占位点")],
+                         "默认数据还是占位的：%s" % names)
+
+    def test_pending_list_is_reported(self):
+        """任务书要求区分"已核实"与"待确认"：用到的种子数据必须进 meta.pending。"""
+        resp = plan_from_text("上午自习，中午吃饭", scenario="daily", strategy="stub")
+        self.assertIn("pending", resp.meta)
+        self.assertTrue(resp.meta["pending"])
 
 
 class TestExporters(unittest.TestCase):

@@ -41,15 +41,34 @@ def city_options() -> list[dict[str, Any]]:
 
 
 def options() -> dict[str, Any]:
-    """一次性给齐所有可选项，UI 与 /api/options 共用。"""
+    """一次性给齐所有可选项，UI 与 /api/options 共用。
+
+    `default_strategy` 必须由后端给：`available()` 是**字母序**，
+    第一个是 `greedy`（真算法），而场景配置里默认是 `stub`。
+    前端如果拿"第一个"当默认值，就等于悄悄换了算法 —— 页面的站点顺序
+    会和命令行对不上，还容易被误判成算法有 bug（见 `04` AC-44）。
+    """
     from data.cities import default_city
+
+    cfg = load_scenario()
+    scenarios = list_scenarios()
+
+    # 每个场景各自的默认算法：切场景时前端跟着切，但用户手动选过就不再覆盖
+    per_scenario: dict[str, str] = {}
+    for name in scenarios:
+        try:
+            per_scenario[name] = load_scenario(name).default_strategy
+        except Exception:                       # noqa: BLE001 - 单个场景坏了不拖垮选项
+            per_scenario[name] = cfg.default_strategy
 
     return {
         "cities": city_options(),
-        "scenarios": list_scenarios(),
+        "scenarios": scenarios,
         "strategies": available(),
         "default_city": default_city(),
-        "default_scenario": load_scenario().name,
+        "default_scenario": cfg.name,
+        "default_strategy": per_scenario.get(cfg.name, cfg.default_strategy),
+        "scenario_strategies": per_scenario,
     }
 
 
@@ -117,7 +136,17 @@ def build_request(text: str = "",
     cfg = cfg or load_scenario(scenario)
     req = parse(text or "", cfg)
     req.raw_query = text or req.raw_query
-    return apply_overrides(req, overrides)
+    req = apply_overrides(req, overrides)
+
+    # 文本里没提城市 → 用注册表的默认城市。
+    # 不留空是必须的：城市是**数据路由**，空城市会让 `poi_path()` 掉回场景配置里的
+    # 兜底文件（`data/pois.csv`，8 条占位数据），于是网页/命令行默认看到的是
+    # "占位点01"而不是真实的凌水生活圈 —— 演示第一眼就露馅。
+    if not (req.city or "").strip():
+        from data.cities import default_city
+
+        req.city = default_city()
+    return req
 
 
 def plan_context_for(req: PlanRequest,
