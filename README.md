@@ -35,9 +35,19 @@
 # 5) 跑基线对比（4 个算法 × 6 个用例，结果写入 eval/results.md）
 .venv\Scripts\python.exe -m eval.baseline --scenario daily
 
+# 6) 断网兜底样例：校验 7 份 JSON 是否仍与当前引擎一致（M6 必跑）
+.venv\Scripts\python.exe -m tools.make_demo_outputs --verify
+
 # 开发期可选：不开浏览器验证前端画得对不对（13 项断言 + 生成静态预览页）
 node _render_check.js
 ```
+
+> ⚠️ **第 7 条（前端自检）需要 Node.js，本机不一定装**。PyCharm 的终端不继承 WorkBuddy 的 PATH，
+> 所以直接敲 `node` 会报 `CommandNotFoundException: 无法将"node"项识别为 cmdlet` —— 这不是项目坏了。
+> 三种处置，任选：① 跳过（它只是开发期自检，**不在评分项里**）；
+> ② 用绝对路径跑：`C:\Users\18055\.workbuddy\binaries\node\versions\22.22.2\node.exe _render_check.js`；
+> ③ 装一次 Node LTS 后重开终端。
+> **答辩机建议按 ① 处理**：真正必跑的是 Python 那几条（测试 / options / 兜底校验）。
 
 > 三种入口用的是**同一份**业务逻辑（`service/usecases.py`）：
 > 命令行 `main.py` ｜ Streamlit `ui/app.py` ｜ 网页 `api.server` + `web/index.html`。

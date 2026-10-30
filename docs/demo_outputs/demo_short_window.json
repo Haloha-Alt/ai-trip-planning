@@ -1,0 +1,100 @@
+{
+  "_note": "主线B-4：17:00–17:30 太短。页面/命令行显示空行程 + NO_CANDIDATE，不崩（AC-42）。",
+  "_how": "api.routes.dispatch POST /api/plan，realtime=false",
+  "request_body": {
+    "query": "随便走走",
+    "overrides": {
+      "start_time": "17:00",
+      "end_time": "17:30",
+      "top_n": 3
+    },
+    "scenario": "daily",
+    "strategy": "stub",
+    "narrate": true
+  },
+  "response": {
+    "ok": true,
+    "plan": {
+      "contract": "v1",
+      "strategy": "stub",
+      "scenario": "daily",
+      "generated_at": "2026-10-30T22:22:12",
+      "city": "dalian",
+      "request": {
+        "city": "dalian",
+        "days": 1,
+        "start_time": "17:00",
+        "end_time": "17:30",
+        "daily_budget": 60.0,
+        "interests": [],
+        "avoid": [],
+        "pace": "normal",
+        "start_poi_id": null,
+        "top_n": 3,
+        "raw_query": "随便走走",
+        "origin": "",
+        "date": "",
+        "travelers": 1,
+        "budget_basis": "per_person",
+        "must_visit": [],
+        "mobility": "walk",
+        "seed": null,
+        "deadline": "",
+        "waypoints": [],
+        "profile": ""
+      },
+      "days": [
+        {
+          "day_index": 1,
+          "date": "",
+          "weather": "",
+          "theme": "第 1 天",
+          "total_cost": 0,
+          "total_stay_min": 0,
+          "total_travel_min": 0,
+          "total_distance_km": 0,
+          "items": []
+        }
+      ],
+      "warnings": [
+        "[Day1] NO_CANDIDATE: 没有排入任何站点",
+        "[narrate] 未启用大模型（缺 LLM_API_KEY），直接用规则结果"
+      ],
+      "metrics": {
+        "satisfaction": 0.0,
+        "cost": 1.0,
+        "time": 0.0,
+        "distance": 0.0,
+        "feasibility": 0.0,
+        "overall": 0.0
+      },
+      "meta": {
+        "data": {
+          "matrix_edges": 145,
+          "matrix_modes": [
+            "walk"
+          ],
+          "city": "dalian"
+        },
+        "weights": {
+          "satisfaction": 0.45,
+          "cost": 0.25,
+          "time": 0.2,
+          "distance": 0.1
+        },
+        "narrative": {
+          "summary": "1 天 0 站，总花费 0 元，满意度 0.00、可行性 0.00，总分 0.0000。",
+          "days": [
+            {
+              "day": 1,
+              "theme": "第 1 天",
+              "note": "这一天是空的 —— 多半是时间窗太短，或候选都被过滤掉了。"
+            }
+          ]
+        }
+      },
+      "realtime": {}
+    },
+    "map": []
+  }
+}

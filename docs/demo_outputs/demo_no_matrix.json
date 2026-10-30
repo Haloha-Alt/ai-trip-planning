@@ -1,0 +1,171 @@
+{
+  "_note": "AC-64：切到北京。无实测路网，meta.data.matrix_edges = 0，页面写明按直线估算。",
+  "_how": "api.routes.dispatch POST /api/plan，realtime=false",
+  "request_body": {
+    "query": "想看人文类的地方",
+    "overrides": {
+      "city": "beijing",
+      "top_n": 2,
+      "daily_budget": 200
+    },
+    "scenario": "daily",
+    "strategy": "stub",
+    "narrate": true
+  },
+  "response": {
+    "ok": true,
+    "plan": {
+      "contract": "v1",
+      "strategy": "stub",
+      "scenario": "daily",
+      "generated_at": "2026-10-30T22:22:12",
+      "city": "beijing",
+      "request": {
+        "city": "beijing",
+        "days": 1,
+        "start_time": "07:00",
+        "end_time": "22:00",
+        "daily_budget": 200.0,
+        "interests": [
+          "人文"
+        ],
+        "avoid": [],
+        "pace": "normal",
+        "start_poi_id": null,
+        "top_n": 2,
+        "raw_query": "想看人文类的地方",
+        "origin": "",
+        "date": "",
+        "travelers": 1,
+        "budget_basis": "per_person",
+        "must_visit": [],
+        "mobility": "walk",
+        "seed": null,
+        "deadline": "",
+        "waypoints": [],
+        "profile": ""
+      },
+      "days": [
+        {
+          "day_index": 1,
+          "date": "",
+          "weather": "",
+          "theme": "展馆 · 寺庙",
+          "total_cost": 85.0,
+          "total_stay_min": 240,
+          "total_travel_min": 48.1,
+          "total_distance_km": 3.61,
+          "items": [
+            {
+              "seq": 1,
+              "poi_id": "BJ001",
+              "name": "故宫博物院",
+              "category": "展馆",
+              "address": "东城区",
+              "lat": 39.9163,
+              "lon": 116.3972,
+              "arrive": "08:30",
+              "leave": "11:30",
+              "stay_min": 180,
+              "cost": 60.0,
+              "transport": {
+                "mode": "start",
+                "minutes": 0.0,
+                "distance_km": 0.0,
+                "cost": 0.0
+              },
+              "reason": "命中兴趣：人文；到早了等开门 90 分钟",
+              "tips": "建议停留 180 分钟，人均 60 元，命中兴趣：人文；到早了等开门 90 分钟。",
+              "flags": [
+                "wait_open"
+              ],
+              "url": ""
+            },
+            {
+              "seq": 2,
+              "poi_id": "BJ010",
+              "name": "雍和宫",
+              "category": "寺庙",
+              "address": "东城区",
+              "lat": 39.947,
+              "lon": 116.411,
+              "arrive": "12:18",
+              "leave": "13:18",
+              "stay_min": 60,
+              "cost": 25.0,
+              "transport": {
+                "mode": "walk",
+                "minutes": 48.1,
+                "distance_km": 3.611,
+                "cost": 0.0
+              },
+              "reason": "命中兴趣：人文",
+              "tips": "建议停留 60 分钟，人均 25 元，命中兴趣：人文，从上一站 walk 约 48 分钟。",
+              "flags": [],
+              "url": ""
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "[narrate] 未启用大模型（缺 LLM_API_KEY），直接用规则结果"
+      ],
+      "metrics": {
+        "satisfaction": 1.0,
+        "cost": 0.575,
+        "time": 0.2667,
+        "distance": 0.833,
+        "feasibility": 1.0,
+        "overall": 0.7304
+      },
+      "meta": {
+        "data": {
+          "matrix_edges": 0,
+          "matrix_modes": [],
+          "city": "beijing"
+        },
+        "weights": {
+          "satisfaction": 0.45,
+          "cost": 0.25,
+          "time": 0.2,
+          "distance": 0.1
+        },
+        "pending": [
+          "故宫博物院（展馆，per_person）",
+          "雍和宫（寺庙，per_person）"
+        ],
+        "narrative": {
+          "summary": "1 天 2 站，总花费 85 元，满意度 1.00、可行性 1.00，总分 0.7304。",
+          "days": [
+            {
+              "day": 1,
+              "theme": "展馆 · 寺庙",
+              "note": "08:30 出发，13:18 收尾，共 2 站，停留 240 分钟、在途 48 分钟，花费 85 元。"
+            }
+          ]
+        }
+      },
+      "realtime": {}
+    },
+    "map": [
+      {
+        "day": 1,
+        "seq": 1,
+        "name": "故宫博物院",
+        "lat": 39.9163,
+        "lon": 116.3972,
+        "arrive": "08:30",
+        "category": "展馆"
+      },
+      {
+        "day": 1,
+        "seq": 2,
+        "name": "雍和宫",
+        "lat": 39.947,
+        "lon": 116.411,
+        "arrive": "12:18",
+        "category": "寺庙"
+      }
+    ]
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "_note": "主线B-5：16:50 出发、兴趣看病/邮政。17:00 关门的点不进候选（AC-59），无 CLOSED。",
+  "_how": "api.routes.dispatch POST /api/plan，realtime=false",
+  "request_body": {
+    "request": {
+      "city": "dalian",
+      "top_n": 4,
+      "start_time": "16:50",
+      "end_time": "21:30",
+      "interests": [
+        "看病",
+        "邮政"
+      ]
+    },
+    "scenario": "daily",
+    "strategy": "stub",
+    "narrate": true
+  },
+  "response": {
+    "ok": true,
+    "plan": {
+      "contract": "v1",
+      "strategy": "stub",
+      "scenario": "daily",
+      "generated_at": "2026-10-30T22:22:12",
+      "city": "dalian",
+      "request": {
+        "city": "dalian",
+        "days": 1,
+        "start_time": "16:50",
+        "end_time": "21:30",
+        "daily_budget": null,
+        "interests": [
+          "看病",
+          "邮政"
+        ],
+        "avoid": [],
+        "pace": "normal",
+        "start_poi_id": null,
+        "top_n": 4,
+        "raw_query": "",
+        "origin": "",
+        "date": "",
+        "travelers": 1,
+        "budget_basis": "per_person",
+        "must_visit": [],
+        "mobility": "walk",
+        "seed": null,
+        "deadline": "",
+        "waypoints": [],
+        "profile": ""
+      },
+      "days": [
+        {
+          "day_index": 1,
+          "date": "",
+          "weather": "",
+          "theme": "医疗",
+          "total_cost": 25.0,
+          "total_stay_min": 10,
+          "total_travel_min": 0.0,
+          "total_distance_km": 0.0,
+          "items": [
+            {
+              "seq": 1,
+              "poi_id": "DL022",
+              "name": "校园药店",
+              "category": "医疗",
+              "address": "凌水主校区中部",
+              "lat": 38.8847,
+              "lon": 121.5294,
+              "arrive": "16:50",
+              "leave": "17:00",
+              "stay_min": 10,
+              "cost": 25.0,
+              "transport": {
+                "mode": "start",
+                "minutes": 0.0,
+                "distance_km": 0.0,
+                "cost": 0.0
+              },
+              "reason": "命中兴趣：医疗、药店",
+              "tips": "建议停留 10 分钟，人均 25 元，命中兴趣：医疗、药店。",
+              "flags": [],
+              "url": ""
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "[narrate] 未启用大模型（缺 LLM_API_KEY），直接用规则结果"
+      ],
+      "metrics": {
+        "satisfaction": 0.6667,
+        "cost": 0.5833,
+        "time": 0.0357,
+        "distance": 1.0,
+        "feasibility": 1.0,
+        "overall": 0.553
+      },
+      "meta": {
+        "data": {
+          "matrix_edges": 145,
+          "matrix_modes": [
+            "walk"
+          ],
+          "city": "dalian"
+        },
+        "weights": {
+          "satisfaction": 0.45,
+          "cost": 0.25,
+          "time": 0.2,
+          "distance": 0.1
+        },
+        "pending": [
+          "校园药店（医疗，per_trip）"
+        ],
+        "narrative": {
+          "summary": "1 天 1 站，总花费 25 元，满意度 0.67、可行性 1.00，总分 0.5530。",
+          "days": [
+            {
+              "day": 1,
+              "theme": "医疗",
+              "note": "16:50 出发，17:00 收尾，共 1 站，停留 10 分钟、在途 0 分钟，花费 25 元。"
+            }
+          ]
+        }
+      },
+      "realtime": {}
+    },
+    "map": [
+      {
+        "day": 1,
+        "seq": 1,
+        "name": "校园药店",
+        "lat": 38.8847,
+        "lon": 121.5294,
+        "arrive": "16:50",
+        "category": "医疗"
+      }
+    ]
+  }
+}

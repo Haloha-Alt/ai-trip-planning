@@ -1,0 +1,208 @@
+{
+  "_note": "主线B-3：出发 06:20。第一站前面出现橙色「等开门」段（AC-45 第 5 条）。",
+  "_how": "api.routes.dispatch POST /api/plan，realtime=false",
+  "request_body": {
+    "query": "上午去图书馆自习，中午食堂吃饭，别太赶",
+    "overrides": {
+      "start_time": "06:20",
+      "pace": "normal",
+      "top_n": 3
+    },
+    "scenario": "daily",
+    "strategy": "stub",
+    "narrate": true
+  },
+  "response": {
+    "ok": true,
+    "plan": {
+      "contract": "v1",
+      "strategy": "stub",
+      "scenario": "daily",
+      "generated_at": "2026-10-30T22:22:12",
+      "city": "dalian",
+      "request": {
+        "city": "dalian",
+        "days": 1,
+        "start_time": "06:20",
+        "end_time": "22:00",
+        "daily_budget": 60.0,
+        "interests": [
+          "图书馆",
+          "吃饭",
+          "自习"
+        ],
+        "avoid": [],
+        "pace": "normal",
+        "start_poi_id": null,
+        "top_n": 3,
+        "raw_query": "上午去图书馆自习，中午食堂吃饭，别太赶",
+        "origin": "",
+        "date": "",
+        "travelers": 1,
+        "budget_basis": "per_person",
+        "must_visit": [],
+        "mobility": "walk",
+        "seed": null,
+        "deadline": "",
+        "waypoints": [],
+        "profile": ""
+      },
+      "days": [
+        {
+          "day_index": 1,
+          "date": "",
+          "weather": "",
+          "theme": "图书馆 · 食堂",
+          "total_cost": 12.0,
+          "total_stay_min": 280,
+          "total_travel_min": 12.5,
+          "total_distance_km": 0.94,
+          "items": [
+            {
+              "seq": 1,
+              "poi_id": "DL003",
+              "name": "伯川图书馆",
+              "category": "图书馆",
+              "address": "凌水主校区西部",
+              "lat": 38.8843,
+              "lon": 121.5272,
+              "arrive": "07:30",
+              "leave": "09:30",
+              "stay_min": 120,
+              "cost": 0.0,
+              "transport": {
+                "mode": "start",
+                "minutes": 0.0,
+                "distance_km": 0.0,
+                "cost": 0.0
+              },
+              "reason": "命中兴趣：图书馆、自习；到早了等开门 70 分钟",
+              "tips": "建议停留 120 分钟，免费，命中兴趣：图书馆、自习；到早了等开门 70 分钟。",
+              "flags": [
+                "wait_open"
+              ],
+              "url": ""
+            },
+            {
+              "seq": 2,
+              "poi_id": "DL004",
+              "name": "令希图书馆",
+              "category": "图书馆",
+              "address": "凌水主校区北部",
+              "lat": 38.887,
+              "lon": 121.5315,
+              "arrive": "09:36",
+              "leave": "11:36",
+              "stay_min": 120,
+              "cost": 0.0,
+              "transport": {
+                "mode": "walk",
+                "minutes": 6.4,
+                "distance_km": 0.478,
+                "cost": 0.0
+              },
+              "reason": "命中兴趣：图书馆、自习",
+              "tips": "建议停留 120 分钟，免费，命中兴趣：图书馆、自习，从上一站 walk 约 6 分钟。",
+              "flags": [],
+              "url": ""
+            },
+            {
+              "seq": 3,
+              "poi_id": "DL007",
+              "name": "第一食堂",
+              "category": "食堂",
+              "address": "凌水主校区中部",
+              "lat": 38.8832,
+              "lon": 121.5295,
+              "arrive": "11:42",
+              "leave": "12:22",
+              "stay_min": 40,
+              "cost": 12.0,
+              "transport": {
+                "mode": "walk",
+                "minutes": 6.1,
+                "distance_km": 0.457,
+                "cost": 0.0
+              },
+              "reason": "命中兴趣：食堂、餐饮",
+              "tips": "建议停留 40 分钟，人均 12 元，命中兴趣：食堂、餐饮，从上一站 walk 约 6 分钟。",
+              "flags": [],
+              "url": ""
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "[narrate] 未启用大模型（缺 LLM_API_KEY），直接用规则结果"
+      ],
+      "metrics": {
+        "satisfaction": 0.5,
+        "cost": 0.8,
+        "time": 0.2979,
+        "distance": 0.9573,
+        "feasibility": 1.0,
+        "overall": 0.5803
+      },
+      "meta": {
+        "data": {
+          "matrix_edges": 145,
+          "matrix_modes": [
+            "walk"
+          ],
+          "city": "dalian"
+        },
+        "weights": {
+          "satisfaction": 0.45,
+          "cost": 0.25,
+          "time": 0.2,
+          "distance": 0.1
+        },
+        "pending": [
+          "令希图书馆（图书馆，per_person）",
+          "伯川图书馆（图书馆，per_person）",
+          "第一食堂（食堂，per_person）"
+        ],
+        "narrative": {
+          "summary": "1 天 3 站，总花费 12 元，满意度 0.50、可行性 1.00，总分 0.5803。",
+          "days": [
+            {
+              "day": 1,
+              "theme": "图书馆 · 食堂",
+              "note": "07:30 出发，12:22 收尾，共 3 站，停留 280 分钟、在途 12 分钟，花费 12 元。"
+            }
+          ]
+        }
+      },
+      "realtime": {}
+    },
+    "map": [
+      {
+        "day": 1,
+        "seq": 1,
+        "name": "伯川图书馆",
+        "lat": 38.8843,
+        "lon": 121.5272,
+        "arrive": "07:30",
+        "category": "图书馆"
+      },
+      {
+        "day": 1,
+        "seq": 2,
+        "name": "令希图书馆",
+        "lat": 38.887,
+        "lon": 121.5315,
+        "arrive": "09:36",
+        "category": "图书馆"
+      },
+      {
+        "day": 1,
+        "seq": 3,
+        "name": "第一食堂",
+        "lat": 38.8832,
+        "lon": 121.5295,
+        "arrive": "11:42",
+        "category": "食堂"
+      }
+    ]
+  }
+}

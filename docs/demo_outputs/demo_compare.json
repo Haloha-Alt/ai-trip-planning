@@ -1,0 +1,141 @@
+{
+  "_note": "主线C：同一份需求跑全部算法的对比结论（★ 最优行 + 相对基线的百分比）。",
+  "_how": "api.routes.dispatch POST /api/compare，baseline=random",
+  "request_body": {
+    "query": "上午自习，中午吃饭，顺便取快递，别太赶",
+    "scenario": "daily",
+    "realtime": false
+  },
+  "response": {
+    "ok": true,
+    "scenario": "daily",
+    "baseline": "random",
+    "best": "greedy",
+    "rows": [
+      {
+        "strategy": "greedy",
+        "items": 2,
+        "days": 1,
+        "cost": 0.0,
+        "stay_min": 240,
+        "travel_min": 6.4,
+        "distance_km": 0.48,
+        "satisfaction": 0.4,
+        "cost_score": 1.0,
+        "time_score": 0.2667,
+        "distance_score": 0.974,
+        "feasibility": 1.0,
+        "overall": 0.5807,
+        "warnings": 0,
+        "warning_list": [],
+        "is_best": true,
+        "wins": 2,
+        "vs_baseline": {
+          "overall_pct": 13.5,
+          "cost_pct": null,
+          "travel_min_pct": 106.5,
+          "wins": 2
+        }
+      },
+      {
+        "strategy": "stub",
+        "items": 2,
+        "days": 1,
+        "cost": 0.0,
+        "stay_min": 240,
+        "travel_min": 6.4,
+        "distance_km": 0.48,
+        "satisfaction": 0.4,
+        "cost_score": 1.0,
+        "time_score": 0.2667,
+        "distance_score": 0.974,
+        "feasibility": 1.0,
+        "overall": 0.5807,
+        "warnings": 0,
+        "warning_list": [],
+        "is_best": false,
+        "wins": 2,
+        "vs_baseline": {
+          "overall_pct": 13.5,
+          "cost_pct": null,
+          "travel_min_pct": 106.5,
+          "wins": 2
+        }
+      },
+      {
+        "strategy": "two_opt",
+        "items": 2,
+        "days": 1,
+        "cost": 0.0,
+        "stay_min": 240,
+        "travel_min": 6.4,
+        "distance_km": 0.48,
+        "satisfaction": 0.4,
+        "cost_score": 1.0,
+        "time_score": 0.2667,
+        "distance_score": 0.974,
+        "feasibility": 1.0,
+        "overall": 0.5807,
+        "warnings": 0,
+        "warning_list": [],
+        "is_best": false,
+        "wins": 2,
+        "vs_baseline": {
+          "overall_pct": 13.5,
+          "cost_pct": null,
+          "travel_min_pct": 106.5,
+          "wins": 2
+        }
+      },
+      {
+        "strategy": "random",
+        "items": 2,
+        "days": 1,
+        "cost": 0.0,
+        "stay_min": 130,
+        "travel_min": 3.1,
+        "distance_km": 0.23,
+        "satisfaction": 0.3,
+        "cost_score": 1.0,
+        "time_score": 0.1444,
+        "distance_score": 0.9767,
+        "feasibility": 1.0,
+        "overall": 0.5116,
+        "warnings": 0,
+        "warning_list": [],
+        "is_best": false,
+        "wins": 0,
+        "vs_baseline": {}
+      }
+    ],
+    "request": {
+      "city": "dalian",
+      "days": 1,
+      "start_time": "07:00",
+      "end_time": "22:00",
+      "daily_budget": 60.0,
+      "interests": [
+        "取快递",
+        "吃饭",
+        "快递",
+        "自习"
+      ],
+      "avoid": [],
+      "pace": "relaxed",
+      "start_poi_id": null,
+      "top_n": 4,
+      "raw_query": "上午自习，中午吃饭，顺便取快递，别太赶",
+      "origin": "",
+      "date": "",
+      "travelers": 1,
+      "budget_basis": "per_person",
+      "must_visit": [],
+      "mobility": "walk",
+      "seed": null,
+      "deadline": "",
+      "waypoints": [],
+      "profile": ""
+    },
+    "summary": "「greedy」总分 0.5807，比基线「random」高 13.5%，在 2 项指标上更优。"
+  }
+}
