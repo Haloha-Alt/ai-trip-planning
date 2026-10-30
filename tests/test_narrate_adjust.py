@@ -175,6 +175,32 @@ class TestAdjustRoute(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertFalse(body["ok"])
 
+    def test_instructions_are_replayed_in_order(self):
+        """连续两次调整：第二次不能把第一次的结果吞掉。
+
+        网页每点一次「应用调整」都会带上**全部历史指令**，服务端按顺序重放。
+        只发最后一句话时，第二次是从原始行程重新开始 —— 用户看到"已调整"，
+        实际第一次的改动已经没了。
+        """
+        _, base = dispatch("POST", "/api/plan", {}, self.BODY)
+        ids0 = [i["poi_id"] for d in base["plan"]["days"] for i in d["items"]]
+        if len(ids0) < 4:
+            self.skipTest("该数据下站点不足以做两次调整")
+
+        _, only = dispatch("POST", "/api/adjust", {},
+                           dict(self.BODY, instruction="删掉第3站"))
+        _, chain = dispatch("POST", "/api/adjust", {},
+                            dict(self.BODY, instructions=["删掉第3站", "第1站换成近的"]))
+
+        ids1 = [i["poi_id"] for d in only["plan"]["days"] for i in d["items"]]
+        ids2 = [i["poi_id"] for d in chain["plan"]["days"] for i in d["items"]]
+        self.assertNotIn(ids0[2], ids1, "第一次调整没删掉第 3 站")
+        # 判据看"站数"而不是"某个点还在不在"：第二次是替换，完全可能换回同一个点。
+        # 删掉的站没被补回来 → 第一次调整的结果被保留了。
+        self.assertEqual(len(ids2), len(ids0) - 1, "第一次删掉的站被补回来了：%s" % ids2)
+        self.assertNotEqual(ids2[0], ids1[0], "第二次调整没生效")
+        self.assertEqual(len(chain["adjust"]["instructions"]), 2)
+
     def test_narrate_flag_adds_tips(self):
         status, body = dispatch("POST", "/api/plan", {},
                                 dict(self.BODY, narrate=True))

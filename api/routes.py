@@ -106,10 +106,18 @@ def post_adjust(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     为什么"重新生成再打补丁"而不是"把整份 plan 传回来"：
     `/api/plan` 在 `realtime=false` 时是确定性的，同一份 body 必然得到同一份行程，
     所以两者等价，但请求体小得多，也不用担心前后端契约版本不一致。
+
+    **连续调整**用 `instructions: ["删掉第3站", "第1站换成近的"]`：
+    服务端按顺序重放（先 plan，再逐条打补丁）。不这么做的话，第二次调整会从
+    "原始行程"重新开始，第一次的结果被静默吞掉 —— 而用户看到的提示却是"已调整"。
     """
     body = req.get("body") or {}
-    text = str(body.get("instruction") or "").strip()
-    if not text:
+    raw = body.get("instructions")
+    texts = [str(t).strip() for t in raw if str(t).strip()] if isinstance(raw, list) else []
+    one = str(body.get("instruction") or "").strip()
+    if not texts and one:
+        texts = [one]
+    if not texts:
         return _err("缺少 instruction（例如：第2站太贵了换一个）", 400)
 
     try:
@@ -117,7 +125,13 @@ def post_adjust(req: HttpRequest) -> tuple[int, dict[str, Any]]:
                          body.get("realtime", False))
         if body.get("narrate"):
             base = narrate_plan(base)
-        new = adjust_plan(base, text)
+        new = base
+        notes: list[str] = []
+        for t in texts:
+            new = adjust_plan(new, t)
+            n = (new.meta.get("adjust") or {}).get("note", "")
+            if n:
+                notes.append(n)
     except KeyError as e:
         return _err(str(e).strip('"'), 400)
     except Exception as e:                      # noqa: BLE001
@@ -128,7 +142,8 @@ def post_adjust(req: HttpRequest) -> tuple[int, dict[str, Any]]:
         "plan": to_api_dict(new),
         "map": to_map_points(new),
         "before": to_api_dict(base),
-        "adjust": {"instruction": text, "note": changed.get("note", ""),
+        "adjust": {"instruction": texts[-1], "instructions": texts,
+                   "note": "；".join(notes),
                    "changed_days": changed.get("changed_days", 0)},
     })
 

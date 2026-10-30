@@ -9,7 +9,7 @@
     --bg:#f6f7f9; --card:#ffffff; --line:#e3e6ea; --ink:#1f2328;
     --sub:#6b7280; --accent:#2563eb; --accent-soft:#eaf1ff;
     --warn:#b45309; --warn-bg:#fff7ed; --ok:#15803d; --ok-bg:#f0fdf4;
-    --stay:#2563eb; --move:#9aa4b2; --best:#15803d; --best-bg:#f0fdf4;
+    --stay:#2563eb; --move:#9aa4b2; --wait:#f59e0b; --best:#15803d; --best-bg:#f0fdf4;
   }
   *{box-sizing:border-box}
   [hidden]{display:none !important}
@@ -214,6 +214,8 @@ let LAST = null;        // 最近的查询条件，导出与对比复用
 let PLAN = null;        // 最近一次的规划结果
 let PTS = [];           // 地图点
 let CMP = null;         // 最近一次的算法对比结果
+let OPTS = null;        // /api/options 的原始返回（切场景时要用）
+let ADJ = [];           // 本份行程已经下过的调整指令，按顺序重放
 
 /* 所有拼进 innerHTML 的外部文本都要过一遍 —— 站点名里出现 & 或 < 时页面不能崩 */
 function esc(s){
@@ -242,10 +244,21 @@ async function boot() {
   }
   try {
     const o = await api('/api/options');
+    OPTS = o;
     fill('city', o.cities, o.default_city, c => [c.key, c.name + '（' + c.key + '）']);
     fill('scenario', o.scenarios, o.default_scenario, s => [s, s]);
     fill('strategy', o.strategies, o.default_strategy, s => [s, s]);
   } catch (e) { /* 选项拉不到就用空下拉，页面不至于打不开 */ }
+}
+
+/* 换场景时把算法切回该场景的默认值 —— 但用户手动选过算法就不动。
+ * 没有这一步，"切到 tight-budget 却还在跑 two_opt"会让场景配置形同虚设。 */
+function bindScenarioStrategy(){
+  $('scenario').addEventListener('change', () => {
+    if (TOUCHED.strategy || !OPTS || !OPTS.scenario_strategies) return;
+    const s = OPTS.scenario_strategies[$('scenario').value];
+    if (s) $('strategy').value = s;
+  });
 }
 
 function fill(id, items, def, kv) {
@@ -276,7 +289,8 @@ function markTouched(field){
   el.addEventListener('change', set);
 }
 
-['start', 'end', 'budget', 'top_n', 'pace', 'mobility', 'days', 'city'].forEach(markTouched);
+['start', 'end', 'budget', 'top_n', 'pace', 'mobility', 'days', 'city',
+ 'strategy'].forEach(markTouched);
 
 function collect() {
   const ov = {};
@@ -334,6 +348,7 @@ async function plan() {
   }
   PLAN = res.plan;
   PTS = res.map || [];
+  ADJ = [];                    // 新行程 = 调整历史的新起点
   renderPlan();
   showTab('list');
 }
@@ -343,7 +358,7 @@ function renderPlan(){
   $('adjustBar').hidden = false;
   $('summary').innerHTML = '<div class="card">' + narrativeHtml(PLAN) + metricsHtml(PLAN)
                          + metaLine(PLAN) + realtimeNote(PLAN) + warningsHtml(PLAN)
-                         + exportBar() + '</div>';
+                         + pendingHtml(PLAN) + exportBar() + '</div>';
   $('pane-list').innerHTML = listHtml(PLAN);
   $('pane-timeline').innerHTML = timelineHtml(PLAN);
   $('pane-map').innerHTML = mapHtml(PTS);
@@ -401,6 +416,19 @@ function warningsHtml(plan){
          + plan.warnings.map(w => '· ' + esc(w)).join('<br>') + '</div>';
   }
   return '<div class="ok">无异常提示</div>';
+}
+
+/* 待核实清单：任务书明确要求"区分已核实信息与待确认信息"。
+ * 后端一直在 meta.pending 里列，前端以前不渲染 —— 等于把这条要求做没了。 */
+function pendingHtml(plan){
+  const list = (plan.meta && plan.meta.pending) || [];
+  if (!list.length) {
+    return '<p class="muted">数据核对：本次用到的站点均带来源适用日期。</p>';
+  }
+  return '<div class="warn" style="background:#f8fafc;border-color:#e3e6ea;color:#475569">'
+       + '<b>待核实（' + list.length + ' 项）</b>：下列站点的开放时间与价格取自种子数据，'
+       + '未标注来源适用日期，出发前建议再确认一次。<br>'
+       + list.map(x => '· ' + esc(x)).join('<br>') + '</div>';
 }
 
 function exportBar(){
@@ -464,25 +492,39 @@ function timelineHtml(plan){
   let html = '<div class="card"><div class="legend">'
            + '<span><i style="background:var(--stay)"></i>停留</span>'
            + '<span><i style="background:var(--move)"></i>在途</span>'
+           + '<span><i style="background:var(--wait)"></i>等开门</span>'
            + '<span>横轴按真实时刻排布，空白 = 空闲</span></div>';
-  days.forEach(d => html += dayTimeline(d));
+  days.forEach(d => html += dayTimeline(d, plan));
   return html + '</div>';
 }
 
-function dayTimeline(d){
+function dayTimeline(d, plan){
   const items = d.items || [];
   let s = '<div class="tl-day"><h3>第 ' + d.day_index + ' 天'
         + '<span>停留 ' + d.total_stay_min + ' 分 · 在途 ' + d.total_travel_min.toFixed(0)
         + ' 分 · 花费 ' + d.total_cost.toFixed(0) + '</span></h3>';
   if (!items.length) return s + '<p class="muted">（空行程，画不出时间轴）</p></div>';
 
+  /* 三段拆开算，否则会把"到早了等开门"画成"在路上走了很久"：
+   *   离开上一站 depart → 路上 travelEnd（depart + 在途）→ 等开门 wait（到开门时刻）
+   * 引擎里 arrive = max(路上到的时间, open_time)，所以 arrive 不一定是车到站的时刻。
+   */
+  const startClock = toMin((plan && plan.request && plan.request.start_time) || '00:00');
+  const segs = [];
+  let prevLeave = null;
+  items.forEach(it => {
+    const arr = toMin(it.arrive), lv = toMin(it.leave);
+    const t = it.transport || {};
+    const travel = (t.mode && t.mode !== 'start') ? (t.minutes || 0) : 0;
+    const depart = (prevLeave == null) ? startClock : prevLeave;
+    const travelEnd = Math.min(depart + travel, arr);        // 路上到站时刻，不越过 arrive
+    segs.push({it, arr, lv, travel, depart, travelEnd, wait: Math.max(0, arr - travelEnd)});
+    prevLeave = lv;
+  });
+
   // 时间范围：从第一段的"出发时刻"到最后一段的"离开时刻"，向外取整到整点
   let lo = Infinity, hi = -Infinity;
-  items.forEach(it => {
-    const travel = (it.transport && it.transport.mode !== 'start') ? (it.transport.minutes || 0) : 0;
-    lo = Math.min(lo, toMin(it.arrive) - travel);
-    hi = Math.max(hi, toMin(it.leave));
-  });
+  segs.forEach(g => { lo = Math.min(lo, g.depart); hi = Math.max(hi, g.lv); });
   if (!isFinite(lo) || !isFinite(hi) || hi <= lo) { lo = toMin('08:00'); hi = lo + 60; }
   lo = Math.floor(lo / 60) * 60;
   hi = Math.ceil(hi / 60) * 60;
@@ -505,23 +547,29 @@ function dayTimeline(d){
        + '" fill="#6b7280" font-size="10" text-anchor="' + anchor + '">' + hhmm(m) + '</text>';
   }
 
-  items.forEach(it => {
-    const arr = toMin(it.arrive), lv = toMin(it.leave);
-    const t = it.transport || {};
-    const travel = (t.mode && t.mode !== 'start') ? (t.minutes || 0) : 0;
+  segs.forEach(g => {
+    const it = g.it, t = it.transport || {};
 
-    if (travel > 0.5) {                       // 在途段：到达时刻往前推
-      const a = x(arr - travel), b = x(arr);
+    if (g.travel > 0.5) {                     // 在途段：从上一站离开算起
+      const a = x(g.depart), b = x(g.travelEnd);
       s += '<rect x="' + a.toFixed(1) + '" y="' + (TOP + 4) + '" width="' + Math.max(b - a, 0.8).toFixed(1)
          + '" height="' + (BAR_H - 8) + '" rx="3" fill="#9aa4b2" fill-opacity="0.85">'
-         + '<title>' + esc(it.name) + ' 前在途 ' + travel.toFixed(0) + ' 分钟 / '
+         + '<title>' + esc(it.name) + ' 前在途 ' + g.travel.toFixed(0) + ' 分钟 / '
          + (t.distance_km || 0).toFixed(2) + ' km</title></rect>';
     }
 
-    const a = x(arr), b = x(lv);
+    if (g.wait > 0.5) {                       // 等开门：到站了但还没开门
+      const a = x(g.travelEnd), b = x(g.arr);
+      s += '<rect x="' + a.toFixed(1) + '" y="' + (TOP + 7) + '" width="' + Math.max(b - a, 0.8).toFixed(1)
+         + '" height="' + (BAR_H - 14) + '" rx="2" fill="#f59e0b" fill-opacity="0.9">'
+         + '<title>' + esc(it.name) + ' 等开门 ' + g.wait.toFixed(0) + ' 分钟</title></rect>';
+    }
+
+    const a = x(g.arr), b = x(g.lv);
     s += '<rect x="' + a.toFixed(1) + '" y="' + TOP + '" width="' + Math.max(b - a, 1.2).toFixed(1)
        + '" height="' + BAR_H + '" rx="4" fill="#2563eb">'
        + '<title>' + esc(it.name) + ' ' + esc(it.arrive) + '–' + esc(it.leave)
+       + (g.wait > 0.5 ? '（含等开门 ' + g.wait.toFixed(0) + ' 分钟）' : '')
        + '（停留 ' + it.stay_min + ' 分钟）</title></rect>';
 
     // 段够宽才写字，否则只留 tooltip —— 挤在一起反而看不清
@@ -595,15 +643,27 @@ function mapHtml(pts) {
     }
   });
 
-  // 站名不重叠：先试圆点上方，被占了就翻到下方（校园里食堂/教学楼挨得很近，不处理会糊成一团）
+  // 站名不重叠：食堂/教学楼常常挤在几十米内，只试"上方/下方"两个位置不够，
+  // 这里按「上→下→更上→更下→左上→右上→左下→右下」依次探，放到第一个不撞的位置。
   const labels = [];
   pts.forEach(p => {
     const x = X(p.lon), y = Y(p.lat), c = color(p.day);
     const half = Math.max(24, String(p.name).length * 6);
-    const box = yy => ({x1: x - half, x2: x + half, y1: yy - 11, y2: yy + 3});
-    let ly = y - 18;
-    if (labels.some(b => boxesHit(b, box(ly)))) ly = y + 26;
-    labels.push(box(ly));
+    const box = (xx, yy) => ({x1: xx - half, x2: xx + half, y1: yy - 11, y2: yy + 3});
+    // 候选位置是**相对圆点的偏移**，不是绝对坐标 —— 写成绝对坐标会让所有标签落到 x=0。
+    const cands = [
+      [0, -18], [0, 26], [0, -34], [0, 42],
+      [-(half + 6), -18], [half + 6, -18],
+      [-(half + 6), 26], [half + 6, 26],
+    ];
+    let lx = x, ly = y - 18;
+    for (const [dx, dy] of cands) {
+      const cx = x + dx, cy = y + dy;
+      if (cx - half < 2 || cx + half > W - 2) continue;          // 不许被 viewBox 裁掉
+      if (cy < 10 || cy > H - 4) continue;
+      if (!labels.some(b => boxesHit(b, box(cx, cy)))) { lx = cx; ly = cy; break; }
+    }
+    labels.push(box(lx, ly));
 
     s += '<g>';
     s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="13" fill="' + c
@@ -612,7 +672,7 @@ function mapHtml(pts) {
        + '<title>' + esc(p.name) + ' · 第 ' + p.day + ' 天 · ' + esc(p.arrive || '') + '</title></circle>';
     s += '<text x="' + x.toFixed(1) + '" y="' + (y + 4).toFixed(1)
        + '" fill="#fff" font-size="11" text-anchor="middle" pointer-events="none">' + p.seq + '</text>';
-    s += '<text x="' + x.toFixed(1) + '" y="' + ly.toFixed(1)
+    s += '<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1)
        + '" fill="#1f2328" font-size="11" text-anchor="middle" stroke="#fbfcfe" '
        + 'stroke-width="3" paint-order="stroke" pointer-events="none">'
        + esc(p.name) + '</text>';
@@ -726,18 +786,22 @@ async function adjustPlan(){
   if (!text) { $('adjNote').textContent = '先写一句要改什么，例如「第2站太贵了换一个」。'; return; }
   if (!LAST) { $('adjNote').textContent = '先生成一份行程，再调整。'; return; }
 
+  // 累加而不是替换：/api/adjust 每次都从"原始行程"重放，只发最后一句话会把前几次吞掉
+  ADJ.push(text);
   $('adjGo').disabled = true;
-  $('adjNote').textContent = '正在按「' + text + '」调整…';
+  $('adjNote').textContent = '正在按「' + text + '」调整'
+    + (ADJ.length > 1 ? '（连同前面 ' + (ADJ.length - 1) + ' 次一并在新行程上重放）' : '') + '…';
   let res;
   try {
-    res = await api('/api/adjust', Object.assign({}, LAST, {instruction: text}));
+    res = await api('/api/adjust', Object.assign({}, LAST, {instructions: ADJ.slice()}));
   } catch (e) {
+    ADJ.pop();
     $('adjNote').textContent = '请求失败：' + (e.message || e);
     $('adjGo').disabled = false;
     return;
   }
   $('adjGo').disabled = false;
-  if (!res.ok) { $('adjNote').textContent = res.error; return; }
+  if (!res.ok) { ADJ.pop(); $('adjNote').textContent = res.error; return; }
 
   PLAN = res.plan;
   PTS = res.map || [];
@@ -745,8 +809,10 @@ async function adjustPlan(){
   showTab('list');
   const a = res.adjust || {};
   $('adjNote').textContent = a.changed_days
-    ? ('已调整：' + (a.note || a.instruction)) + '（改了 ' + a.changed_days + ' 天的行程）'
+    ? ('已调整：' + (a.note || a.instruction)
+       + '（第 ' + ADJ.length + ' 次，改了 ' + a.changed_days + ' 天的行程；前几次的结果已保留）')
     : ('没有改动：' + (a.note || '没听懂要改什么'));
+  $('adjText').value = '';
 }
 
 $('go').onclick = plan;
@@ -754,6 +820,7 @@ $('cmp').onclick = compare;
 $('adjGo').onclick = adjustPlan;
 $('adjText').addEventListener('keydown', e => { if (e.key === 'Enter') adjustPlan(); });
 $('reload').onclick = async () => { await api('/api/reload', {}); alert('已清空数据缓存'); };
+bindScenarioStrategy();
 boot();
 </script>
 </body>

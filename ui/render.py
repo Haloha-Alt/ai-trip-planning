@@ -82,6 +82,21 @@ def render_raw_json(resp: PlanResponse) -> None:
         st.code(resp.to_json(), language="json")
 
 
+def render_pending(resp: PlanResponse) -> None:
+    """待核实清单：任务书要求"区分已核实信息与待确认信息"。
+
+    引擎在 `meta["pending"]` 里列了所有"没标来源适用日期"的站点，
+    这里必须显示出来 —— 只在报告里说"数据可能有误"不算做到。
+    """
+    pending = (resp.meta or {}).get("pending") or []
+    if not pending:
+        st.caption("数据核对：本次用到的站点均带来源适用日期。")
+        return
+    with st.expander("待核实 %d 项（种子数据，出发前请再确认）" % len(pending), expanded=False):
+        for p in pending:
+            st.write("- " + p)
+
+
 def render_plan(resp: PlanResponse) -> None:
     """一次画完整个结果。"""
     st.caption("场景 `%s` · 策略 `%s` · 生成于 %s"
@@ -92,4 +107,5 @@ def render_plan(resp: PlanResponse) -> None:
         render_day(day)
     st.divider()
     render_warnings(resp)
+    render_pending(resp)
     render_raw_json(resp)
