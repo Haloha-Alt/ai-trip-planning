@@ -357,8 +357,8 @@ function renderPlan(){
   $('tabs').hidden = false;
   $('adjustBar').hidden = false;
   $('summary').innerHTML = '<div class="card">' + narrativeHtml(PLAN) + metricsHtml(PLAN)
-                         + metaLine(PLAN) + realtimeNote(PLAN) + warningsHtml(PLAN)
-                         + pendingHtml(PLAN) + exportBar() + '</div>';
+                         + metaLine(PLAN) + realtimeNote(PLAN) + dataNote(PLAN)
+                         + warningsHtml(PLAN) + pendingHtml(PLAN) + exportBar() + '</div>';
   $('pane-list').innerHTML = listHtml(PLAN);
   $('pane-timeline').innerHTML = timelineHtml(PLAN);
   $('pane-map').innerHTML = mapHtml(PTS);
@@ -408,6 +408,19 @@ function realtimeNote(plan) {
   const warn = rt.warnings || [];
   return '<p class="muted">🌤 未使用实时数据'
        + (warn.length ? '：' + esc(warn.join('；')) : '') + '</p>';
+}
+
+/* 数据覆盖这一行：矩阵有多少条实测边，如实说。
+ * 没有实测路网时必须承认"在途时间是直线估算"，不能让用户以为分钟数是量出来的。 */
+function dataNote(plan){
+  const d = (plan.meta && plan.meta.data) || null;
+  if (!d) return '';
+  if (!d.matrix_edges) {
+    return '<p class="muted">🧭 该城市暂无实测路网：在途时间全部按直线距离 + 配置时速估算。</p>';
+  }
+  const modes = (d.matrix_modes || []).join('/') || '未知方式';
+  return '<p class="muted">🧭 实测路网 ' + d.matrix_edges + ' 条边（' + esc(modes)
+       + '），其余在途时间为直线估算。</p>';
 }
 
 function warningsHtml(plan){

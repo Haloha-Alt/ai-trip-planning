@@ -97,6 +97,19 @@ def render_pending(resp: PlanResponse) -> None:
             st.write("- " + p)
 
 
+def render_data_note(resp: PlanResponse) -> None:
+    """数据覆盖情况：没有实测路网就说清楚"在途是直线估算"，别装作量过。"""
+    d = (resp.meta or {}).get("data") or {}
+    edges = d.get("matrix_edges")
+    if edges is None:
+        return
+    if not edges:
+        st.caption("该城市暂无实测路网：在途时间全部按直线距离 + 配置时速估算。")
+        return
+    modes = "/".join(d.get("matrix_modes") or []) or "未知方式"
+    st.caption("实测路网 %d 条边（%s），其余在途时间为直线估算。" % (edges, modes))
+
+
 def render_plan(resp: PlanResponse) -> None:
     """一次画完整个结果。"""
     st.caption("场景 `%s` · 策略 `%s` · 生成于 %s"
@@ -107,5 +120,6 @@ def render_plan(resp: PlanResponse) -> None:
         render_day(day)
     st.divider()
     render_warnings(resp)
+    render_data_note(resp)
     render_pending(resp)
     render_raw_json(resp)
