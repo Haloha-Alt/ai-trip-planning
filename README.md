@@ -1,7 +1,8 @@
 # AI 出行与规划
 
-> 大连理工大学 Python 课程项目 · 2 人小组
-> 当前阶段：**工程骨架**（业务场景待定，所有业务参数外置，代码零改动即可换场景）
+> 大连理工大学《AI 大模型及其运用》课程项目 · 2 人小组
+> 当前状态：**功能完成**（M0–M4 收尾，M5 交付物在 `docs/submission/`）
+> 场景已锁定：**日常出行**（校园生活圈 46 个点，不是游客一日游）
 
 ---
 
@@ -14,28 +15,31 @@
 
 ---
 
-## 二、三条命令跑起来
+## 二、五条命令跑起来
 
 在 PyCharm 底部 Terminal（工作目录自动是项目根）里执行：
 
 ```bash
-# 1) 命令行跑通整条链路
-.venv\Scripts\python.exe main.py --scenario demo
+# 1) 命令行跑通整条链路（默认场景 daily / 默认算法 stub / 默认城市 dalian）
+.venv\Scripts\python.exe main.py --request mock\case_multiday.json
 
-# 2) 打开网页界面
+# 2) 打开网页界面（四页签：行程表 / 时间轴 / 地图 / 算法对比）
+.venv\Scripts\python.exe -m api.server        # 然后打开 http://127.0.0.1:8000/
+
+# 3) 另一个界面（Streamlit，答辩时可作为对照）
 .venv\Scripts\python.exe -m streamlit run ui/app.py
 
-# 3) 跑测试，确认项目健康
-.venv\Scripts\python.exe -m unittest discover -s tests -t . -v
+# 4) 跑测试，确认项目健康（当前 210 个）
+.venv\Scripts\python.exe -m unittest discover -s tests -t .
 
-# 4) 跑基线对比（所有算法 × 所有用例，结果写入 eval/results.md）
-.venv\Scripts\python.exe -m eval.baseline
+# 5) 跑基线对比（4 个算法 × 6 个用例，结果写入 eval/results.md）
+.venv\Scripts\python.exe -m eval.baseline --scenario daily
 
-# 5) 启动新版网页（FastAPI/Starlette 后端 + 无构建前端）
-.venv\Scripts\python.exe -m api.server        # 然后打开 http://127.0.0.1:8000/
+# 开发期可选：不开浏览器验证前端画得对不对（13 项断言 + 生成静态预览页）
+node _render_check.js
 ```
 
-> 三种入口用的是**同一份**业务逻辑（`app/usecases.py`）：
+> 三种入口用的是**同一份**业务逻辑（`service/usecases.py`）：
 > 命令行 `main.py` ｜ Streamlit `ui/app.py` ｜ 网页 `api.server` + `web/index.html`。
 > 所以"网页上看到的结果"和"命令行跑出来的"必然一致，不会出现两套口径。
 
@@ -54,22 +58,27 @@
 ```
 .
 ├── main.py                 命令行入口：读场景 → 解析 → 规划 → 打印 + 落盘 JSON
-├── config\scenarios\       ★ 业务参数全在这里（换场景只改这里）
-├── data\                   ★ POI 与距离矩阵（换数据只改这里）
+├── config\scenarios\       ★ 业务参数全在这里（daily / commute / errand / rainy / tight-budget）
+├── data\                   ★ POI 与交通矩阵；data\cities\<key>\ 按城市分目录
 ├── engine\
-│   ├── models.py           ★★ 接口契约（唯一的类定义，冻结文件）
+│   ├── models.py           ★★ 接口契约（唯一的类定义，冻结文件，v1.4）
 │   ├── config.py           场景配置加载
 │   ├── geo.py              距离 / 时间 / 费用估算
 │   ├── constraints.py      硬约束校验 + 评分
-│   ├── strategies.py       所有规划算法（新增算法 = 一个函数 + 一行字典）
+│   ├── strategies.py       所有规划算法（stub / random / greedy / two_opt）
+│   ├── adjust.py           局部调整（打补丁 → 重铺时间轴 → 重算分）
 │   └── planner.py          ★ 唯一对外入口 plan()
-├── llm\                    自然语言解析（当前是规则 stub）
+├── service\                用例层：三种入口共用（usecases / dto / exporters / compare）
+├── api\                    HTTP 接口与服务启动（routes / server / asgi_min）
+├── web\index.html          ★ 四页签前端（无构建、离线渲染）
+├── llm\                    自然语言解析 / 解说 / 局部调整听懂
 ├── ui\                     Streamlit 页面（app.py 管交互，render.py 管展示）
-├── mock\                   请求样例（测试与演示用）
+├── mock\                   请求样例（6 个用例，评测与演示用）
 ├── eval\                   基线对比脚本与结果
-├── tests\                  单元测试
+├── tests\                  单元测试（210 个）
 ├── schemas\                接口契约的 JSON 文档版（给人看）
-└── docs\                   接口契约 / 分工 / 使用手册 / 需求说明书
+├── tools\                  高德步行耗时抓取（生成 travel_matrix.csv）
+└── docs\                   接口契约 / 验收清单 / 需求说明书 / submission 交付物
 ```
 
 `outputs/` 由 `main.py` 自动创建，存放生成的行程 JSON，不进版本库。
@@ -101,8 +110,12 @@
 | `docs/使用手册.md` | 第一次上手：怎么跑、改东西在哪改、报错怎么修 |
 | `docs/接口契约.md` | 要动数据结构时看（改字段必须同步这里） |
 | `docs/分工与所有权.md` | 分活、避免两人改同一个文件 |
-| `docs/需求说明书.md` | 待定 —— 等助教答复评分细则后填 |
-| `docs/演示脚本.md` | 答辩前 |
+| `docs/需求说明书.md` | 课程要求与评分口径（已锁定，含差距清单） |
+| `docs/场景定义.md` | 日常出行场景的边界、六种情形、已知缺口 |
+| `docs/数据来源.md` | 46 个点的来源与核实纪律 |
+| `docs/submission/课程报告.md` | **交付物**：课程报告 |
+| `docs/submission/答辩讲稿.md` | **交付物**：15 分钟讲稿 + 演示步骤 + 翻车预案 |
+| `docs/submission/AI出行规划器-答辩.pptx` | **交付物**：12 页答辩 PPT |
 | `config/README.md` | 换场景 |
 | `data/README.md` | 换 POI 数据 |
 | `eval/results.md` | 算法对比结果（自动生成） |
@@ -114,15 +127,15 @@
 ## 六、当前进度
 
 - [x] 工程骨架：目录、依赖、gitignore、git 仓库
-- [x] 接口契约 v1（冻结）
-- [x] 数据层 + 占位数据
-- [x] 规划引擎 + 策略注册表（stub / random）
-- [x] Streamlit 端到端跑通
-- [x] 基线对比 + 文档
+- [x] 接口契约 v1 → **v1.4**（只增字段，`PlanMetrics` 零改动）
+- [x] 数据层 + 大连凌水生活圈 **46 个点** + **145 条高德步行实测耗时**
+- [x] 规划引擎 + 策略注册表（`stub` / `random` / `greedy` / `two_opt`）
+- [x] 三个入口：CLI / Streamlit / 网页（四页签 + 一句话调整 + 算法对比）
+- [x] 基线对比 + **210 个 unittest 全绿**，结果可复现（两次逐字节一致）
 - [x] **已推送到 GitHub**：https://github.com/Haloha-Alt/ai-trip-planning
-- [x] **9 处死链与硬点已修复**（UI 覆盖语义、多天、pace、起点、cfg 传递、测试硬断言、GBK 兜底、弃用参数、多天统计）
-- [x] 43 个 unittest 全绿，评测结果可复现
-- [ ] **等助教答复后**：锁定场景 → 填 `config/scenarios/` + `data/` → 写真实算法进 `strategies.py`
+- [x] 出行规则打通：关门跳过、闭馆日、必去点、出发地、默认站数、无路网如实报
+- [x] 交付物：课程报告 / 答辩讲稿 / 答辩 PPT（`docs/submission/`）
+- [ ] **待办**：用户手动 push（本地领先 origin/main）；彩排（M6）与 `v1.0` tag
 
 ---
 
@@ -130,10 +143,12 @@
 
 | 想改什么 | 改哪里 |
 |---|---|
-| 预算、时间窗、权重、交通方式 | `config/scenarios/demo.toml` |
+| 预算、时间窗、权重、交通方式、默认站数 | `config/scenarios/daily.toml` |
 | 换一整套场景 | 复制 `template.toml` → 改名 → `--scenario xxx` |
-| POI 清单、标签、坐标 | `data/pois.csv` |
-| 兴趣词 → 标签的映射 | `demo.toml` 的 `[interest_alias]` 段 |
+| POI 清单、标签、坐标、开关门 | `data/cities/dalian/pois.csv` |
+| 交通矩阵（实测耗时） | `data/cities/dalian/travel_matrix.csv`，或用 `tools/amap_matrix.py` 重抓 |
+| 兴趣词 → 标签的映射 | `daily.toml` 的 `[interest_alias]` 段 |
+| 加一座城市 | `data/cities/<key>/pois.csv` + `data/cities/registry.toml` 加一段 |
 
 **Python 代码里不允许出现任何具体业务数值。**
 
