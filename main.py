@@ -55,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="城市（数据路由）。填 data/cities/registry.toml 里的 key 或别名；"
                         "未注册的城市回退到默认数据")
     p.add_argument("--request", default=None, help="请求 JSON 文件路径，例如 mock/case_basic.json")
-    p.add_argument("--query", default=None, help="自然语言需求（骨架阶段仅留痕，不解析）")
+    p.add_argument("--query", default=None, help="自然语言需求（走 llm/parser 解析，缺省补注册表默认城市）")
     p.add_argument("--days", type=int, default=None)
     p.add_argument("--start", dest="start_time", default=None, help='开始时间 "HH:MM"')
     p.add_argument("--end", dest="end_time", default=None, help='结束时间 "HH:MM"')
@@ -74,11 +74,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 def make_request(args) -> PlanRequest:
     """构建请求。优先级：--query（走 llm/parser）> --request 文件 > 默认值，
-    最后再用命令行单项参数覆盖 —— 单项参数永远最大。"""
-    if args.query:
-        from llm.parser import parse
+    最后再用命令行单项参数覆盖 —— 单项参数永远最大。
 
-        req = parse(args.query, load_scenario(args.scenario))
+    **默认城市**：除 `--request`（显式给了整份请求，按它的来）以外，其余路径在末尾补
+    注册表默认城市，与网页 `/api/plan`、Streamlit 完全一致。不补的话 `req.city` 为空，
+    `poi_path()` 会掉回 `data/pois.csv` 那 8 条占位数据 —— 终端上显示"占位点02"，
+    而网页上是"伯川图书馆"，同一句话两个入口两个结果，演示时一眼就露馅（AC-66）。
+    """
+    if args.query:
+        from service.usecases import build_request
+
+        req = build_request(args.query, scenario=args.scenario)
     elif args.request:
         path = Path(args.request)
         if not path.is_absolute():
@@ -107,6 +113,11 @@ def make_request(args) -> PlanRequest:
         req.interests = _split(args.interests)
     if args.avoid is not None:
         req.avoid = _split(args.avoid)
+
+    if not args.request and not (req.city or "").strip():
+        from data.cities import default_city
+
+        req.city = default_city()
     return req
 
 
