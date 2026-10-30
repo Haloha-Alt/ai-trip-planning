@@ -43,6 +43,48 @@ RANDOM_SEED = 20261027
 # ---------------------------------------------------------------- 公共小工具
 
 
+def _weekday_of(date_str: str) -> int | None:
+    """把 "YYYY-MM-DD" 换成 0=周一 … 6=周日；没给日期或格式不对就返回 None。"""
+    key = (date_str or "").strip()
+    if not key:
+        return None
+    try:
+        from datetime import datetime
+
+        return datetime.strptime(key, "%Y-%m-%d").weekday()
+    except Exception:
+        return None
+
+
+def _closed_on(p: POI, weekday: int | None) -> bool:
+    """这个点今天是否固定闭馆（数据里的 closed_weekdays）。"""
+    return weekday is not None and weekday in (p.closed_weekdays or [])
+
+
+def _closes_before(p: POI, leave_min: int) -> bool:
+    """按这个时刻离开，是不是已经关门了。
+
+    `close_time` 默认 23:59，所以绝大多数点是"永不关门"——
+    真的会在 17:00 关门的食堂/场馆才需要这条。
+    """
+    return leave_min > to_minutes(p.close_time or "23:59")
+
+
+def _origin_poi(req: PlanRequest, cfg: ScenarioConfig) -> POI | None:
+    """出发地 → POI（按 poi_id 或名称匹配）。
+
+    填了认不出来的名字就当没填 —— 与 `start_poi_id` 同一口径：
+    不为一个笔误扣可行性分，也不让整条行程因为起点写错而崩。
+    """
+    key = (req.origin or "").strip()
+    if not key:
+        return None
+    for p in load_pois(cfg, req.city):
+        if p.poi_id == key or p.name == key:
+            return p
+    return None
+
+
 def _candidate_pool(req: PlanRequest, cfg: ScenarioConfig) -> tuple[list[POI], set[str]]:
     """按兴趣/排除条件筛出候选 POI。
 
@@ -52,12 +94,15 @@ def _candidate_pool(req: PlanRequest, cfg: ScenarioConfig) -> tuple[list[POI], s
     pois = load_pois(cfg, req.city)       # city 是数据路由：不同城市读不同的 CSV
     wanted = expand_interests(req.interests, cfg)
     avoid = set(req.avoid or [])
+    weekday = _weekday_of(req.date)       # 有日期才能判断"今天闭不闭馆"
 
     pool = [p for p in pois
             if (not wanted or (set(p.tags) & wanted))
-            and not (set(p.tags) & avoid)]
+            and not (set(p.tags) & avoid)
+            and not _closed_on(p, weekday)]
     if not pool:
-        pool = list(pois)
+        # 放宽时也要排除当天固定闭馆的点：那不是"找不到合适的"，是"今天根本不开门"
+        pool = [p for p in pois if not _closed_on(p, weekday)] or list(pois)
     return pool, wanted
 
 
@@ -119,6 +164,41 @@ def _apply_waypoints(pool: list[POI], req: PlanRequest, cfg: ScenarioConfig) -> 
     return prefix + head + [p for p in rest if p.poi_id not in head_ids]
 
 
+def _apply_must_visit(pool: list[POI], req: PlanRequest, cfg: ScenarioConfig) -> list[POI]:
+    """把"必去点"提到前排（顺序不限，但必须排进来）。
+
+    与 `waypoints` 的区别：途经点**规定先后**，必去点**只规定要有**。
+    两者同时给时：起点 → 途经点（按序）→ 必去点（按给出的顺序补位）→ 其余。
+    必去点被兴趣过滤掉时从全量数据里补回来；一个都对不上就原样返回，
+    由 planner 统一报 MUST_VISIT_MISS（策略层不静默兜底）。
+    """
+    keys = [str(m).strip() for m in (req.must_visit or []) if str(m).strip()]
+    if not keys:
+        return pool
+
+    allp = load_pois(cfg, req.city)
+    by_id = {p.poi_id: p for p in allp}
+    by_name = {p.name: p for p in allp}
+
+    head: list[POI] = []
+    ids: set[str] = set()
+    for k in keys:
+        p = by_id.get(k) or by_name.get(k)
+        if p is not None and p.poi_id not in ids:
+            head.append(p)
+            ids.add(p.poi_id)
+    if not head:
+        return pool
+
+    # 已经排在前面的是起点/途经点，必去点紧跟其后，不打断它们的硬顺序
+    front = [(req.start_poi_id or "").strip()] + [str(w).strip() for w in (req.waypoints or [])]
+    front = [f for f in front if f]
+    n = 0
+    while n < len(pool) and (pool[n].poi_id in front or pool[n].name in front):
+        n += 1
+    return pool[:n] + head + [p for p in pool[n:] if p.poi_id not in ids]
+
+
 def _match_score(p: POI, wanted: set[str]) -> float:
     """单个 POI 与兴趣的匹配度；没填兴趣时用数据自带的静态分。"""
     if not wanted:
@@ -150,19 +230,28 @@ def _arrive_at(clock: int, p: POI, edge: Transport) -> int:
 
 
 def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
-              wanted: set[str], day_index: int = 1) -> DayPlan:
+              wanted: set[str], day_index: int = 1,
+              start_from: POI | None = None) -> DayPlan:
     """把选中的 POI 依次铺到时间轴上，产出 DayPlan。
 
     所有策略共用这段逻辑 —— 不同算法的区别只在"怎么挑、怎么排序"，
     铺时间轴的规则是一致的。
+
+    三件事以前没有，现在必须有：
+    - **`start_from`**：`req.origin` 认出来是哪个 POI 时，第一段在途从它算起
+      （以前不管用户说"从宿舍出发"，第一段永远是 0 分钟的 `start`）；
+    - **关门就跳过**：`leave` 已经过了 `close_time` 的点不排进去。
+      以前排进去再由约束层报 CLOSED —— 那等于"知道要关门还是硬安排"；
+    - **当天固定闭馆的点不排**：靠 `closed_weekdays`，需要 `req.date` 才生效。
     """
     day = DayPlan(day_index=day_index)
     clock = to_minutes(req.start_time or cfg.day_start)
     limit = to_minutes(req.end_time or cfg.day_end)
     mode = resolve_mode(cfg, req.mobility)
-    prev: POI | None = None
+    weekday = _weekday_of(req.date)
+    prev: POI | None = start_from
 
-    for seq, p in enumerate(picked, start=1):
+    for p in picked:
         if prev is None:
             edge = Transport(mode="start", minutes=0.0, distance_km=0.0, cost=0.0)
         else:
@@ -173,10 +262,11 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
         leave = arrive + p.stay_min
         if leave > limit:                       # 装不下就停，越界是硬约束，不硬塞
             break
+        if _closed_on(p, weekday) or _closes_before(p, leave):
+            continue                            # 今天关门 / 来不及：跳过这一站，接着排下一站
 
-        waited = arrive - (clock + int(round(edge.minutes)))
         day.items.append(ItineraryItem(
-            seq=seq,
+            seq=len(day.items) + 1,
             poi_id=p.poi_id,
             name=p.name,
             lat=p.lat,
@@ -186,8 +276,10 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
             stay_min=p.stay_min,
             cost=p.cost,
             transport=edge,
-            reason=_reason(p, wanted) + ("；到早了等开门 %d 分钟" % waited if waited > 0 else ""),
-            flags=["wait_open"] if waited > 0 else [],
+            reason=_reason(p, wanted) + (
+                "；到早了等开门 %d 分钟" % (arrive - (clock + int(round(edge.minutes))))
+                if arrive > clock + int(round(edge.minutes)) else ""),
+            flags=["wait_open"] if arrive > clock + int(round(edge.minutes)) else [],
             # 分类/地址跟着复制：前端要按分类上色、解说要按分类起标题，
             # 让 UI 直连 data/ 去查又违反分层（UI 只允许 import engine）
             category=p.category,
@@ -224,8 +316,11 @@ def _build_days(ranked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
     per_day = _per_day_top_n(req, cfg)
     ranked = _apply_start(ranked, req, cfg)      # 起点置顶必须放在排序之后
     ranked = _apply_waypoints(ranked, req, cfg)  # 途经点紧跟起点，保持用户给的先后
+    ranked = _apply_must_visit(ranked, req, cfg)  # 必去点紧随其后
+    origin = _origin_poi(req, cfg)               # 出发地：只影响第 1 天的第一段在途
     return [
-        _fill_day(ranked[i * per_day:(i + 1) * per_day], req, cfg, wanted, day_index=i + 1)
+        _fill_day(ranked[i * per_day:(i + 1) * per_day], req, cfg, wanted,
+                  day_index=i + 1, start_from=origin if i == 0 else None)
         for i in range(n_days)
     ]
 
@@ -320,6 +415,16 @@ def _mandatory_head(req: PlanRequest, cfg: ScenarioConfig) -> list[POI]:
         if p is not None and p.poi_id not in seen:
             head.append(p)
             seen.add(p.poi_id)
+
+    # 必去点：顺序不限，但必须排进来，所以跟在途经点后面一起先落位
+    for m in (req.must_visit or []):
+        key = str(m).strip()
+        if not key:
+            continue
+        p = by_id.get(key) or by_name.get(key)
+        if p is not None and p.poi_id not in seen:
+            head.append(p)
+            seen.add(p.poi_id)
     return head
 
 
@@ -345,12 +450,17 @@ def _utility(p: POI, e: Transport, wanted: set[str], w: dict[str, float],
 
 def _fits(clock: int, p: POI, e: Transport, limit: int, spent: float,
           budget: float | None) -> bool:
-    """硬约束：装得进时间窗、不超预算。贪心只在可行解里挑，不靠事后补救。
+    """硬约束：装得进时间窗、不超预算、**别在人家关门之后才走**。
 
-    注意用的是 `_arrive_at`（含"等开门"），与真正铺时间轴时同一套算法 ——
-    否则会出现"贪心觉得放得下、真排的时候被 `_fill_day` 截断"的错位。
+    贪心只在可行解里挑，不靠事后补救 —— 否则会出现
+    "算法觉得划算、排进时间轴才发现已经闭馆"的荒唐结果。
+
+    注意用的是 `_arrive_at`（含"等开门"），与真正铺时间轴时同一套算法。
     """
-    if _arrive_at(clock, p, e) + p.stay_min > limit:
+    arrive = _arrive_at(clock, p, e)
+    if arrive + p.stay_min > limit:
+        return False
+    if _closes_before(p, arrive + p.stay_min):
         return False
     if budget is not None and spent + p.cost + e.cost > budget + 1e-9:
         return False
@@ -359,16 +469,17 @@ def _fits(clock: int, p: POI, e: Transport, limit: int, spent: float,
 
 def _greedy_one_day(req: PlanRequest, cfg: ScenarioConfig, wanted: set[str],
                     remaining: list[POI], forced: list[POI], per_day: int,
-                    day_len: int, budget: float | None) -> list[POI]:
-    """排一天：先把硬顺序（起点/途经点）落位，再逐站挑净收益最高的。
+                    day_len: int, budget: float | None,
+                    start_from: POI | None = None) -> list[POI]:
+    """排一天：先把硬顺序（起点/途经点/必去点）落位，再逐站挑净收益最高的。
 
-    `budget` 传 None = 今天不看预算（降级用）。
+    `budget` 传 None = 今天不看预算（降级用）；`start_from` = 出发地（只有第 1 天用）。
     """
     w = _weights(cfg, req)
     clock = to_minutes(req.start_time or cfg.day_start)
     limit = to_minutes(req.end_time or cfg.day_end)
     spent = 0.0
-    prev: POI | None = None
+    prev: POI | None = start_from
     picked: list[POI] = []
     queue = list(forced)
 
@@ -426,16 +537,19 @@ def _greedy_days(req: PlanRequest, cfg: ScenarioConfig, wanted: set[str],
 
     head_ids = {p.poi_id for p in head}
     remaining = [p for p in pool if p.poi_id not in head_ids]
+    origin = _origin_poi(req, cfg)
 
     days: list[list[POI]] = []
     for di in range(n_days):
         forced = list(head) if di == 0 else []      # 硬顺序只在第一天消耗
         picked = _greedy_one_day(req, cfg, wanted, list(remaining), forced,
-                                 per_day, day_len, budget)
+                                 per_day, day_len, budget,
+                                 start_from=origin if di == 0 else None)
 
         if not picked and budget is not None:
             picked = _greedy_one_day(req, cfg, wanted, list(remaining), list(forced),
-                                     per_day, day_len, None)
+                                     per_day, day_len, None,
+                                     start_from=origin if di == 0 else None)
 
         for p in picked:                            # 不被跨天重复选中
             if p in remaining:
@@ -447,7 +561,9 @@ def _greedy_days(req: PlanRequest, cfg: ScenarioConfig, wanted: set[str],
 def _fill_all(days: list[list[POI]], req: PlanRequest, cfg: ScenarioConfig,
               wanted: set[str]) -> list[DayPlan]:
     """把选好的点交给与其它策略共用的铺时间轴逻辑，保证统计口径一致。"""
-    return [_fill_day(picked, req, cfg, wanted, day_index=i + 1)
+    origin = _origin_poi(req, cfg)
+    return [_fill_day(picked, req, cfg, wanted, day_index=i + 1,
+                      start_from=origin if i == 0 else None)
             for i, picked in enumerate(days)]
 
 

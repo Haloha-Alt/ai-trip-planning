@@ -116,7 +116,7 @@ def _rule_parse(text: str, cfg: ScenarioConfig | None = None) -> PlanRequest:
         end_time=cfg.day_end,
         daily_budget=cfg.daily_budget,
         pace=cfg.default_pace,
-        top_n=cfg.max_poi_per_day,
+        top_n=cfg.default_top_n or cfg.max_poi_per_day,
         raw_query=text,
     )
     if not text:

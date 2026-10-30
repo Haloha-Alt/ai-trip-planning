@@ -197,6 +197,17 @@ def ensure_city_data(key: str) -> bool:
     return bool(info and info.poi_file and _exists(info.poi_file))
 
 
+def has_matrix(key: str) -> bool:
+    """该城市是否有**自己的**交通矩阵。
+
+    没有就不要借用别的城市的矩阵：两边的 poi_id 根本不是一套，能命中的概率是 0，
+    却会让"这座城市到底有多少实测路网"再也看不出来。宁可全部走直线估算，
+    并由 `resp.meta.data.matrix_edges` 如实报 0。
+    """
+    info = city_info(key)
+    return bool(info and info.matrix_file and _exists(info.matrix_file))
+
+
 # ---------------------------------------------------------------- 写入
 
 

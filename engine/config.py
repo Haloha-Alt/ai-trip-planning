@@ -45,6 +45,10 @@ class ScenarioConfig:
     poi_file: str = "pois.csv"
     matrix_file: str = "travel_matrix.csv"
     default_strategy: str = "stub"
+    # 一句话需求里没说"每天几站"时的默认站数。0 = 用 max_poi_per_day（老行为）。
+    # 之所以单独给一个字段：max_poi_per_day 是**上限**（校验用），
+    # 拿上限当默认值等于"能塞多少塞多少"，一天会出现 8 站，日常出行没人这么过。
+    default_top_n: int = 0
 
 
 def list_scenarios() -> list[str]:
@@ -96,4 +100,5 @@ def load_scenario(name: str | None = None) -> ScenarioConfig:
         poi_file=dfs.get("pois", "pois.csv"),
         matrix_file=dfs.get("matrix", "travel_matrix.csv"),
         default_strategy=raw.get("default_strategy", "stub"),
+        default_top_n=int(raw.get("default_top_n", 0) or 0),
     )

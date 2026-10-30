@@ -26,6 +26,7 @@ from pathlib import Path
 from data.cities import matrix_path as _city_matrix_path
 from data.cities import poi_path as _city_poi_path
 from data.cities import resolve_city as _resolve_city
+from data.cities import has_matrix as _city_has_matrix
 from engine.config import ScenarioConfig, load_scenario
 from engine.models import POI, Transport, TravelEdge
 
@@ -64,8 +65,23 @@ def _poi_file_for(city: str, cfg: ScenarioConfig) -> str:
 
 
 def _matrix_file_for(city: str, cfg: ScenarioConfig) -> str:
-    """同上，但矩阵缺失是常态（走 geo 估算兜底），不打印提醒。"""
-    return _city_matrix_path(city, cfg.matrix_file)
+    """挑矩阵文件。**注册过但没有自己矩阵的城市，不要再借用别的城市的边。**
+
+    以前这里无脑回退到场景的 `matrix_file`：选「北京」时会读到 `data/travel_matrix.csv`
+    里 P001–P008 那几条占位边 —— 北京的点是 BJ001…，一条都命中不了，
+    于是"矩阵存在"这件事是假的，真实覆盖度也看不出来。现在直接返回空，
+    全部走 `engine/geo.py` 的直线估算，并让 `meta.data.matrix_edges = 0` 说出来。
+    """
+    if not city:
+        return cfg.matrix_file
+    if _resolve_city(city) is None:              # 未注册城市：保持老行为（回退并提醒）
+        return cfg.matrix_file
+    if _city_has_matrix(city):
+        return _city_matrix_path(city, cfg.matrix_file)
+    if city not in _UNKNOWN_CITY_WARNED:
+        _UNKNOWN_CITY_WARNED.add(city)
+        print("[warn] 城市 '%s' 没有自己的交通矩阵，在途时间全部按直线估算" % city)
+    return ""                                     # 空文件名 → load_matrix 返回空表
 
 
 _ENCODINGS = ("utf-8-sig", "gbk")      # 顺序不能反：utf-8-sig 也能读无 BOM 的 UTF-8
@@ -158,6 +174,8 @@ def load_matrix(cfg: ScenarioConfig | None = None, city: str = "") -> list[Trave
     """
     cfg = _resolve(cfg)
     file = _matrix_file_for(city, cfg)
+    if not file:                                  # 该城市没有自己的矩阵：全部交给估算
+        return []
     key = file
     if key in _MATRIX_CACHE:
         return _MATRIX_CACHE[key]

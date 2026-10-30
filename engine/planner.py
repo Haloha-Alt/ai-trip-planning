@@ -15,7 +15,7 @@ from datetime import datetime
 from engine import constraints, strategies
 from engine.config import ScenarioConfig, load_scenario
 from engine.context import PlanContext
-from engine.models import PlanRequest, PlanResponse
+from engine.models import PlanRequest, PlanResponse, Violation
 
 
 def plan(req: PlanRequest,
@@ -54,7 +54,32 @@ def plan(req: PlanRequest,
         for v in constraints.validate_day(d, cfg, req):
             resp.warnings.append(str(v))
 
+    # 必去点：**跨天**判断。放在 day 级校验里会把"排在第 2 天"误报成"没排进来"。
+    if req.must_visit:
+        placed_ids = {it.poi_id for d in resp.days for it in d.items}
+        placed_names = {it.name for d in resp.days for it in d.items}
+        missing = [str(m).strip() for m in req.must_visit
+                   if str(m).strip() and str(m).strip() not in placed_ids
+                   and str(m).strip() not in placed_names]
+        if missing:
+            resp.warnings.append(str(Violation(
+                "MUST_VISIT_MISS", "必去点未排入行程：%s" % "、".join(missing))))
+
     resp.metrics = constraints.score(resp, cfg)
+
+    # 数据覆盖情况：让界面能如实说"这个城市没有实测路网，在途时间是直线估算"，
+    # 而不是让用户以为地图上的分钟数是量出来的。
+    try:
+        from data.loader import load_matrix
+
+        edges = load_matrix(cfg, req.city)
+        resp.meta["data"] = {
+            "matrix_edges": len(edges),
+            "matrix_modes": sorted({e.mode for e in edges}),
+            "city": req.city,
+        }
+    except Exception:                       # 数据层异常不能连累主结果
+        pass
 
     # 权重档位：profile 优先 → 场景 [weights] → 都没有就交给 PlanMetrics.overall 的内置默认值。
     # 写进 meta 是为了让 UI / 导出 / 评测用同一套权重算总分，不各算各的。
