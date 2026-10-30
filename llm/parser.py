@@ -51,7 +51,11 @@ def _known_words(cfg: ScenarioConfig) -> list[str]:
             words.add(p.category)
     except Exception:
         pass
-    return sorted(words, key=len, reverse=True)
+    # 排序键必须**完全确定**：先长词优先（"取快递" 要排在 "快递" 前），同长再按字面排。
+    # 只按 `len` 排是不够的 —— 输入是 set，等长词之间的先后由字符串哈希决定，
+    # 而 Python 每个进程的哈希种子不同，于是 `/api/plan` 两次跑出来的
+    # `request.interests` 顺序会变，同一份兜底 JSON 校验时假红（2026-10-30 实测）。
+    return sorted(words, key=lambda w: (-len(w), w))
 
 
 def _extract_time(text: str) -> tuple[str | None, str | None]:
