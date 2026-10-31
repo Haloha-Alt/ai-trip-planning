@@ -270,7 +270,9 @@ $env:ACCESS_CODE="你自己定的口令"
 - [x] **大模型真接入**（校内网关 + 强制流式兼容 + 多模型路由 + 模型体检工具）
 - [x] **对外分享**：访问口令 + `分享给他人.bat` + `tools/share_link.py`
 - [x] **M6 彩排完成**：262 测试全绿、7 份兜底样例 `全部一致`、断网演示通过、`v1.0` tag 已打
-- [ ] **待办**：用户手动 `git push`（本地领先 origin/main，含 v1.0 tag）
+- [ ] **待办**：只差推 tag —— `git push origin main --follow-tags`
+  （分支已与 `origin/main` 同步；**GitHub Desktop 在没有待推提交时不会推 tag**，
+  按钮只显示 "Fetch origin"，所以要用命令行或网页 Release）
 - [ ] 下一步：按 `docs/07-v2.0路线图.md` 推进 v2.0
 
 ---
