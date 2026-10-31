@@ -222,20 +222,32 @@ def plan_from_text(text: str,
 
 
 def llm_client():
-    """取大模型客户端。没有 Key 时返回 NullClient（调用方不用判断）。"""
-    from llm.client import get_client
+    """取大模型客户端。没有 Key 时返回 NullClient（调用方不用判断）。
 
-    return get_client()
+    配了 `LLM_ROUTER=rules|llm` 时会被包一层模型路由（见 `llm/router.py`）：
+    调用方一行都不用改，任务类型由 guard 的 tag 自动透传。
+    """
+    from llm.client import get_client
+    from llm.router import wrap
+
+    return wrap(get_client())
 
 
 def narrate_plan(resp: PlanResponse, enabled: bool = True) -> PlanResponse:
     """给行程补上主题 / 每站解说 / 一句话汇总。
 
     `enabled=False` 或没有 Key 时走规则模板 —— **永远有解说，不会因为模型失败就空白**。
+    开了模型路由时，把这次的选型结论写进 `meta["router"]`，答辩时能当场解释"为什么用这个模型"。
     """
     from llm.narrate import narrate
 
-    return narrate(resp, client=llm_client() if enabled else None, use_llm=enabled)
+    client = llm_client() if enabled else None
+    resp = narrate(resp, client=client, use_llm=enabled)
+
+    routes = getattr(client, "last_routes", None)
+    if routes and isinstance(getattr(resp, "meta", None), dict):
+        resp.meta["router"] = routes[-1].to_dict()
+    return resp
 
 
 def adjust_plan(resp: PlanResponse, instruction: str,

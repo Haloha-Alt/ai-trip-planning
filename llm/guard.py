@@ -116,7 +116,7 @@ def guarded_json(client,
     last = ""
     for attempt in range(retries + 1):
         try:
-            obj = client.json_chat(system, user)
+            obj = client.json_chat(system, user, task=tag)
         except LLMError as e:
             last = str(e)
         except Exception as e:  # noqa: BLE001 - 任何意外都算调用失败
@@ -159,7 +159,7 @@ def guarded_text(client, system: str, user: str, *,
     last = ""
     for attempt in range(retries + 1):
         try:
-            text = client.chat(system, user)
+            text = client.chat(system, user, task=tag)
         except LLMError as e:
             last = str(e)
         except Exception as e:  # noqa: BLE001

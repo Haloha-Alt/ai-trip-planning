@@ -62,6 +62,26 @@ def env_bool(key: str, default: bool = False) -> bool:
     return raw in ("1", "true", "yes", "on")
 
 
+def lan_ip() -> str:
+    """本机内网 IP —— 拼"发给别人"的那个地址用。
+
+    做法是让系统选一次出口网卡（UDP connect 不发包）。取不到就退回 127.0.0.1，
+    宁可给出一个明显是"本机"的地址，也不要抛异常把健康检查搞崩。
+
+    注意：换网络（热点 ↔ 校园网）这个值就会变，所以每次启动都要重新取。
+    """
+    import socket
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("223.5.5.5", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
 def ensure_output_dir() -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     return OUTPUT_DIR

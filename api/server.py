@@ -77,8 +77,16 @@ def build_app():
 app = build_app()
 
 
+def _lan_ip() -> str:
+    """本机内网 IP（给别人用的那个地址）。逻辑在 service/bootstrap，这里只做转发。"""
+    from service.bootstrap import lan_ip
+
+    return lan_ip()
+
+
 def main() -> int:
     """直接 `python -m api.server` 启动。优先 uvicorn，没有就用标准库兜底。"""
+    import os
     import sys
 
     try:
@@ -90,15 +98,29 @@ def main() -> int:
         return serve_stdlib(app)
 
     port = 8000
+    # 默认只听本机：Key 在你机器上，随便开 0.0.0.0 等于把"无限额度"挂在墙上
+    host = (os.environ.get("WEB_HOST") or "127.0.0.1").strip()
     for a in sys.argv[1:]:
         if a.startswith("--port="):
             try:
                 port = int(a.split("=", 1)[1])
             except ValueError:
                 pass
-    print("前端： http://127.0.0.1:%d/" % port)
-    print("接口： http://127.0.0.1:%d/api/health" % port)
-    uvicorn.run("api.server:app", host="127.0.0.1", port=port, log_level="info")
+        elif a.startswith("--host="):
+            host = a.split("=", 1)[1].strip() or host
+
+    print("前端（本机）： http://127.0.0.1:%d/" % port)
+    if host in ("0.0.0.0", "::"):
+        lan = _lan_ip()
+        code = (os.environ.get("ACCESS_CODE") or "").strip()
+        print("")
+        print("[注意] 已对外开放监听 —— 同一个 Wi-Fi 下的设备才连得上")
+        print("       发给别人：http://%s:%d/%s" % (lan, port, ("?code=" + code) if code else ""))
+        if code:
+            print("       （上面这条已经带口令，对方直接打开就行，不用再输）")
+        else:
+            print("[注意] 没设 ACCESS_CODE：局域网内谁都能用你的大模型额度，建议配一个")
+    uvicorn.run("api.server:app", host=host, port=port, log_level="info")
     return 0
 
 

@@ -19,6 +19,12 @@
     LLM_BASE_URL     默认 https://api.deepseek.com/v1
     LLM_MODEL        默认 deepseek-chat
     LLM_TIMEOUT      默认 8（秒）
+
+两种返回体都要吃得下
+--------------------
+公网服务商（DeepSeek 官方等）返回一整个 JSON；而校内网关（vLLM 后端）
+**即使请求里写 stream=false，也照样返回 SSE 流**（`data: {...}` 一行行推）。
+所以本文件不假设返回格式，按响应头 + 正文首字符判断，两条路都能走通。
 """
 
 from __future__ import annotations
@@ -94,6 +100,27 @@ class OpenAICompatClient:
 
     # ---- 调用 ----
 
+    def list_models(self) -> list[str]:
+        """取网关**声称**支持的模型名（给 tools/model_bench.py 用）。
+
+        注意：出现在列表里 ≠ 真的能用。校内网关就有过"模型在列表里、调用 90 秒超时"的
+        情况（Qwen3.5-9B，2026-10-31 实测），所以换模型前先跑 `model_bench` 体检。
+        """
+        req = urllib.request.Request(
+            self.base_url + "/models",
+            headers={"Authorization": "Bearer %s" % self.api_key},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                obj = json.loads(r.read().decode("utf-8", "replace") or "{}")
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError) as e:
+            raise LLMError("取模型列表失败：%s" % e)
+        data = obj.get("data") if isinstance(obj, dict) else None
+        if not isinstance(data, list):
+            return []
+        return [str(m.get("id")) for m in data if isinstance(m, dict) and m.get("id")]
+
     def chat(self, system: str, user: str, **kwargs) -> str:
         """发一次对话，返回**纯文本**（assistant 的 content）。
 
@@ -123,6 +150,7 @@ class OpenAICompatClient:
 
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                ctype = r.headers.get("Content-Type", "") or ""
                 raw = r.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
             body = ""
@@ -136,10 +164,21 @@ class OpenAICompatClient:
         except TimeoutError:
             raise LLMError("请求超时（%.0f 秒）" % self.timeout)
 
+        # 网关强制流式：先按 SSE 拼，拼不出来再按整包 JSON 解
+        if _looks_like_sse(ctype, raw):
+            text = _content_from_sse(raw)
+            if text:
+                return text
+            raise LLMError("流式返回里没有正文；原文前 200 字：%s" % raw[:200])
+
         try:
             obj = json.loads(raw)
             return obj["choices"][0]["message"]["content"]
         except (ValueError, KeyError, IndexError, TypeError) as e:
+            # 少数网关既不给 event-stream 头、正文又是 SSE，这里兜一次再放弃
+            text = _content_from_sse(raw)
+            if text:
+                return text
             raise LLMError("返回体解析失败：%s；原文前 200 字：%s" % (e, raw[:200]))
 
     def json_chat(self, system: str, user: str, **kwargs) -> dict[str, Any]:
@@ -149,6 +188,52 @@ class OpenAICompatClient:
         if obj is None:
             raise LLMError("模型返回的不是 JSON：%s" % text[:200])
         return obj
+
+
+def _looks_like_sse(content_type: str, raw: str) -> bool:
+    """返回体是不是 SSE 流。校内网关（vLLM）永远走这条。"""
+    if "text/event-stream" in (content_type or "").lower():
+        return True
+    return (raw or "").lstrip().startswith("data:")
+
+
+def _content_from_sse(raw: str) -> str:
+    """把 SSE 流里所有片段拼成一整段文本。
+
+    兼容两种写法：
+      - chat.completion.chunk → choices[0].delta.content（网关 / vLLM 用这个）
+      - 个别实现只在最后一帧给 choices[0].message.content，也一并收下
+
+    坏帧（半截 JSON、心跳、注释行）一律跳过：一条坏帧不该毁掉整次调用。
+    """
+    parts: list[str] = []
+    for line in (raw or "").splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if not data or data == "[DONE]":
+            continue
+        try:
+            obj = json.loads(data)
+        except ValueError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        choices = obj.get("choices")
+        if not isinstance(choices, list) or not choices:
+            continue
+        head = choices[0]
+        if not isinstance(head, dict):
+            continue
+        delta = head.get("delta")
+        if isinstance(delta, dict) and isinstance(delta.get("content"), str):
+            parts.append(delta["content"])
+            continue
+        message = head.get("message")
+        if isinstance(message, dict) and isinstance(message.get("content"), str):
+            parts.append(message["content"])
+    return "".join(parts)
 
 
 def _safe_json(text: str) -> dict[str, Any] | None:

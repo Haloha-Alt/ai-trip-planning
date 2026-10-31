@@ -17,7 +17,7 @@ import unittest
 from engine.config import load_scenario
 from engine.models import PlanRequest
 from llm import parser
-from llm.client import LLMError, NullClient, _safe_json
+from llm.client import LLMError, NullClient, _content_from_sse, _looks_like_sse, _safe_json
 from llm.guard import guarded_json, guarded_text
 
 
@@ -156,6 +156,56 @@ class TestParserWithLLM(unittest.TestCase):
     def test_parse_never_raises_on_empty(self):
         for text in ("", None, "   ", "?????"):
             self.assertIsInstance(parser.parse(text, self.cfg, FakeClient("x")), PlanRequest)
+
+
+class TestSSE(unittest.TestCase):
+    """校内网关（vLLM）即使 stream=false 也返回 SSE 流，这里锁住解析行为。"""
+
+    STREAM = (
+        'data: {"id":"x","object":"chat.completion.chunk","choices":'
+        '[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}\n\n'
+        'data: {"id":"x","object":"chat.completion.chunk","choices":'
+        '[{"index":0,"delta":{"content":"{\\"days\\":"},"finish_reason":null}]}\n\n'
+        'data: {"id":"x","object":"chat.completion.chunk","choices":'
+        '[{"index":0,"delta":{"content":" 3}"},"finish_reason":null}]}\n\n'
+        'data: {"id":"x","object":"chat.completion.chunk","choices":'
+        '[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"total_tokens":9}}\n\n'
+        "data: [DONE]\n\n"
+    )
+
+    def test_detects_by_header(self):
+        self.assertTrue(_looks_like_sse("text/event-stream; charset=utf-8", ""))
+
+    def test_detects_by_body(self):
+        self.assertTrue(_looks_like_sse("application/json", 'data: {"a":1}'))
+
+    def test_plain_json_is_not_sse(self):
+        self.assertFalse(_looks_like_sse("application/json", '{"choices":[]}'))
+
+    def test_joins_deltas(self):
+        self.assertEqual(_content_from_sse(self.STREAM), '{"days": 3}')
+
+    def test_survives_bad_frames(self):
+        raw = (
+            ": keep-alive\n\n"
+            "data: {not json}\n\n"
+            "data: {\"choices\":[],\"usage\":{}}\n\n"
+            'data: {"choices":[{"index":0,"delta":{"content":"好"}}]}\n\n'
+            "data: [DONE]\n\n"
+        )
+        self.assertEqual(_content_from_sse(raw), "好")
+
+    def test_message_content_fallback(self):
+        raw = 'data: {"choices":[{"index":0,"message":{"content":"整包"}}]}\n\n'
+        self.assertEqual(_content_from_sse(raw), "整包")
+
+    def test_empty(self):
+        self.assertEqual(_content_from_sse(""), "")
+        self.assertEqual(_content_from_sse("data: [DONE]"), "")
+
+    def test_sse_becomes_json_for_guard(self):
+        """流式拼出来的文本要能走后面的 JSON 提取，才能被 guarded_json 用。"""
+        self.assertEqual(_safe_json(_content_from_sse(self.STREAM)), {"days": 3})
 
 
 if __name__ == "__main__":

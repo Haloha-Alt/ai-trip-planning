@@ -174,6 +174,7 @@
     <button class="ghost" id="cmp">算法对比（同一份需求，各算法跑一遍）</button>
     <button class="ghost" id="reload">清空数据缓存（改了 CSV 后点）</button>
     <p class="muted" style="margin-top:10px">接口状态：<span id="health">…</span></p>
+    <p class="muted" id="shareLine" style="display:none"></p>
   </div>
 
   <!-- 右：结果 -->
@@ -224,12 +225,78 @@ function esc(s){
     .replace(/"/g, '&quot;');
 }
 
-async function api(path, body) {
+/* localStorage 不能裸用：无痕模式、以及开发期的 node 渲染自检里它都不存在或会抛异常。
+   所有读写都走这两个兜底函数，拿不到就当没有。 */
+function lsGet(k) {
+  try { return localStorage.getItem(k) || ''; } catch (e) { return ''; }
+}
+function lsSet(k, v) {
+  try { localStorage.setItem(k, v); } catch (e) { /* 存不了就每次重输，不影响功能 */ }
+}
+
+/* 访问口令：服务端配了 ACCESS_CODE 时，接口会回 401 + code_required。
+   口令存在 localStorage，只在第一次问；换浏览器要重新输一次。 */
+function withCode(path) {
+  const c = lsGet('trip_code');
+  if (!c) return path;
+  return path + (path.indexOf('?') >= 0 ? '&' : '?') + 'code=' + encodeURIComponent(c);
+}
+
+async function api(path, body, retried) {
   const opt = body ? {method:'POST', headers:{'Content-Type':'application/json'},
                       body: JSON.stringify(body)} : {method:'GET'};
-  const r = await fetch(path, opt);
+  const r = await fetch(withCode(path), opt);
+  if (r.status === 401) {
+    let info = {};
+    try { info = await r.json(); } catch (e) { /* 没有 JSON 体也照常处理 */ }
+    if (info.code_required && !retried) {
+      const v = prompt('这个站点开了访问口令，请输入（向站长要）：');
+      if (v && v.trim()) {
+        lsSet('trip_code', v.trim());
+        return api(path, body, true);
+      }
+      throw new Error('需要访问口令');
+    }
+    throw new Error(info.error || '需要访问口令');
+  }
   if (!r.ok && r.status >= 500) throw new Error('服务端 ' + r.status);
   return await r.json();
+}
+
+/* 别人拿到的链接可以直接带口令：http://<ip>:8000/?code=xxx
+   打开就记住，不用把"网址"和"口令"分两条发。 */
+(function adoptCodeFromUrl() {
+  try {
+    const q = (location && location.search) || '';
+    const c = new URLSearchParams(q).get('code');
+    if (c && c.trim()) lsSet('trip_code', c.trim());
+  } catch (e) { /* 没有 URLSearchParams / location 就走弹框那条路 */ }
+})();
+
+/* 把"发给别人"的地址直接显示在页面上：
+   不用去翻黑窗口、也不用记 IP。地址由后端 /api/health 带回的内网 IP 拼出来，
+   口令从 localStorage 里取，所以复制过去就能直接打开。 */
+function showShareLine(h) {
+  const el = $('shareLine');
+  if (!el) return;
+  if (!h || !h.lan) { el.style.display = 'none'; return; }
+
+  const code = lsGet('trip_code');
+  let port = '';
+  try { port = location.port ? (':' + location.port) : ''; } catch (e) { port = ''; }
+  const url = 'http://' + h.lan + port + '/' + (code ? ('?code=' + encodeURIComponent(code)) : '');
+
+  el.style.display = '';
+  el.innerHTML = '发给别人（要连同一个 Wi-Fi）：<a href="' + esc(url) + '">' + esc(url) + '</a>'
+    + ' <button class="ghost" id="copyShare" style="padding:2px 8px;font-size:12px">复制</button>';
+  const btn = $('copyShare');
+  if (btn) {
+    btn.onclick = () => {
+      const done = (t) => { btn.textContent = t; setTimeout(() => { btn.textContent = '复制'; }, 1500); };
+      try { navigator.clipboard.writeText(url).then(() => done('已复制'), () => done('请手动选中复制')); }
+      catch (e) { done('请手动选中复制'); }
+    };
+  }
 }
 
 async function boot() {
@@ -239,6 +306,7 @@ async function boot() {
       ? ('正常 · 城市 ' + h.cities + ' 个 · 高德'
          + ((h.amap && h.amap.configured) ? ('已接入（' + h.amap.cached_points + ' 条真实路线）') : '未配置'))
       : ('异常：' + h.error);
+    showShareLine(h);
   } catch (e) {
     $('health').textContent = '连不上后端（用 python -m api.server 启动）';
   }
@@ -387,9 +455,16 @@ function metric(label, v) {
 }
 
 function metaLine(plan){
+  /* 开了模型路由时多一个"模型"标签：悬停能看到为什么选它（rule/judge/fallback） */
+  const rt = (plan.meta && plan.meta.router) || null;
+  const rtHtml = rt
+    ? '模型 <span class="pill" title="' + esc(rt.source + ' · ' + rt.why) + '">'
+      + esc(rt.model) + '</span>'
+    : '';
   return '<p class="muted">场景 <span class="pill">' + esc(plan.scenario) + '</span>'
        + '算法 <span class="pill">' + esc(plan.strategy) + '</span>'
        + (plan.city ? '城市 <span class="pill">' + esc(plan.city) + '</span>' : '')
+       + rtHtml
        + '生成于 ' + esc(plan.generated_at) + '</p>';
 }
 

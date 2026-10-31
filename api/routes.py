@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Callable
 
 from service import exporters
@@ -47,6 +48,7 @@ def health(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
     """健康检查：回答"为什么跑不起来"最快的入口。"""
     from data import amap
     from data.cities import list_cities
+    from service.bootstrap import lan_ip
 
     a = amap.status()
     return _ok({
@@ -55,6 +57,8 @@ def health(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
         "strategies": options()["strategies"],
         # 只暴露"配没配/缓存多少条"，不暴露 Key 本身
         "amap": {"configured": a["configured"], "cached_points": a["cached_points"]},
+        # 本机内网 IP：前端拿它拼"发给别人"的地址，省得用户去翻黑窗口
+        "lan": lan_ip(),
     })
 
 
@@ -233,9 +237,30 @@ ROUTES: list[tuple[str, str, Handler]] = [
 ]
 
 
+def _gate(query: dict[str, Any]) -> tuple[int, dict[str, Any]] | None:
+    """访问口令：把站点暴露到局域网/公网时挡一道（默认关闭）。
+
+    为什么需要：本项目的后端是"拿着学校无限额度 Key 的代理"，一旦地址被别人知道，
+    谁都能白嫖。默认只监听 127.0.0.1 就是为了这个；真要给别人用，就配 `ACCESS_CODE`，
+    并把 `?code=xxx` 发给对方（前端会记住，只在第一次问）。
+
+    没配 `ACCESS_CODE` 时**完全不影响本地开发**，返回 None 表示放行。
+    """
+    want = (os.environ.get("ACCESS_CODE") or "").strip()
+    if not want:
+        return None
+    got = str((query or {}).get("code") or "").strip()
+    if got == want:
+        return None
+    return 401, {"ok": False, "code_required": True, "error": "需要访问口令"}
+
+
 def dispatch(method: str, path: str, query: dict[str, Any] | None,
              body: dict[str, Any] | None) -> tuple[int, dict[str, Any]]:
     """按路由表分发。找不到就 404，并列出可用的路径 —— 排错时省一轮猜测。"""
+    denied = _gate(query or {})
+    if denied is not None:
+        return denied
     for m, p, fn in ROUTES:
         if m == method.upper() and p == path:
             return fn({"method": method, "path": path,
