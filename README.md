@@ -38,11 +38,14 @@
 # 6) 断网兜底样例：校验 7 份 JSON 是否仍与当前引擎一致（M6 必跑）
 .venv\Scripts\python.exe -m tools.make_demo_outputs --verify
 
+# 7) 大模型自检（配了 LLM_API_KEY 才需要跑；不配也能演示，只是解说走规则）
+.venv\Scripts\python.exe -m tools.llm_probe --narrate
+
 # 开发期可选：不开浏览器验证前端画得对不对（13 项断言 + 生成静态预览页）
 node _render_check.js
 ```
 
-> ⚠️ **第 7 条（前端自检）需要 Node.js，本机不一定装**。PyCharm 的终端不继承 WorkBuddy 的 PATH，
+> ⚠️ **最后一条（前端自检）需要 Node.js，本机不一定装**。PyCharm 的终端不继承 WorkBuddy 的 PATH，
 > 所以直接敲 `node` 会报 `CommandNotFoundException: 无法将"node"项识别为 cmdlet` —— 这不是项目坏了。
 > 三种处置，任选：① 跳过（它只是开发期自检，**不在评分项里**）；
 > ② 用绝对路径跑：`C:\Users\18055\.workbuddy\binaries\node\versions\22.22.2\node.exe _render_check.js`；
