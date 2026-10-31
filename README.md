@@ -29,7 +29,7 @@
 # 3) 另一个界面（Streamlit，答辩时可作为对照）
 .venv\Scripts\python.exe -m streamlit run ui/app.py
 
-# 4) 跑测试，确认项目健康（当前 210 个）
+# 4) 跑测试，确认项目健康（当前 262 个，全程不联网，2 秒）
 .venv\Scripts\python.exe -m unittest discover -s tests -t .
 
 # 5) 跑基线对比（4 个算法 × 6 个用例，结果写入 eval/results.md）
@@ -41,9 +41,28 @@
 # 7) 大模型自检（配了 LLM_API_KEY 才需要跑；不配也能演示，只是解说走规则）
 .venv\Scripts\python.exe -m tools.llm_probe --narrate
 
+# 8) 模型体检：网关上哪些模型**真的能用**（列表里有 ≠ 后端加载了）
+.venv\Scripts\python.exe -m tools.model_bench
+
+# 9) 生成"发给别人"的链接（自动从 bat 读口令；--check 会真打一次接口）
+.venv\Scripts\python.exe -m tools.share_link
+.venv\Scripts\python.exe -m tools.share_link https://你的穿透域名 --check
+
 # 开发期可选：不开浏览器验证前端画得对不对（13 项断言 + 生成静态预览页）
 node _render_check.js
 ```
+
+> 🔑 **大模型用的是校内网关**（`.env` 已是可用配置）：`LLM_BASE_URL=http://aigw.dlut.edu.cn/v1`、
+> `LLM_MODEL=DeepSeek-V4-Flash-0731-W8A8`。两个必须知道的特性：
+> ① 网关**只有 http、没有 https**，所以后端直连没问题，但**不能从前端页面直接调**；
+> ② 网关**强制流式返回** —— 请求里写 `stream=false` 也照样回 `data: {...}`，`llm/client.py`
+> 已内置 SSE 拼接（`_content_from_sse`），换回公网服务商（返回整包 JSON）同样能跑。
+
+> 🧭 **多模型路由**（`LLM_ROUTER=llm`，`llm/router.py`）：一个 Key 就能用全部 25 个模型，
+> **不需要额外申请 Key**。"用哪个模型"是请求体里的一个字段，不是另一个账号。
+> 规则先判难度（短需求→fast、长/约束多→reasoning、长行程→long），规则拿不准才请小模型裁决；
+> 裁判只允许回答四个角色之一，坏帧/超时一律回退默认模型。页面上会多一个「模型」标签，
+> 悬停看得到选它的理由（rule / judge / fallback）。`LLM_ROUTER=off` 即完全恢复原行为。
 
 > ⚠️ **最后一条（前端自检）需要 Node.js，本机不一定装**。PyCharm 的终端不继承 WorkBuddy 的 PATH，
 > 所以直接敲 `node` 会报 `CommandNotFoundException: 无法将"node"项识别为 cmdlet` —— 这不是项目坏了。
@@ -63,6 +82,104 @@ node _render_check.js
 > 或在 PyCharm 里新建运行配置：Module name = `streamlit`，Parameters = `run ui/app.py`，Working directory = 项目根。
 
 详细操作见 `docs/使用手册.md`。
+
+---
+
+## 二·五、让别人也能打开（局域网 / 公网）
+
+默认**只有本机能开**：服务只监听 `127.0.0.1`，而且大模型 Key 只在你机器的 `.env` 里。
+"别人打开"取决于你选哪条路：
+
+| 方式 | 命令 / 做法 | 适用 | 注意 |
+|---|---|---|---|
+| **A. 局域网**（同 Wi-Fi） | `python -m api.server --host=0.0.0.0`，别人访问 `http://<你的内网IP>:8000/` | 课堂、宿舍、答辩同屋 | 校园网若开了"终端隔离"，同 SSID 也连不上；Windows 防火墙要放行 |
+| **B. 内网穿透** | 本机照常启动，再用 cpolar / frp / ngrok 把 8000 映射成公网地址 | 发给不在同一网络的同学 | 免费版限速、临时域名会变；**务必设 ACCESS_CODE** |
+| **C. 部署到服务器** | 整个项目跑在校内服务器 / 云主机上，Key 放服务器的环境变量 | 长期可用、要给别人看 | 服务器必须**能访问 `aigw.dlut.edu.cn`**；若网关限校园网，就得部署在校内 |
+
+三条路有一个共同点：**Key 始终留在"跑后端的那台机器"上**，不会进到任何人的浏览器。
+
+### 穿透起来之后：一条命令算好链接（别手抄）
+
+```bash
+# 不带参数：只输出内网链接，顺带告诉你 8000 在不在跑、口令是什么
+.venv\Scripts\python.exe -m tools.share_link
+
+# 穿透给了你域名，直接喂给它，会自动拼上口令并真打一次接口验证
+.venv\Scripts\python.exe -m tools.share_link https://abcd.r3.cpolar.cn --check
+```
+
+它会输出类似：
+
+```
+== 本机服务 ==
+  127.0.0.1:8000  [在跑]
+  访问口令         trip-8261
+== 可以发出去的链接 ==
+  同一 Wi-Fi：http://192.168.43.8:8000/?code=trip-8261
+  公网：      https://abcd.r3.cpolar.cn/?code=trip-8261
+== 自检 ==
+  公网    https://abcd.r3.cpolar.cn    [OK] HTTP 200，城市 2 个
+```
+
+`--check` 失败时会告诉你卡在哪一层：服务没跑、口令不对（401）、隧道没开、域名抄错。
+**发人之前跑一次，比发出去被问"打不开"省事得多。**
+
+### 最省事：双击 `分享给他人.bat`
+
+文件开头两行就是要改的全部：
+
+```bat
+set WEB_HOST=0.0.0.0
+set ACCESS_CODE=trip-8261
+```
+
+双击后窗口里会打印两行，直接抄给对方：
+
+```
+[注意] 已对外开放监听 —— 同一个 Wi-Fi 下的设备才连得上
+       发给别人：http://10.15.49.87:8000/?code=trip-8261
+       （上面这条已经带口令，对方直接打开就行，不用再输）
+```
+
+内网地址每次换网络都会变（连热点和连校园网就不是一个），以窗口里打印的为准。
+页面「接口状态」下面也会显示同一条链接，点「复制」即可发人。
+
+> **同学打不开？先分清是哪一类：**
+>
+> 1. **防火墙**：第一次启动 uvicorn 弹"是否允许访问"时点了取消。
+>    管理员 PowerShell 放行一次：`netsh advfirewall firewall add rule name="ai-trip 8000" dir=in action=allow protocol=TCP localport=8000`
+> 2. **校园网终端隔离**（更容易中招）：2026-10-31 实测，本机连 `DLUT-LingShui 2`
+>    （NetworkCategory=Public）时，防火墙对 `.venv\Scripts\python.exe` 已有放行规则，
+>    手机连同一个 Wi-Fi 仍然打不开 —— 交换机层就不让客户端互访，改本地设置都没用。
+>    **只能绕开**：手机开热点、电脑连热点（一般 192.168.43.x 段，互通）；
+>    或者直接走 B（内网穿透），一条公网地址谁都能开。
+
+### ⚠️ GitHub Pages 为什么不行（重要）
+
+**Pages 只能托管静态文件，不能跑 Python。** 这个项目的 `/api/plan` 是 Python 后端，
+`engine/`、`data/` 全在服务端，Pages 上没有东西能执行它们。
+
+那"改成纯前端、让每个人自己填 Key"呢？**同样走不通**，三条都是硬约束：
+
+1. 网关是 **http**，Pages 是 **https** → 浏览器直接按"混合内容"拦掉请求，跨域（CORS）也不会放行；
+2. Key 写进前端 = 公开给你的每一个访问者；
+3. 所以 Key 必须待在服务端 —— 而 Pages 没有服务端。
+
+GitHub 仍然有用，但用途是**代码托管和备份**（clone 下来自己跑、或作为部署到服务器的源），
+不是"别人打开就能用"。要"别人打开就能用"，还是 A（局域网）/ B（内网穿透）/ C（服务器）。
+
+### 访问口令（开放出去之前一定要设）
+
+```bash
+# PowerShell
+$env:ACCESS_CODE="你自己定的口令"
+.venv\Scripts\python.exe -m api.server --host=0.0.0.0
+```
+
+- 配了之后，`/api/*` 都需要 `?code=口令`，否则返回 401（带 `code_required` 标记）
+- 前端第一次打开会弹框问一次，之后存在 `localStorage`，不用反复输
+- **不配 = 任何拿到地址的人都能白嫖学校的大模型额度**，别偷这个懒
+- 本地开发时不用配，`ACCESS_CODE` 留空就是关闭
 
 ---
 
@@ -125,6 +242,8 @@ node _render_check.js
 | `docs/分工与所有权.md` | 分活、避免两人改同一个文件 |
 | `docs/需求说明书.md` | 课程要求与评分口径（已锁定，含差距清单） |
 | `docs/场景定义.md` | 日常出行场景的边界、六种情形、已知缺口 |
+| `docs/06-内网穿透与分享.md` | 要把网页给别人看（cpolar 实操 / 故障对照 / 安全底线） |
+| `docs/07-v2.0路线图.md` | **下一步做什么**：四条主线 + 编号任务 + 里程碑 |
 | `docs/数据来源.md` | 46 个点的来源与核实纪律 |
 | `docs/submission/课程报告.md` | **交付物**：课程报告 |
 | `docs/submission/答辩讲稿.md` | **交付物**：15 分钟讲稿 + 演示步骤 + 翻车预案 |
@@ -144,11 +263,15 @@ node _render_check.js
 - [x] 数据层 + 大连凌水生活圈 **46 个点** + **145 条高德步行实测耗时**
 - [x] 规划引擎 + 策略注册表（`stub` / `random` / `greedy` / `two_opt`）
 - [x] 三个入口：CLI / Streamlit / 网页（四页签 + 一句话调整 + 算法对比）
-- [x] 基线对比 + **210 个 unittest 全绿**，结果可复现（两次逐字节一致）
+- [x] 基线对比 + **262 个 unittest 全绿**，全程离线（约 2 秒），结果可复现（两次逐字节一致）
 - [x] **已推送到 GitHub**：https://github.com/Haloha-Alt/ai-trip-planning
 - [x] 出行规则打通：关门跳过、闭馆日、必去点、出发地、默认站数、无路网如实报
 - [x] 交付物：课程报告 / 答辩讲稿 / 答辩 PPT（`docs/submission/`）
-- [ ] **待办**：用户手动 push（本地领先 origin/main）；彩排（M6）与 `v1.0` tag
+- [x] **大模型真接入**（校内网关 + 强制流式兼容 + 多模型路由 + 模型体检工具）
+- [x] **对外分享**：访问口令 + `分享给他人.bat` + `tools/share_link.py`
+- [x] **M6 彩排完成**：262 测试全绿、7 份兜底样例 `全部一致`、断网演示通过、`v1.0` tag 已打
+- [ ] **待办**：用户手动 `git push`（本地领先 origin/main，含 v1.0 tag）
+- [ ] 下一步：按 `docs/07-v2.0路线图.md` 推进 v2.0
 
 ---
 
