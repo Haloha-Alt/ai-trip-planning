@@ -206,11 +206,96 @@ def clear_cache() -> int:
 _RECENT: list[dict[str, Any]] = []
 MAX_RECENT = 20
 
+#: 全局递增序号：A6 可观测用。一次请求开始前取 `seq()`，
+#: 结束后 `since(起始序号)` 就得到"这次请求引发了哪些模型调用"——
+#: 不用比较 HH:MM:SS 字符串（同秒内分不清先后），也不怕并发乱序。
+_SEQ = 0
+
+# ------------------------------------------------------------------ A1 自适应路由
+
+#: 每个模型的成功/失败滚动窗口长度。太小会因偶发抖动误杀，太大反应迟钝。
+MODEL_STATS_WINDOW = 20
+
+#: 触发降级的最低样本数：窗口没攒够这么多次调用，不轻率下结论。
+MODEL_MIN_SAMPLES = 5
+
+#: 失败率超过这个比例就认为模型"当前不可用"（网关的可用性会漂移，见文件头实测记录）。
+MODEL_FAIL_RATE = 0.2
+
+#: 降级时的角色优先顺序：先试主力，再试快的，再试推理档。
+FALLBACK_ORDER = ("default", "fast", "reasoning", "long")
+
+#: 模型名 → 最近窗口内的成败序列（True=成功）。
+_MODEL_STATS: dict[str, list[bool]] = {}
+
+
+def fail_rate(model: str) -> tuple[int, float]:
+    """某模型的 (样本数, 失败率)。没记录过返回 (0, 0.0)。"""
+    xs = _MODEL_STATS.get(model) or []
+    if not xs:
+        return 0, 0.0
+    return len(xs), sum(1 for ok in xs if not ok) / len(xs)
+
+
+def degraded() -> set[str]:
+    """当前应被绕开的模型集合：样本够、且失败率越线。"""
+    bad: set[str] = set()
+    for name in set(ROLE_MODELS.values()) | set(_MODEL_STATS):
+        n, fr = fail_rate(name)
+        if n >= MODEL_MIN_SAMPLES and fr > MODEL_FAIL_RATE:
+            bad.add(name)
+    return bad
+
+
+def health() -> dict[str, dict[str, Any]]:
+    """各模型的健康快照（/api/llm 面板用）。"""
+    out: dict[str, dict[str, Any]] = {}
+    bad = degraded()
+    for name in sorted(set(ROLE_MODELS.values()) | set(_MODEL_STATS)):
+        n, fr = fail_rate(name)
+        out[name] = {"calls": n, "fail_rate": round(fr, 3),
+                     "degraded": name in bad}
+    return out
+
+
+def adapt(d: Decision) -> Decision:
+    """把一条路由结论过一遍健康检查：选中的模型在降级名单里就换成备选。
+
+    **换模型、不换角色语义**：备选按 FALLBACK_ORDER 找第一个还健康的模型。
+    全部模型都降级时原样返回 —— 上层护栏本来就会兜底，这里不做多余动作。
+    """
+    if not isinstance(d, Decision):
+        return d
+    bad = degraded()
+    if d.model not in bad:
+        return d
+    for role in FALLBACK_ORDER:
+        m = ROLE_MODELS.get(role, "")
+        if m and m not in bad:
+            n, fr = fail_rate(d.model)
+            return Decision(role, m, "adaptive",
+                            "「%s」最近失败率 %.0f%%（%d 次），自动降级到 %s"
+                            % (d.model, fr * 100, n, m))
+    return d
+
+
+def seq() -> int:
+    return _SEQ
+
+
+def since(mark: int, limit: int = 50) -> list[dict[str, Any]]:
+    """序号 mark 之后的调用记录，**旧的在前**（按发生顺序回放决策链）。"""
+    out = [r for r in _RECENT if r.get("seq", 0) > mark]
+    return out[-max(0, int(limit)):] if limit else out
+
 
 def record(task: str, decision: Decision, ms: float, ok: bool = True,
            error: str = "") -> None:
     """记一次调用。字段刻意保持扁平，前端直接拼字符串即可。"""
+    global _SEQ
+    _SEQ += 1
     _RECENT.append({
+        "seq": _SEQ,
         "time": time.strftime("%H:%M:%S"),
         "task": task or "(未标注)",
         "role": decision.role,
@@ -222,6 +307,10 @@ def record(task: str, decision: Decision, ms: float, ok: bool = True,
         "error": error[:80],
     })
     del _RECENT[:-MAX_RECENT]
+    # A1 自适应路由：按模型滚动记账（成功 True / 失败 False），驱动自动降级
+    _stats = _MODEL_STATS.setdefault(decision.model, [])
+    _stats.append(bool(ok))
+    del _stats[:-MODEL_STATS_WINDOW]
 
 
 def recent(limit: int = 8) -> list[dict[str, Any]]:
@@ -231,8 +320,10 @@ def recent(limit: int = 8) -> list[dict[str, Any]]:
 
 
 def clear_recent() -> int:
+    """清空调用记录**和**模型健康统计（测试/换网关后想重新观察时用）。"""
     n = len(_RECENT)
     _RECENT.clear()
+    _MODEL_STATS.clear()
     return n
 
 
@@ -261,6 +352,7 @@ class RoutedClient:
         d = decide(task, "%s\n%s" % (system or "", user or ""),
                    client=self._base if self.mode == "llm" else None,
                    mode=self.mode)
+        d = adapt(d)            # A1：选中的模型近期失败率高就自动换备选
         self.last_routes.append(d)
         if len(self.last_routes) > 50:
             del self.last_routes[:-20]

@@ -91,6 +91,8 @@ def get_llm(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
         "roles": router.ROLE_MODELS,
         "judge": router.JUDGE_MODEL,
         "recent": router.recent(8),
+        # A1 自适应路由：各模型滚动窗口的失败率与降级状态
+        "health": router.health(),
     })
 
 
@@ -130,6 +132,9 @@ def post_plan(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     if no_llm:
         model = None
     must_leave = (body.get("must_leave") or "").strip() or None
+    from llm import router as _router
+
+    _trace_mark = _router.seq()                 # A6：请求起点，之后新增的调用才算这次的
     try:
         r = _run_plan(body, body.get("scenario"), body.get("strategy"),
                       body.get("realtime", False), use_llm=not no_llm, model=model)
@@ -147,7 +152,29 @@ def post_plan(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     except Exception as e:                      # noqa: BLE001 - 接口层兜底，不能让 500 裸奔
         return _err("规划失败：%s" % e, 500)
 
+    # A6 可观测：把"这次请求引发了哪些模型调用"如实写进 meta.trace，
+    # 前端与导出都能回放决策链（选了哪个模型、为什么、耗时、有没有失败）。
+    try:
+        from llm import router as _router
+
+        r.meta["trace"] = {"router_mode": _router.router_mode(),
+                           "calls": _router.since(_trace_mark)}
+    except Exception:                           # noqa: BLE001 - 观测层绝不连累主结果
+        pass
+
     payload = {"plan": to_api_dict(r), "map": to_map_points(r)}
+    # A2 多轮会话：签发/续用 session_id，并把"最近一版行程"落盘，
+    # 之后的 /api/adjust 带上它就能在上一版上继续改（不重排、不丢上一句的效果）。
+    sid = (body.get("session_id") or "").strip() or None
+    try:
+        from service import session as _session
+
+        if sid is None:
+            sid = _session.new_id()
+        _session.save(sid, body=body, plan=payload["plan"], instructions=[])
+        payload["session_id"] = sid
+    except Exception:                           # noqa: BLE001 - 会话失败不影响行程
+        pass
     if must_leave:                              # 反向规划：告诉用户"最晚几点到校"
         from service.extras import reverse_hint
 
@@ -180,11 +207,38 @@ def post_adjust(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     if not texts:
         return _err("缺少 instruction（例如：第2站太贵了换一个）", 400)
 
+    # A2 多轮会话：带 session_id 且会话里有上一版行程时，
+    # 直接以它为 base 继续 adjust —— 连续多轮不重排、不互相覆盖。
+    sid = (body.get("session_id") or "").strip() or None
+    sess = None
+    if sid:
+        try:
+            from service import session as _session
+
+            sess = _session.load(sid)
+        except Exception:                       # noqa: BLE001
+            sess = None
+
     try:
-        base = _run_plan(body, body.get("scenario"), body.get("strategy"),
-                         body.get("realtime", False))
-        if body.get("narrate"):
-            base = narrate_plan(base)
+        if sess:
+            from engine.models import PlanResponse
+
+            # 会话里存的是 to_api_dict 口径：比契约多出 contract/city/metrics.overall
+            # 三个"展示层字段"，重建 PlanResponse 前剥掉，from_dict 才吃得下。
+            d = dict(sess["plan"])
+            d.pop("contract", None)
+            d.pop("city", None)
+            m = dict(d.get("metrics") or {})
+            m.pop("overall", None)
+            d["metrics"] = m
+            base = PlanResponse.from_dict(d)
+            history = [str(x) for x in sess.get("instructions") or []]
+        else:
+            base = _run_plan(body, body.get("scenario"), body.get("strategy"),
+                             body.get("realtime", False))
+            if body.get("narrate"):
+                base = narrate_plan(base)
+            history = []
         new = base
         notes: list[str] = []
         for t in texts:
@@ -197,15 +251,30 @@ def post_adjust(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     except Exception as e:                      # noqa: BLE001
         return _err("调整失败：%s" % e, 500)
 
+    # 调整结果写回会话：下一轮拿到的就是这一版
+    if sid:
+        try:
+            from service import session as _session
+
+            _session.save(sid, body=(sess or {}).get("body") or body,
+                          plan=to_api_dict(new), instructions=history + texts)
+        except Exception:                       # noqa: BLE001
+            pass
+
     changed = new.meta.get("adjust") or {}
-    return _ok({
+    out = {
         "plan": to_api_dict(new),
         "map": to_map_points(new),
         "before": to_api_dict(base),
         "adjust": {"instruction": texts[-1], "instructions": texts,
                    "note": "；".join(notes),
                    "changed_days": changed.get("changed_days", 0)},
-    })
+    }
+    if sid:
+        out["session_id"] = sid
+        if sess:
+            out["adjust"]["from_session"] = True
+    return _ok(out)
 
 
 def _prepare(body: dict[str, Any], scenario: str | None, use_realtime: bool,
@@ -341,7 +410,39 @@ def post_compare(req: HttpRequest) -> tuple[int, dict[str, Any]]:
 def post_reload(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
     """改了 CSV / registry 之后调用，清缓存。"""
     reload_data()
+    try:
+        from llm import rag
+
+        rag.clear_cache()
+    except Exception:                           # noqa: BLE001
+        pass
     return _ok({"reloaded": True})
+
+
+def get_search(req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """A3 知识检索：按问题在 POI 知识语料里找证据（BM25，纯标准库）。
+
+    query: ?q=晚上想听音乐会&city=dalian&scenario=&top=5
+
+    返回 hits：[{poi_id,name,category,text,score,lat,lon}]。
+    这是 RAG 的"R"：前端问答/解说可以先取证据再喂模型，
+    没有 LLM Key 时它也是独立可用的"问答事实层"。
+    """
+    from llm import rag
+
+    qd = req.get("query") or {}
+    q = str(qd.get("q") or "").strip()
+    try:
+        top = max(1, min(20, int(qd.get("top") or 5)))
+    except (TypeError, ValueError):
+        top = 5
+    try:
+        hits = rag.search(q, city=str(qd.get("city") or "").strip() or None,
+                          scenario=str(qd.get("scenario") or "").strip() or None,
+                          top=top)
+    except Exception as e:                      # noqa: BLE001
+        return _err("检索失败：%s" % e, 500)
+    return _ok({"q": q, "hits": hits})
 
 
 # ---------------------------------------------------------------- 约会模式（v1.5）
@@ -408,6 +509,9 @@ def post_date_brief(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     model = (body.get("model") or "").strip() or None
     zone = str(body.get("zone") or "").strip()
     city = str(body.get("city") or "").strip()
+    from llm import router as _router
+
+    _trace_mark = _router.seq()                 # A6：与 /api/plan 同口径
 
     overrides: dict[str, Any] = dict(body.get("overrides") or {})
     if city:
@@ -489,6 +593,12 @@ def post_date_brief(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     except Exception as e:                      # noqa: BLE001 - 简报失败不拖垮行程
         brief = {"headline": "简报生成失败（行程本身有效）：%s" % e}
 
+    try:
+        r.meta["trace"] = {"router_mode": _router.router_mode(),
+                           "calls": _router.since(_trace_mark)}
+    except Exception:                           # noqa: BLE001 - 观测层绝不连累主结果
+        pass
+
     return _ok({"plan": to_api_dict(r), "map": to_map_points(r), "brief": brief})
 
 
@@ -505,6 +615,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("POST", "/api/extras", post_extras),
     ("POST", "/api/export", post_export),
     ("POST", "/api/reload", post_reload),
+    ("GET", "/api/search", get_search),
     ("GET", "/api/metrics", lambda req: get_metrics(req)),
     ("GET", "/api/date/info", get_date_info),
     ("POST", "/api/date/locate", post_date_locate),
