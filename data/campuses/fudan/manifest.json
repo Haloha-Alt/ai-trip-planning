@@ -1,0 +1,17 @@
+{
+  "key": "fudan",
+  "name": "复旦大学（邯郸校区）",
+  "city": "shanghai",
+  "level": "L0",
+  "gates": ["正门（邯郸路220号）", "南三门", "老校门"],
+  "visitor_difficulty": 2,
+  "guide_doc": "docs/23-C9高校访客参观指南/03-复旦大学.md",
+  "sources": [
+    {"kind": "research", "what": "入校登记政策+复旦源六馆调研", "via": "复旦保卫处通告2024-09-02、复旦文明网2025-05、杨浦区政府2025-12-04", "date": "2026-11-04"}
+  ],
+  "next_steps": [
+    "L1: tools/new_city.py --scaffold fudan，按指南 2.3 点位表抓高德 POI（≥30）",
+    "L2: tools.amap_matrix 实测步行矩阵（≥80 边）",
+    "事实层: visitor_guide.json（注意分校区登记规则差异；复旦源周一闭馆）"
+  ]
+}

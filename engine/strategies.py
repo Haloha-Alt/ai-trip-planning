@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import random
+from dataclasses import replace
 from typing import Callable
 
 from data.loader import get_matrix_edge, load_pois
@@ -85,13 +86,152 @@ def _origin_poi(req: PlanRequest, cfg: ScenarioConfig) -> POI | None:
     return None
 
 
+# 单一分类在候选池里最多留几个（算法内部参数，与 _two_opt 的 max_rounds 同类）。
+# 清华有 8 个图书馆，全放进池子贪心就会排出"图书馆一日游" ——
+# 访客来看的是一所学校，不是同一类楼。
+_CANDIDATES_PER_CATEGORY = 2
+
+
+def _needs_semantic(cfg: ScenarioConfig, city: str) -> bool:
+    """是否需要对 POI 做语义归一化。
+
+    **只有高德抓来的校区数据包（`data/campuses/<key>/`）才需要。**
+    它的 tags 是「科教文化服务|学校|高等院校」这类原始分类，跟用户说的
+    「图书馆」「吃饭」「拍照」对不上；而项目自己维护的 `cities/dalian/pois.csv`
+    标签本来就规范，走老逻辑逐字不变 —— 这是 294 个存量测试的零回归保证。
+    """
+    if not (getattr(cfg, "tag_aliases", None) or {}):
+        return False
+    if getattr(cfg, "poi_routing", "") == "campus_visit":
+        return True
+    if not city:
+        return False
+    try:
+        from data.cities import poi_path
+
+        return poi_path(city, "").startswith("campuses/")
+    except Exception:                       # noqa: BLE001 - 注册表异常不该让规划崩
+        return False
+
+
+def _normalize_poi(p: POI, cfg: ScenarioConfig) -> POI:
+    """给一个 POI 追加语义标签、按访客口径压停留上限。
+
+    不改 CSV、不改冻结契约：用 `dataclasses.replace` 造一个新对象，
+    原始 tags 全部保留，只在末尾追加命中的语义标签。
+
+    压停留上限是"访客可执行"的关键：高德默认给图书馆 120 分钟，那是进去自习
+    的口径；访客一般只能在楼前广场看外观，照抄会让一站吃掉整个上午。
+    """
+    text = " ".join([str(p.name or ""), str(p.category or ""),
+                     "|".join(str(t) for t in (p.tags or []))])
+    extra = [label for label, kws in (getattr(cfg, "tag_aliases", None) or {}).items()
+             if any(str(k) in text for k in kws)]
+    tags = list(p.tags or [])
+    if extra:
+        tags = list(dict.fromkeys(tags + extra))
+
+    stay = p.stay_min
+    caps = getattr(cfg, "visit_stay_cap", None) or {}
+    cap = int(caps.get((p.category or "").strip(), 0) or 0)
+    if not cap:
+        cap = int(getattr(cfg, "visit_stay_default", 0) or 0)
+    if cap and stay > cap:
+        stay = cap
+
+    if tags == list(p.tags or []) and stay == p.stay_min:
+        return p
+    return replace(p, tags=tags, stay_min=stay)
+
+
+def _category_of(p: POI) -> str:
+    return (p.category or "").strip() or "未分类"
+
+
+def _group_of(p: POI, cfg: ScenarioConfig) -> str:
+    """把高德的细分分类归并成"参观语义大类"（规则在场景配置里，不在代码里）。"""
+    text = "%s %s" % (p.category or "", p.name or "")
+    for group, kws in (getattr(cfg, "candidate_groups", None) or {}).items():
+        if any(str(k) in text for k in kws):
+            return group
+    return _category_of(p)
+
+
+def _diversify_and_pad(pool: list[POI], all_pois: list[POI], wanted: set[str],
+                       avoid: set[str], weekday: int | None,
+                       min_n: int, cfg: ScenarioConfig) -> list[POI]:
+    """候选池既要够多、又要够杂。
+
+    1. 按匹配度排序后每类最多留 3 个 —— 避免"5 站全是图书馆"；
+    2. 命中点不足 `min_n` 时，按"新分类优先 + 质量分"从全量补足。
+       补位点没命中兴趣，后续 `_reason` 会如实写"按质量分补位"，不假装匹配。
+    """
+    ranked = sorted(pool, key=lambda p: (-_match_score(p, wanted), p.poi_id))
+    kept: list[POI] = []
+    per_cat: dict[str, int] = {}
+    for p in ranked:
+        c = _group_of(p, cfg)
+        if per_cat.get(c, 0) < _CANDIDATES_PER_CATEGORY:
+            kept.append(p)
+            per_cat[c] = per_cat.get(c, 0) + 1
+    if len(kept) >= min_n:
+        return kept
+
+    ids = {p.poi_id for p in kept}
+    rest = [p for p in all_pois
+            if p.poi_id not in ids
+            and not (set(p.tags or []) & avoid)
+            and not _closed_on(p, weekday)]
+    rest.sort(key=lambda p: (-p.score, p.poi_id))
+
+    for p in rest:                          # 第一轮：只补没出现过的语义大类
+        if len(kept) >= min_n:
+            break
+        c = _group_of(p, cfg)
+        if per_cat.get(c, 0) == 0:
+            kept.append(p)
+            per_cat[c] = 1
+            ids.add(p.poi_id)
+    for p in rest:                          # 第二轮：还不够就按质量分补齐
+        if len(kept) >= min_n:
+            break
+        if p.poi_id in ids:
+            continue
+        kept.append(p)
+        c = _group_of(p, cfg)
+        per_cat[c] = per_cat.get(c, 0) + 1
+        ids.add(p.poi_id)
+    return kept
+
+
 def _candidate_pool(req: PlanRequest, cfg: ScenarioConfig) -> tuple[list[POI], set[str]]:
-    """按兴趣/排除条件筛出候选 POI。
+    """按兴趣/排除条件/商圈筛出候选 POI。
 
     返回 (候选池, 展开后的兴趣标签集合)。
     一个都匹配不上时**放宽**到全部 POI —— 宁可给个不完美的结果，也不返回空行程。
+    `req.zone` 非空时只在商圈内挑（约会模式：选定中心辐射周边）；
+    商圈里筛不出东西时放开过滤 —— 不因为一个写错的商圈名返回空行程。
+
+    v1.6：`tag_aliases` 配了且当前是校区数据包时，先做语义归一化，
+    再做"每类限量 + 最少补位"，保证换到任何一所高校都能排出多站且多样的行程。
     """
     pois = load_pois(cfg, req.city)       # city 是数据路由：不同城市读不同的 CSV
+    semantic = _needs_semantic(cfg, req.city)
+    if semantic:
+        pois = [_normalize_poi(p, cfg) for p in pois]
+        # 访客口径清洗：0/5 分钟的"路过点"（地铁站、宿舍楼下的窗口）
+        # 不是一站，排进时间表只会出来一行"09:39–09:39"。全表都这么短时才放行。
+        usable = [p for p in pois if p.stay_min >= 10]
+        if usable:
+            pois = usable
+        bad_names = getattr(cfg, "candidate_exclude_names", None) or []
+        bad_groups = set(getattr(cfg, "candidate_exclude_groups", None) or [])
+        if bad_names or bad_groups:
+            clean = [p for p in pois
+                     if not any(k in (p.name or "") for k in bad_names)
+                     and _group_of(p, cfg) not in bad_groups]
+            if clean:                        # 别把整张表滤空
+                pois = clean
     wanted = expand_interests(req.interests, cfg)
     avoid = set(req.avoid or [])
     weekday = _weekday_of(req.date)       # 有日期才能判断"今天闭不闭馆"
@@ -103,6 +243,17 @@ def _candidate_pool(req: PlanRequest, cfg: ScenarioConfig) -> tuple[list[POI], s
     if not pool:
         # 放宽时也要排除当天固定闭馆的点：那不是"找不到合适的"，是"今天根本不开门"
         pool = [p for p in pois if not _closed_on(p, weekday)] or list(pois)
+
+    if semantic:
+        min_n = int(getattr(cfg, "min_candidates", 0) or 0)
+        if min_n > 0:
+            pool = _diversify_and_pad(pool, pois, wanted, avoid, weekday, min_n, cfg)
+
+    zone = (req.zone or "").strip()
+    if zone:
+        zpool = [p for p in pool if p.zone == zone]
+        if zpool:
+            pool = zpool
     return pool, wanted
 
 
@@ -285,6 +436,7 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
             category=p.category,
             address=p.address,
             url=p.url,
+            tips=p.tips,   # v1.6：数据层"怎么玩"随行；narrate 对已有 tips 不覆盖
         ))
         clock, prev = leave, p
 
@@ -574,6 +726,8 @@ def greedy_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
     1. **预算硬约束** —— 超预算的候选直接不入选，不会排完再报 BUDGET_OVER；
     2. **在途惩罚** —— 同样的满意度，近的优先，避免为了一个点横穿校区；
     3. **目标函数与评分同源** —— 优化什么就是评什么，权重取自场景配置。
+
+    （带锚点的请求由 planner.plan() 中枢委托给 date_plan，见 planner.py。）
     """
     pool, wanted = _candidate_pool(req, cfg)
     pool.sort(key=lambda p: (-_match_score(p, wanted), p.poi_id))   # 同分时让结果稳定
@@ -622,7 +776,10 @@ def _two_opt(path: list[POI], req: PlanRequest, cfg: ScenarioConfig) -> list[POI
 
 
 def two_opt_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
-    """贪心选点 + 2-opt 改序：通常比纯贪心少跑一点路，代价是慢几毫秒。"""
+    """贪心选点 + 2-opt 改序：通常比纯贪心少跑一点路，代价是慢几毫秒。
+
+    （带锚点的请求由 planner.plan() 中枢委托给 date_plan，见 planner.py。）
+    """
     pool, wanted = _candidate_pool(req, cfg)
     pool.sort(key=lambda p: (-_match_score(p, wanted), p.poi_id))
     head = _mandatory_head(req, cfg)
@@ -635,6 +792,152 @@ def two_opt_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
     return PlanResponse(request=req, days=_fill_all(days, req, cfg, wanted))
 
 
+# ---------------------------------------------------------------- 真算法：date（约会模式）
+#
+# 约会的骨架不是"分数"，是**硬时刻**：电影 14:30 开场、餐厅 18:00 订座，
+# 这些事不会因为你没赶到就改时间。所以先按锚点把一天切成段，
+# 每段里"玩得完、还赶得上下一场"的候选里挑净收益最高的 —— 错过电影 = 约会失败，
+# 这比少逛一个商场严重得多。
+
+
+def _resolve_anchors(req: PlanRequest, cfg: ScenarioConfig) -> list[tuple[POI, int, int, str]]:
+    """把 req.anchors 解析成 [(POI, 时刻分钟, 时长, 标签)]，按时刻升序。
+
+    解析不了的条目（poi 认不出 / 时刻非法）直接跳过，不抛异常 ——
+    未排入的锚点由约束层如实报 ANCHOR_MISS，策略层不静默编造。
+    """
+    out: list[tuple[POI, int, int, str]] = []
+    for a in (req.anchors or []):
+        if not isinstance(a, dict):
+            continue
+        key = str(a.get("poi") or "").strip()
+        t = str(a.get("time") or "").strip()
+        try:
+            dur = int(float(a.get("duration_min") or 120))
+        except (TypeError, ValueError):
+            continue
+        try:
+            hh, mm = t.split(":")
+            at = int(hh) * 60 + int(mm)
+        except (TypeError, ValueError):
+            continue
+        if not key or not (0 <= at < 24 * 60):
+            continue
+        poi = None
+        for p in load_pois(cfg, req.city):
+            if p.poi_id == key or p.name == key:
+                poi = p
+                break
+        if poi is None:
+            continue
+        out.append((poi, at, max(15, dur), str(a.get("label") or "")))
+    out.sort(key=lambda x: x[1])
+    return out
+
+
+def date_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
+    """约会模式：锚点（电影开场/餐厅订座）切段，段内贪心填充。
+
+    三条铁规矩：
+    1. **锚点钉死在时刻上**：arrive = 锚点时刻、leave = 时刻 + 时长。
+       电影不会因为你早到而提前开场，晚到也不改表 —— 赶不赶得上由约束层
+       如实报 ANCHOR_MISS，前端拿告警提醒用户"这段路上要抓紧"。
+    2. **段内候选必须"玩得完、还赶得上下一场"**：离开候选点的时间
+       + 候选点到下一锚点的在途 <= 锚点时刻，否则不入选（硬约束）。
+    3. **没有锚点时退化为普通贪心**：复用 `_greedy_one_day` 的选点逻辑，
+       不会因为"约会模式"就变笨。
+    """
+    pool, wanted = _candidate_pool(req, cfg)
+    anchors = _resolve_anchors(req, cfg)
+    w = _weights(cfg, req)
+    start = to_minutes(req.start_time or cfg.day_start)
+    limit = to_minutes(req.end_time or cfg.day_end)
+    origin = _origin_poi(req, cfg)
+    weekday = _weekday_of(req.date)
+    budget = req.daily_budget if (req.daily_budget or 0) > 0 else None
+    day_len = max(1, limit - start)
+    cap = max(1, _per_day_top_n(req, cfg))
+
+    anchor_ids = {p.poi_id for p, _, _, _ in anchors}
+    remaining = [p for p in pool if p.poi_id not in anchor_ids]
+    remaining.sort(key=lambda p: (-_match_score(p, wanted), p.poi_id))
+
+    day = DayPlan(day_index=1)
+    state = {"clock": start, "prev": origin, "spent": 0.0}
+
+    def emit(p: POI, e: Transport, arrive: int, leave: int, reason: str,
+             stay: int | None = None) -> None:
+        day.items.append(ItineraryItem(
+            seq=len(day.items) + 1,
+            poi_id=p.poi_id,
+            name=p.name,
+            lat=p.lat, lon=p.lon,
+            arrive=to_hhmm(arrive), leave=to_hhmm(leave),
+            stay_min=stay if stay is not None else p.stay_min,
+            cost=p.cost,
+            transport=e,
+            reason=reason[:120],
+            category=p.category, address=p.address, url=p.url,
+            tips=p.tips,   # v1.6：数据层"怎么玩"随行（约会/日常两条排程路径都要带上）
+        ))
+        state["clock"], state["prev"] = leave, p
+        state["spent"] += p.cost + e.cost
+
+    def fill_until(deadline: int, back_to: POI | None = None) -> None:
+        """在 [clock, deadline] 这一段里贪心填充，直到装不下或站数到顶。
+
+        `back_to` 是本段结束后的锚点：候选必须"玩完还能赶到它"（离开时刻
+        + 候选点 → 锚点的在途 <= deadline），否则不入选。
+        末段（没有下一锚点）只看 deadline 本身。
+        """
+        while len(day.items) < cap and remaining:
+            best, best_u, best_pack = None, 0.0, None
+            for p in remaining:
+                e = _edge_between(state["prev"], p, req, cfg)
+                arrive = _arrive_at(state["clock"], p, e)
+                leave = arrive + p.stay_min
+                if leave > deadline:
+                    continue
+                if back_to is not None:
+                    back = _edge_between(p, back_to, req, cfg)
+                    if leave + back.minutes > deadline:
+                        continue              # 赶不上这一场：硬约束，直接出局
+                if _closes_before(p, leave) or _closed_on(p, weekday):
+                    continue
+                if budget is not None and state["spent"] + p.cost + e.cost > budget + 1e-9:
+                    continue
+                u = _utility(p, e, wanted, w, day_len, budget, state["spent"],
+                             state["clock"])
+                if best is None or u > best_u:
+                    best, best_u, best_pack = p, u, (e, arrive, leave)
+            if best is None:
+                break
+            e, arrive, leave = best_pack
+            remaining.remove(best)
+            tail = ("；须在 %s 前离开（锚点不等人）" % to_hhmm(deadline)) if back_to else ""
+            emit(best, e, arrive, leave, _reason(best, wanted) + tail)
+
+    # 有锚点：逐段填充 → 锚点钉死 → … → 最后一段填到 end_time
+    if anchors:
+        for pa, at, dur, label in anchors:
+            fill_until(at, pa)                # 本段候选必须赶得上"当前"这个锚点
+            e = _edge_between(state["prev"], pa, req, cfg)
+            emit(pa, e, at, at + dur,
+                 "锚点：%s，%s 开始（晚到不等人）" % (label or pa.category, to_hhmm(at)),
+                 stay=dur)
+        fill_until(limit, None)
+    # 没有锚点：退化为贪心的一天（复用同一套选点，保证行为一致）
+    else:
+        head = _mandatory_head(req, cfg)
+        picked = _greedy_one_day(req, cfg, wanted, list(remaining), head,
+                                 cap, day_len, budget,
+                                 start_from=origin)
+        day = _fill_day(picked, req, cfg, wanted, day_index=1, start_from=origin)
+
+    day.refresh_stats()
+    return PlanResponse(request=req, days=[day])
+
+
 # ---------------------------------------------------------------- 注册表
 
 STRATEGIES: dict[str, PlannerFn] = {
@@ -642,6 +945,7 @@ STRATEGIES: dict[str, PlannerFn] = {
     "random": random_plan,
     "greedy": greedy_plan,
     "two_opt": two_opt_plan,
+    "date": date_plan,
 }
 
 

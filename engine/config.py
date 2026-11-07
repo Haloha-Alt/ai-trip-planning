@@ -50,6 +50,34 @@ class ScenarioConfig:
     # 拿上限当默认值等于"能塞多少塞多少"，一天会出现 8 站，日常出行没人这么过。
     default_top_n: int = 0
 
+    # ---- v1.6 追加（访客多校区 / 详细行程；全部带默认值，旧场景逐字不变）----
+    # 点位表路由口径："" = v1.5 老逻辑（场景显式 > 城市注册表 > 默认）；
+    # "campus_visit" = 由高校注册表的 visit_poi 决定读哪份校内点位表。
+    poi_routing: str = ""
+    # 语义标签归一化：{语义标签: [点位名称/分类里出现的关键词]}。
+    # 高德抓来的 tags 是「科教文化服务|学校|高等院校」这类原始分类，
+    # 与用户说的「图书馆」「吃饭」对不上；配了这张表才做名称/分类匹配。
+    # **不配 = 完全不启用**（老场景、老测试零回归）。
+    tag_aliases: dict[str, list[str]] = field(default_factory=dict)
+    # 候选池最少点数：命中兴趣的点太少时按质量分 + 类别多样性补足，
+    # 避免"只命中 1 个点 → 只排 1 站"或"5 站全是图书馆"。
+    # 0 = 不补位（老行为）。
+    min_candidates: int = 0
+
+    # ---- v1.6.5 追加：出租车计价（起步价制）。空 = 该场景不做出租车估算 ----
+    # {"start_price": 10.0, "start_km": 3.0, "per_km": 2.0}，业务数值只写在场景 toml。
+    taxi: dict[str, float] = field(default_factory=dict)
+    # 访客停留上限：{POI 分类: 分钟}。高德抓来的点位默认 60/120 分钟，
+    # 那是"进去自习/参观"的口径；访客只看外观、不进馆，照抄会一站占两小时。
+    # 只压上限、不抬高：数据里本来就短的站保持原样。
+    visit_stay_cap: dict[str, int] = field(default_factory=dict)
+    visit_stay_default: int = 0       # 未列出分类的兜底上限；0 = 不限制
+    # 候选池的"语义大类"：{大类: [分类/名称关键词]}。按大类限量才挡得住
+    # 「中餐厅 / 快餐厅 / 星巴克咖啡」被当成 3 个不同类、结果 4 站都在吃饭。
+    candidate_groups: dict[str, list[str]] = field(default_factory=dict)
+    candidate_exclude_groups: list[str] = field(default_factory=list)
+    candidate_exclude_names: list[str] = field(default_factory=list)
+
 
 def list_scenarios() -> list[str]:
     """列出所有可用场景名（不含扩展名），UI 下拉框用。"""
@@ -101,4 +129,18 @@ def load_scenario(name: str | None = None) -> ScenarioConfig:
         matrix_file=dfs.get("matrix", "travel_matrix.csv"),
         default_strategy=raw.get("default_strategy", "stub"),
         default_top_n=int(raw.get("default_top_n", 0) or 0),
+        poi_routing=str(dfs.get("poi_routing", "") or ""),
+        tag_aliases={k: [str(x) for x in v]
+                     for k, v in (raw.get("tag_aliases") or {}).items()},
+        min_candidates=int(raw.get("min_candidates", 0) or 0),
+        visit_stay_cap={k: int(v) for k, v in (raw.get("visit_stay_cap") or {}).items()},
+        visit_stay_default=int(raw.get("visit_stay_default", 0) or 0),
+        candidate_groups={k: [str(x) for x in v]
+                          for k, v in (raw.get("candidate_groups") or {}).items()},
+        candidate_exclude_groups=[str(x) for x in
+                                  (raw.get("candidate_exclude") or {}).get("groups", [])],
+        candidate_exclude_names=[str(x) for x in
+                                 (raw.get("candidate_exclude") or {}).get("name_keywords", [])],
+        taxi={k: float(v) for k, v in (raw.get("taxi") or {}).items()
+              if not isinstance(v, str)},
     )

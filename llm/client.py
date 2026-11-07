@@ -37,7 +37,15 @@ from typing import Any
 
 
 class LLMError(RuntimeError):
-    """调用大模型失败。调用方应当降级，不要把异常抛给用户。"""
+    """调用大模型失败。调用方应当降级，不要把异常抛给用户。
+
+    `fatal=True` 表示「重试也没用」的错误（401/403/400/404 这类确定性失败），
+    护栏看到它会立刻止损，不再白等一整轮超时 —— 鉴权挂掉时能省一半时间。
+    """
+
+    def __init__(self, message: str, *, fatal: bool = False):
+        super().__init__(message)
+        self.fatal = fatal
 
 
 class NullClient:
@@ -79,6 +87,16 @@ class OpenAICompatClient:
         self.timeout = float(timeout or 8.0)
         self.temperature = temperature
         self.max_tokens = max_tokens
+        # 内网网关（如 aigw.dlut.edu.cn）必须直连。环境变量里的 HTTP_PROXY
+        # 会把请求拐到代理上，代理返回 401 会被误判成「Key 失效」——
+        # 实测本机就踩过这个坑。确需代理时显式设 LLM_ALLOW_PROXY=1。
+        self.allow_proxy = (os.environ.get("LLM_ALLOW_PROXY") or "").strip().lower() in (
+            "1", "true", "yes", "on")
+
+    def _opener(self):
+        if self.allow_proxy:
+            return urllib.request.build_opener()
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     # ---- 配置入口 ----
 
@@ -112,7 +130,7 @@ class OpenAICompatClient:
             method="GET",
         )
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            with self._opener().open(req, timeout=self.timeout) as r:
                 obj = json.loads(r.read().decode("utf-8", "replace") or "{}")
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError) as e:
             raise LLMError("取模型列表失败：%s" % e)
@@ -127,6 +145,8 @@ class OpenAICompatClient:
         失败一律抛 LLMError，绝不返回半截内容 —— 半截内容比明确的失败更难查。
         """
         url = "%s/chat/completions" % self.base_url
+        # 单次调用可覆盖超时/长度：长 JSON 的编排任务和一句话解说不该共用一个上限。
+        timeout = float(kwargs.pop("timeout", self.timeout) or self.timeout)
         payload = {
             "model": kwargs.get("model") or self.model,
             "messages": [
@@ -149,7 +169,7 @@ class OpenAICompatClient:
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            with self._opener().open(req, timeout=timeout) as r:
                 ctype = r.headers.get("Content-Type", "") or ""
                 raw = r.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
@@ -158,11 +178,13 @@ class OpenAICompatClient:
                 body = e.read().decode("utf-8", "replace")[:200]
             except Exception:  # noqa: BLE001 - 读错误体失败不影响主错误
                 pass
-            raise LLMError("HTTP %s：%s" % (e.code, body or e.reason))
+            # 4xx 是确定性失败：换一次重试只会再等一轮，护栏会据此止损
+            raise LLMError("HTTP %s：%s" % (e.code, body or e.reason),
+                           fatal=400 <= e.code < 500) from e
         except urllib.error.URLError as e:
-            raise LLMError("网络不可达：%s" % e.reason)
-        except TimeoutError:
-            raise LLMError("请求超时（%.0f 秒）" % self.timeout)
+            raise LLMError("网络不可达：%s" % e.reason) from e
+        except TimeoutError as e:
+            raise LLMError("请求超时（%.0f 秒）" % timeout) from e
 
         # 网关强制流式：先按 SSE 拼，拼不出来再按整包 JSON 解
         if _looks_like_sse(ctype, raw):
@@ -236,11 +258,74 @@ def _content_from_sse(raw: str) -> str:
     return "".join(parts)
 
 
+def _repair_truncated_json(text: str) -> dict[str, Any] | None:
+    """抢救被 `max_tokens` 截断的 JSON。
+
+    详细行程要求模型一次写出 5 站导览，网关默认 800 token 常常在最后一步
+    把 JSON 腰斩（实测 39 秒里有两次都是这种「半截 JSON」）。整段丢弃再重试
+    是最慢的做法：这里把半截字符串/数组/对象补齐闭合，前半段照常合并进结果，
+    后半段由规则模板兜底 —— 用户看到的是「模型生效 + 规则补全」，而不是全退回。
+    """
+    s = (text or "").strip()
+    start = s.find("{")
+    if start < 0:
+        return None
+    s = s[start:]
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(s)
+        if isinstance(obj, dict):
+            return obj
+    except ValueError:
+        pass
+
+    def _close(frag: str) -> tuple[str, str]:
+        stack: list[str] = []
+        in_str = False
+        esc = False
+        for ch in frag:
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch in "{[":
+                stack.append(ch)
+            elif ch in "}]" and stack:
+                stack.pop()
+        fixed = frag + ('"' if in_str else "")
+        closing = "".join("}" if c == "{" else "]" for c in reversed(stack))
+        return fixed, closing
+
+    cuts = [len(s)]
+    for j in range(len(s) - 1, 0, -1):
+        if s[j] in ",}]\"\n":
+            cuts.append(j + 1)
+        if len(cuts) >= 48:
+            break
+    for cut in cuts:
+        frag = s[:cut].rstrip()
+        if frag.endswith(","):
+            frag = frag[:-1].rstrip()
+        fixed, closing = _close(frag)
+        try:
+            obj = json.loads(fixed + closing)
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
+
+
 def _safe_json(text: str) -> dict[str, Any] | None:
     """把模型输出里的 JSON 抠出来。
 
-    模型经常裹一层 ```json  fences，或者在 JSON 前后说两句废话。
-    这里的策略是"找第一对花括号"，够用且不脆弱。
+    模型经常裹一层 ```json fences，或者在 JSON 前后说两句废话；
+    这里先按完整文本解，再按「第一对花括号」解，最后尝试抢救截断输出。
     """
     if not text:
         return None
@@ -251,14 +336,19 @@ def _safe_json(text: str) -> dict[str, Any] | None:
             s = s[4:]
         s = s.strip()
 
-    start, end = s.find("{"), s.rfind("}")
-    if start < 0 or end <= start:
+    start = s.find("{")
+    if start < 0:
         return None
-    try:
-        obj = json.loads(s[start:end + 1])
-    except ValueError:
-        return None
-    return obj if isinstance(obj, dict) else None
+    for candidate in (s[start:], s[start:s.rfind("}") + 1] if s.rfind("}") > start else ""):
+        if not candidate:
+            continue
+        try:
+            obj = json.loads(candidate)
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return _repair_truncated_json(s)
 
 
 def get_client() -> OpenAICompatClient | NullClient:

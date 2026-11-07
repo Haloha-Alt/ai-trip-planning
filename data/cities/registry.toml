@@ -10,12 +10,21 @@
 
 default = "dalian"
 
+# kind = "campus" 表示这份数据包是**一所高校**（UI 下拉框只列这些）。
+# label 是 UI 显示名；没写 label 用 name。
+# visit_poi = 访客场景（visit）专用的**校内点位表**；没写就直接用 poi。
+#   之所以单独留一个字段：dalian 的 poi 是"城市全量"（混着星海广场等校外商圈），
+#   而访客只在校区里活动，必须读裁剪过的 pois_campus.csv；其余高校的包本身就
+#   全是校内点，poi 即访客口径，无需再写一份。
 [cities.dalian]
 name = "大连"
-aliases = ["大连市", "dalian", "dl"]
+label = "大连理工大学"
+kind = "campus"
+aliases = ["大连市", "dalian", "dl", "大连理工大学", "大工"]
 lat = 38.9140
 lon = 121.6147
 poi = "cities/dalian/pois.csv"
+visit_poi = "cities/dalian/pois_campus.csv"
 matrix = "cities/dalian/travel_matrix.csv"
 
 [cities.beijing]
@@ -25,3 +34,23 @@ lat = 39.9042
 lon = 116.4074
 poi = "cities/beijing/pois.csv"
 matrix = "cities/beijing/travel_matrix.csv"
+
+# ---- 多校区扩展（docs/14）：高校数据包放 data/campuses/<key>/ ----
+
+[cities.hit]
+name = "哈尔滨工业大学"
+kind = "campus"
+aliases = ["哈工大", "hit", "HIT", "哈工大一校区"]
+lat = 45.7462
+lon = 126.6296
+poi = "campuses/hit/pois.csv"
+matrix = "campuses/hit/travel_matrix.csv"
+
+[cities.tsinghua]
+name = "清华大学"
+kind = "campus"
+aliases = ["清华", "tsinghua", "thu"]
+lat = 40.0035
+lon = 116.3264
+poi = "campuses/tsinghua/pois.csv"
+matrix = "campuses/tsinghua/travel_matrix.csv"

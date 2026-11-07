@@ -1,0 +1,18 @@
+{
+  "key": "ustc",
+  "name": "中国科学技术大学（东区）",
+  "city": "hefei",
+  "level": "L0",
+  "gates": ["东区老北门（金寨路侧）", "东区北门（黄山路，车辆口）"],
+  "alt_campuses": ["中区", "西区（黄山路443号）", "南区", "高新校区"],
+  "visitor_difficulty": 5,
+  "guide_doc": "docs/23-C9高校访客参观指南/07-中国科学技术大学.md",
+  "sources": [
+    {"kind": "research", "what": "师生亲友系统+科技活动周+动线调研", "via": "包河区政府2025-04、保卫处公众号、校友总会官网、2025科技活动周邀请函", "date": "2026-11-04"}
+  ],
+  "next_steps": [
+    "L1: tools/new_city.py --scaffold ustc，按指南 2.2 点位表抓高德 POI（≥30）",
+    "L2: tools.amap_matrix 实测步行矩阵（≥80 边）",
+    "事实层: visitor_guide.json（无常设公众通道！visit 场景应输出'身份→渠道→最近开放窗口'，与常规模板不同）"
+  ]
+}

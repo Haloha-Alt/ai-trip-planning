@@ -56,6 +56,61 @@
         padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.7}
   .tip{color:var(--sub);font-size:12px;line-height:1.5;margin-top:2px}
 
+  /* ---- 详细行程 v1.6：规则骨架 + 校区事实层 + 大模型，三层分开展示 ---- */
+  .di-hero{background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;
+           padding:14px 16px;margin-bottom:14px}
+  .di-hero h2{margin:0 0 8px;font-size:17px}
+  .di-hero p{margin:5px 0 0;font-size:13px;line-height:1.7}
+  .di-model-note{margin-top:9px;padding:8px 11px;border-radius:8px;background:var(--card);
+                 border:1px dashed var(--line);font-size:12.5px;line-height:1.7}
+  .di-model-note.ok{border-style:solid;border-color:var(--accent)}
+  .di-model-note .muted{display:block;margin-top:3px}
+  .di-badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;
+            font-weight:600;margin:0 6px 4px 0;background:var(--card);
+            border:1px solid var(--line);color:var(--sub)}
+  .di-badge.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .di-sec{margin:18px 0 8px;font-size:14px;font-weight:700;
+          border-left:3px solid var(--accent);padding-left:9px}
+  .di-arch{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .di-arch-col{background:var(--card);border:1px solid var(--line);border-radius:8px;
+               padding:11px 12px;font-size:12px;line-height:1.65;min-width:0}
+  .di-arch-col b{display:block;font-size:13px;margin-bottom:6px;color:var(--accent)}
+  .di-arch-col ul{margin:0;padding-left:16px}
+  .di-arch-col .muted{display:block;margin-top:6px}
+  .di-box{background:var(--card);border:1px solid var(--line);border-radius:8px;
+          padding:12px 14px;font-size:13px;line-height:1.75}
+  .di-box p{margin:0 0 7px}
+  .di-box ul{margin:4px 0 0;padding-left:18px}
+  .di-box li{margin:2px 0}
+  .di-step{border:1px solid var(--line);border-radius:10px;background:var(--card);
+           margin-bottom:12px;overflow:hidden}
+  .di-step-head{display:flex;align-items:center;gap:10px;padding:10px 14px;
+                background:var(--accent-soft);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .di-seq{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+          display:inline-flex;align-items:center;justify-content:center;font-size:13px;
+          font-weight:700;flex:none}
+  .di-step-head h3{margin:0;font-size:15px;flex:1;min-width:130px}
+  .di-meta{font-size:12px;color:var(--sub)}
+  .di-body{padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .di-blk{min-width:0}
+  .di-blk h4{margin:0 0 5px;font-size:11.5px;font-weight:700;color:var(--sub);letter-spacing:.4px}
+  .di-blk p{margin:0 0 7px;font-size:12.5px;line-height:1.75}
+  .di-blk ul{margin:0;padding-left:16px;font-size:12.5px;line-height:1.75}
+  .di-llm{grid-column:1/-1;background:var(--accent-soft);border-left:3px solid var(--accent);
+          border-radius:6px;padding:10px 12px;font-size:12.5px;line-height:1.75}
+  .di-llm h4{color:var(--accent);margin-bottom:7px}
+  .di-llm p{margin:0 0 6px}
+  .di-access{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;
+             border:1px solid var(--line);color:var(--sub);margin-right:6px}
+  .di-access.warn{border-color:var(--accent);color:var(--accent)}
+  .di-tags{margin:8px 0 2px}
+  .di-facts{border-top:1px dashed var(--line);padding-top:8px;font-size:11.5px;
+            color:var(--sub);line-height:1.8}
+  .di-facts b{color:var(--ink);font-weight:600}
+  .di-src{margin-top:6px;font-size:11px;color:var(--sub)}
+  .di-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media (max-width:900px){.di-arch,.di-body,.di-compare{grid-template-columns:1fr}}
+
   /* ---- 页签 ---- */
   .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
   .tab{width:auto;margin:0;padding:8px 16px;background:#fff;color:var(--sub);
@@ -88,124 +143,1157 @@
   pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;
       font-size:12px;line-height:1.5;max-height:340px}
 </style>
+<style>
+  /* ---------- 顶部菜单栏（三主题共用一套结构） ---------- */
+  #menubar{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:8px;
+    padding:8px 18px;background:var(--card);border-bottom:1px solid var(--line);
+    font-size:12.5px;box-shadow:0 1px 0 rgba(0,0,0,.02)}
+  #menubar .brand{font-weight:700;font-size:14px;letter-spacing:.5px;margin-right:4px}
+  #menubar .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+  #menubar .sp{flex:1}
+  #menubar .lab{color:var(--sub)}
+  #menubar select{width:auto;min-width:230px;padding:5px 8px;font-size:12.5px;
+    border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  #menubar .hint{color:var(--sub);font-size:11.5px;max-width:260px;overflow:hidden;
+    white-space:nowrap;text-overflow:ellipsis}
+  #menubar button{width:auto;margin:0;padding:5px 10px;border-radius:6px;font-size:12.5px;
+    background:transparent;color:var(--ink);border:1px solid var(--line)}
+  #menubar button:hover{background:var(--accent-soft);filter:none}
+  #menubar .tb.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  #menubar .mb{background:var(--accent-soft);border-color:transparent;color:var(--ink)}
+
+  /* ---------- 三套主题：只换变量，不碰结构 ---------- */
+  html[data-theme="dark"]{
+    --bg:#0f1216; --card:#171b21; --line:#262c34; --ink:#e6ebf2;
+    --sub:#93a1b1; --accent:#4f8cff; --accent-soft:#16233a;
+    --warn:#f0b429; --warn-bg:#2a2114; --ok:#3ecf8e; --ok-bg:#12251c;
+    --stay:#4f8cff; --move:#5b6675; --wait:#f0b429; --best:#3ecf8e; --best-bg:#12251c;
+  }
+  html[data-theme="paper"]{
+    --bg:#f7f4ec; --card:#fffdf7; --line:#e0d8c6; --ink:#2a2620;
+    --sub:#7a7264; --accent:#b23a2f; --accent-soft:#f7ece9;
+    --warn:#8a5a2f; --warn-bg:#fdf6ec; --ok:#3f6b4a; --ok-bg:#eef3ea;
+    --stay:#b23a2f; --move:#a99f8c; --wait:#c0872a; --best:#3f6b4a; --best-bg:#eef3ea;
+  }
+  html[data-theme="dark"] input, html[data-theme="dark"] select,
+  html[data-theme="dark"] textarea{background:#12161c;color:var(--ink)}
+  html[data-theme="dark"] button.ghost{background:#12161c}
+
+  /* ================= 结构级主题：不只换颜色，排版也跟着换 =================
+     三套主题改的是**版式语言**：字体族、圆角、间距、边框样式、指标网格列数、按钮形状。
+     只换色 = 换皮；换版式才算"另一个界面"。 */
+
+  /* ---- 纸媒：衬线标题 / 无双线不收边 / 三列指标 / 方角描边按钮 ---- */
+  html[data-theme="paper"] body{
+    background-image:repeating-linear-gradient(to bottom,transparent 0 29px,rgba(42,38,32,.045) 29px 30px)}
+  html[data-theme="paper"] .wrap{grid-template-columns:300px 1fr;gap:28px;padding:20px 36px 64px}
+  html[data-theme="paper"] header{padding:26px 36px 16px;border-bottom:3px double var(--line);background:transparent}
+  html[data-theme="paper"] header h1{font:600 25px/1.35 "Songti SC",Georgia,serif;letter-spacing:1.5px}
+  html[data-theme="paper"] header p{font-size:12.5px;letter-spacing:.3px}
+  html[data-theme="paper"] .card{border:0;border-bottom:1px solid var(--line);
+    border-radius:0;background:transparent;padding:14px 0 16px}
+  html[data-theme="paper"] .card h2{font:600 15px/1.4 "Songti SC",Georgia,serif;letter-spacing:.8px}
+  html[data-theme="paper"] .card h2::before{content:"§ ";color:var(--accent)}
+  html[data-theme="paper"] .metrics{grid-template-columns:repeat(3,1fr);gap:12px 22px}
+  html[data-theme="paper"] .metric{background:transparent;border-radius:0;text-align:left;
+    padding:2px 0 2px 10px;border-left:2px solid var(--accent)}
+  html[data-theme="paper"] .metric b{font:600 21px/1.25 Georgia,"Songti SC",serif}
+  html[data-theme="paper"] button{border-radius:0;background:transparent;color:var(--accent);
+    border:1px solid var(--accent);font-weight:600;letter-spacing:.6px}
+  html[data-theme="paper"] button:hover{background:var(--accent);color:#fff;filter:none}
+  html[data-theme="paper"] button.ghost{border-color:var(--line);color:var(--ink)}
+  html[data-theme="paper"] .tabs{border-bottom:1px solid var(--line);gap:0}
+  html[data-theme="paper"] .tab{border-radius:0;background:transparent;border-bottom:2px solid transparent;color:var(--sub)}
+  html[data-theme="paper"] .tab.active{background:transparent;color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+  html[data-theme="paper"] table td{border-bottom:1px dotted var(--line)}
+
+  /* ---- 仪表盘：等宽标题 / 紧凑卡片 / 三列指标带亮条 / 小方角 ---- */
+  html[data-theme="dark"] body{
+    background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+    background-size:32px 32px}
+  html[data-theme="dark"] .wrap{grid-template-columns:320px 1fr;gap:12px;padding:12px 18px 44px}
+  html[data-theme="dark"] header{padding:14px 18px;background:transparent;border-bottom:1px solid #232b35}
+  html[data-theme="dark"] header h1{font:600 15px/1.3 "SF Mono",Consolas,monospace;
+    letter-spacing:1px}
+  html[data-theme="dark"] header p{font:11.5px/1.6 "SF Mono",Consolas,monospace;color:#7b8a9c}
+  html[data-theme="dark"] .card{border-radius:4px;border-color:#2a323c;
+    background:linear-gradient(180deg,#1a1f26,#151a20)}
+  html[data-theme="dark"] .card h2{font:600 13px/1.4 "SF Mono",Consolas,monospace;letter-spacing:1.2px}
+  html[data-theme="dark"] .metrics{grid-template-columns:repeat(3,1fr);gap:6px}
+  html[data-theme="dark"] .metric{background:#12171d;border:1px solid #232b35;border-left:2px solid var(--accent);
+    border-radius:3px;text-align:left;padding:7px 9px}
+  html[data-theme="dark"] .metric b{font-family:"SF Mono",Consolas,monospace;letter-spacing:.5px}
+  html[data-theme="dark"] button{border-radius:3px;background:#1b2430;color:#cfe0f5;
+    border:1px solid #2b3a4d;letter-spacing:.4px}
+  html[data-theme="dark"] button:hover{background:#22303f;filter:none}
+  html[data-theme="dark"] .tabs{gap:4px}
+  html[data-theme="dark"] .tab{border-radius:3px;background:#12171d;border:1px solid #232b35}
+  html[data-theme="dark"] .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  html[data-theme="dark"] #menubar{background:#12171d;border-bottom:1px solid #232b35}
+
+  /* ---- 奶蛙：奶黄 + 超大圆角 + 立体按钮 + 三趾脚印底 ---- */
+  html[data-theme="naiwa"]{
+    --bg:#fbf4df; --card:#fffdf6; --line:#eee0b4; --ink:#4a3c1c;
+    --sub:#9c8a58; --accent:#d3941c; --accent-soft:#fdf1cf;
+    --warn:#a86f14; --warn-bg:#fdf3dd; --ok:#5c8a3c; --ok-bg:#eef4e0;
+    --stay:#d3941c; --move:#c4b489; --wait:#d99a20; --best:#5c8a3c; --best-bg:#eef4e0;
+  }
+  html[data-theme="naiwa"] body{
+    background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Cg fill='%23c89a2c' fill-opacity='0.08'%3E%3Cellipse cx='27' cy='53' rx='10' ry='7'/%3E%3Cellipse cx='48' cy='55' rx='8' ry='6'/%3E%3Cellipse cx='35' cy='33' rx='13' ry='9'/%3E%3C/g%3E%3C/svg%3E");
+    background-size:84px 84px}
+  html[data-theme="naiwa"] .wrap{grid-template-columns:360px 1fr;gap:18px;padding:16px 22px 48px}
+  html[data-theme="naiwa"] header{padding:20px 22px;background:transparent;border:0}
+  html[data-theme="naiwa"] header h1{font:800 22px/1.4 "PingFang SC";letter-spacing:.5px;color:#8a6410}
+  html[data-theme="naiwa"] header p{color:#a08a4e}
+  html[data-theme="naiwa"] .card{border-radius:20px;border:0;padding:18px;
+    box-shadow:0 6px 0 #f1e4bd,0 10px 24px rgba(207,164,60,.14)}
+  html[data-theme="naiwa"] .card h2{font-size:15px;color:#8a6410}
+  html[data-theme="naiwa"] .metrics{grid-template-columns:repeat(3,1fr);gap:10px}
+  html[data-theme="naiwa"] .metric{background:#fdf6e0;border-radius:16px;border:2px dashed #ecdcab;
+    text-align:center;padding:10px 6px}
+  html[data-theme="naiwa"] .metric b{font:800 20px/1.2 "PingFang SC";color:#8a6410}
+  html[data-theme="naiwa"] .metric span{color:#a08a4e}
+  html[data-theme="naiwa"] button{border-radius:999px;color:#4a3710;border:0;font-weight:700;
+    background:linear-gradient(180deg,#f9d768,#e5ad2c);box-shadow:0 4px 0 #c08a18}
+  html[data-theme="naiwa"] button:hover{filter:brightness(1.04)}
+  html[data-theme="naiwa"] button:active{transform:translateY(2px);box-shadow:0 2px 0 #c08a18}
+  html[data-theme="naiwa"] button.ghost{background:#fff;color:#8a6410;border:2px solid #eeddab;
+    box-shadow:0 3px 0 #f2e6c2}
+  html[data-theme="naiwa"] input,html[data-theme="naiwa"] select,html[data-theme="naiwa"] textarea{
+    border-radius:14px;border:2px solid #eddfb2;background:#fffdf6}
+  html[data-theme="naiwa"] .tabs{gap:8px}
+  html[data-theme="naiwa"] .tab{border-radius:999px;background:#f8efd2;border:2px solid transparent;color:#8a7434}
+  html[data-theme="naiwa"] .tab.active{background:#e9b62f;color:#4a3710;border-color:#c8931c}
+  html[data-theme="naiwa"] #menubar{background:#fdf8e9;border-bottom:2px solid #f0e2ba}
+  html[data-theme="naiwa"] .pill{background:#fdf1cf;color:#8a6410}
+  html[data-theme="naiwa"] .narr{background:#fdf8e8;border-left:3px solid var(--accent)}
+
+  /* ---- 像素复古：硬边框 + 硬阴影 + 等宽 + 扫描线 ---- */
+  html[data-theme="pixel"]{
+    --bg:#0f1210; --card:#191d18; --line:#3a4a32; --ink:#d9e6c8;
+    --sub:#8fa27e; --accent:#8ad34f; --accent-soft:#232b1e;
+    --warn:#e0c04a; --warn-bg:#2a2718; --ok:#8ad34f; --ok-bg:#1e2a18;
+    --stay:#8ad34f; --move:#5b6b4e; --wait:#e0c04a; --best:#8ad34f; --best-bg:#1e2a18;
+  }
+  html[data-theme="pixel"] body{font-family:"SF Mono",Consolas,"Courier New",monospace;
+    background-image:repeating-linear-gradient(to bottom,rgba(255,255,255,.03) 0 1px,transparent 1px 4px)}
+  html[data-theme="pixel"] .wrap{grid-template-columns:340px 1fr;gap:14px;padding:14px 16px 40px}
+  html[data-theme="pixel"] header{padding:14px 16px;background:transparent;border-bottom:3px solid var(--line)}
+  html[data-theme="pixel"] header h1{font:700 15px/1.4 monospace;letter-spacing:2px}
+  html[data-theme="pixel"] header h1::before{content:"> ";color:var(--accent)}
+  html[data-theme="pixel"] .card{border-radius:0;border:2px solid var(--line);
+    box-shadow:6px 6px 0 rgba(138,211,79,.16);padding:14px}
+  html[data-theme="pixel"] .card h2{font:700 12.5px/1.4 monospace;letter-spacing:2px;text-transform:uppercase}
+  html[data-theme="pixel"] .metrics{grid-template-columns:repeat(3,1fr);gap:8px}
+  html[data-theme="pixel"] .metric{border-radius:0;border:2px solid var(--line);background:#12160f;
+    text-align:left;padding:8px}
+  html[data-theme="pixel"] .metric b{font:700 18px/1.2 monospace;color:var(--accent)}
+  html[data-theme="pixel"] button{border-radius:0;border:2px solid var(--accent);background:var(--accent);
+    color:#0f1210;font:700 13px/1 monospace;letter-spacing:1px;
+    box-shadow:4px 4px 0 rgba(138,211,79,.35)}
+  html[data-theme="pixel"] button:hover{filter:none;transform:translate(-1px,-1px);
+    box-shadow:5px 5px 0 rgba(138,211,79,.45)}
+  html[data-theme="pixel"] button:active{transform:translate(2px,2px);box-shadow:2px 2px 0 rgba(138,211,79,.35)}
+  html[data-theme="pixel"] button.ghost{background:#12160f;color:var(--accent);
+    border-color:var(--line);box-shadow:none}
+  html[data-theme="pixel"] input,html[data-theme="pixel"] select,html[data-theme="pixel"] textarea{
+    border-radius:0;border:2px solid var(--line);background:#0f120e;color:var(--ink);font-family:monospace}
+  html[data-theme="pixel"] .tab{border-radius:0;background:#12160f;border:2px solid var(--line);font-family:monospace}
+  html[data-theme="pixel"] .tab.active{background:var(--accent);color:#0f1210;border-color:var(--accent)}
+  html[data-theme="pixel"] #menubar{background:#12160f;border-bottom:3px solid var(--line);
+    font-family:monospace;gap:6px;font-size:12px}
+  /* 等宽字体 + 字距会把菜单挤到换行，这里统一不换行并让提示文字先让位 */
+  html[data-theme="pixel"] #menubar .brand,
+  html[data-theme="pixel"] #menubar .lab,
+  html[data-theme="pixel"] #menubar button{white-space:nowrap;letter-spacing:.4px}
+  html[data-theme="pixel"] #menubar .hint{max-width:130px}
+  html[data-theme="pixel"] #menubar select{min-width:180px}
+
+  /* ---- 赛博霓虹：切角 + 荧光边 + 渐变标题 ---- */
+  html[data-theme="cyber"]{
+    --bg:#060911; --card:rgba(12,18,32,.86); --line:#1d2c47; --ink:#d7e7ff;
+    --sub:#7f93b5; --accent:#00e5ff; --accent-soft:rgba(0,229,255,.10);
+    --warn:#ffb020; --warn-bg:#241a06; --ok:#31ffa8; --ok-bg:#062218;
+    --stay:#00e5ff; --move:#3d5375; --wait:#ffb020; --best:#ff2d95; --best-bg:#24061a;
+  }
+  html[data-theme="cyber"] body{
+    background-image:radial-gradient(1200px 500px at 20% -10%,rgba(0,229,255,.10),transparent 60%),
+      radial-gradient(900px 400px at 90% 10%,rgba(255,45,149,.10),transparent 60%),
+      linear-gradient(rgba(0,229,255,.05) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(0,229,255,.05) 1px,transparent 1px);
+    background-size:auto,auto,48px 48px,48px 48px;background-attachment:fixed}
+  html[data-theme="cyber"] .wrap{grid-template-columns:330px 1fr;gap:16px;padding:16px 22px 50px}
+  html[data-theme="cyber"] header{padding:18px 22px;background:transparent;border:0}
+  html[data-theme="cyber"] header h1{font:700 20px/1.4 "PingFang SC";letter-spacing:5px;
+    background:linear-gradient(90deg,#00e5ff,#ff2d95);-webkit-background-clip:text;
+    background-clip:text;color:transparent}
+  html[data-theme="cyber"] .card{border:1px solid rgba(0,229,255,.28);border-radius:2px;padding:16px;
+    box-shadow:0 0 26px rgba(0,229,255,.10);clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,
+      100% 100%,14px 100%,0 calc(100% - 14px))}
+  html[data-theme="cyber"] .card h2{font-size:13px;letter-spacing:2px;color:#9fe9ff;text-transform:uppercase}
+  html[data-theme="cyber"] .card h2::before{content:"// "}
+  html[data-theme="cyber"] .metrics{grid-template-columns:repeat(3,1fr);gap:8px}
+  html[data-theme="cyber"] .metric{background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.22);
+    border-radius:2px;padding:8px 10px;text-align:left}
+  html[data-theme="cyber"] .metric b{font-family:monospace;color:#7ff3ff;
+    text-shadow:0 0 10px rgba(0,229,255,.55)}
+  html[data-theme="cyber"] button{border-radius:2px;color:#b8f4ff;letter-spacing:1px;
+    border:1px solid rgba(0,229,255,.45);
+    background:linear-gradient(180deg,rgba(0,229,255,.16),rgba(0,229,255,.06));
+    clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))}
+  html[data-theme="cyber"] button:hover{filter:none;
+    box-shadow:0 0 18px rgba(0,229,255,.35),0 0 2px rgba(0,229,255,.6) inset}
+  html[data-theme="cyber"] button.ghost{background:rgba(255,45,149,.06);
+    border-color:rgba(255,45,149,.35);color:#ffb3d9}
+  html[data-theme="cyber"] input,html[data-theme="cyber"] select,html[data-theme="cyber"] textarea{
+    border-radius:2px;border:1px solid rgba(0,229,255,.25);background:rgba(6,10,18,.9);color:var(--ink)}
+  html[data-theme="cyber"] input:focus,html[data-theme="cyber"] textarea:focus{
+    outline:1px solid rgba(0,229,255,.6)}
+  html[data-theme="cyber"] .tab{border-radius:2px;background:rgba(0,229,255,.05);
+    border:1px solid rgba(0,229,255,.18);color:#8fb9cf}
+  html[data-theme="cyber"] .tab.active{background:rgba(0,229,255,.16);color:#dffaff;
+    border-color:rgba(0,229,255,.6)}
+  html[data-theme="cyber"] #menubar{background:rgba(6,10,18,.92);
+    border-bottom:1px solid rgba(0,229,255,.22)}
+
+/* ==================================================================
+   结构级差异化 v4 —— 四套主题各有各的「按钮语言」
+   本段没有任何一条规则作用于 light / dark：那两套是浅色/深色基准。
+   ================================================================== */
+.actions{display:block}
+.input-col,.result-col{min-width:0}
+/* 奶蛙相关元素在 light / dark 下完全不出现（连盒子都不占） */
+#buddy,#buddyMini,#naiwaTip{display:none}
+
+/* ---- 纸质杂志 ---- */
+html[data-theme="paper"] .wrap{grid-template-columns:1fr 300px}
+html[data-theme="paper"] .input-col{order:2;display:flex;flex-direction:column}
+html[data-theme="paper"] .result-col{order:1}
+html[data-theme="paper"] .input-col > h2{order:-2}
+html[data-theme="paper"] .input-col > .actions{
+  order:-1;display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;
+  padding:0 0 10px;border-bottom:1px solid var(--line)}
+html[data-theme="paper"] .input-col .actions button{
+  width:auto;margin:0;padding:4px 9px;font-size:11.5px;letter-spacing:0}
+html[data-theme="paper"] .input-col .actions #go{
+  padding:4px 20px;font-size:12.5px;font-weight:700}
+html[data-theme="paper"] .input-col .actions #go::before{content:"§ "}
+
+/* ---- 奶蛙：超大胶囊主按钮 + 小圆饼副按钮 + 满屏奶蛙 ---- */
+html[data-theme="naiwa"] .wrap{grid-template-columns:380px 1fr}
+html[data-theme="naiwa"] .input-col .actions{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:9px;margin-top:18px}
+html[data-theme="naiwa"] .input-col .actions #go{
+  flex:0 0 82%;width:82%;height:64px;margin:0;font-size:19px;border-radius:999px;color:#4a3710;
+  background:linear-gradient(180deg,#fadd74,#e8b02e);
+  box-shadow:0 6px 0 #c08a18,0 12px 20px rgba(214,167,52,.32)}
+html[data-theme="naiwa"] .input-col .actions #go::after{content:" 🐸"}
+html[data-theme="naiwa"] .input-col .actions button.ghost{
+  flex:0 0 auto;width:auto;margin:0;padding:7px 14px;font-size:12px;border-radius:999px}
+
+html[data-theme="naiwa"] #buddy{
+  display:block;position:fixed;right:10px;bottom:6px;z-index:70;width:190px;
+  pointer-events:none;animation:buddyFloat 3.6s ease-in-out infinite}
+html[data-theme="naiwa"] #buddy .frog{
+  width:178px;height:auto;display:block;margin:0 auto;
+  filter:drop-shadow(0 10px 14px rgba(150,118,40,.22))}
+html[data-theme="naiwa"] #buddy .bubble{
+  background:#fff;border:2px solid #eeddab;border-radius:16px;padding:6px 10px;
+  font:700 12px/1.4 "PingFang SC";color:#8a6410;text-align:center;
+  margin-bottom:4px;box-shadow:0 3px 0 #f2e6c2}
+@keyframes buddyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+html[data-theme="naiwa"] header{position:relative}
+html[data-theme="naiwa"] #buddyMini{display:block;position:absolute;right:20px;top:4px;width:54px;pointer-events:none;opacity:.95}
+html[data-theme="naiwa"] #buddyMini img{width:54px;height:auto;display:block}
+
+html[data-theme="naiwa"] #naiwaTip{
+  display:flex;align-items:center;gap:8px;position:fixed;left:14px;bottom:12px;z-index:69;
+  max-width:330px;padding:6px 14px 6px 6px;background:#fff;border:2px solid #eeddab;
+  border-radius:999px;box-shadow:0 4px 0 #f2e6c2;
+  font:600 12px/1.5 "PingFang SC";color:#8a6410;pointer-events:none}
+html[data-theme="naiwa"] #naiwaTip img{width:26px;height:auto;flex:0 0 26px}
+
+html[data-theme="naiwa"] .card h2::before{content:"🐸 "}
+html[data-theme="naiwa"] .metric{position:relative;overflow:hidden}
+html[data-theme="naiwa"] .metric::after{
+  content:"🐸";position:absolute;right:2px;bottom:-8px;font-size:30px;line-height:1;opacity:.12}
+html[data-theme="naiwa"] .tab.active::before{content:"🐸 "}
+
+/* ---- 像素复古 ---- */
+html[data-theme="pixel"] .wrap{padding-right:216px}
+html[data-theme="pixel"] .input-col .actions{
+  position:fixed;top:70px;right:16px;z-index:58;
+  display:grid;grid-template-columns:repeat(2,88px);gap:6px;
+  width:auto;margin:0;padding:8px;background:#12160f;
+  border:2px solid var(--line);box-shadow:6px 6px 0 rgba(138,211,79,.16)}
+html[data-theme="pixel"] .input-col .actions button{
+  display:flex;align-items:center;justify-content:center;
+  width:88px;height:34px;margin:0;padding:0;font-size:0;line-height:0;overflow:hidden}
+html[data-theme="pixel"] .input-col .actions button::after{font:700 12px/1 monospace;letter-spacing:1px}
+html[data-theme="pixel"] .input-col .actions #go{grid-column:1 / -1;height:46px}
+html[data-theme="pixel"] .input-col .actions #go::after{content:"> START";font-size:14px}
+html[data-theme="pixel"] .input-col .actions #ab::after{content:"A/B"}
+html[data-theme="pixel"] .input-col .actions #cmp::after{content:"VS"}
+html[data-theme="pixel"] .input-col .actions #reload{grid-column:1 / -1}
+html[data-theme="pixel"] .input-col .actions #reload::after{content:"RESET"}
+
+/* ---- 赛博霓虹 ---- */
+html[data-theme="cyber"] .wrap{padding-right:198px}
+/* 赛博卡片用了 clip-path：它会成为 fixed 后代的包含块并裁剪它们 */
+html[data-theme="cyber"] .input-col{clip-path:none}
+html[data-theme="cyber"] .input-col .actions{
+  position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:58;
+  display:flex;flex-direction:column;gap:8px;width:170px;margin:0;padding:12px 10px;
+  background:rgba(6,10,18,.92);border-left:1px solid rgba(0,229,255,.35);
+  box-shadow:-8px 0 24px rgba(0,229,255,.08)}
+html[data-theme="cyber"] .input-col .actions button{
+  width:100%;height:36px;margin:0;padding:0 6px;font-size:10.5px;letter-spacing:.5px;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+html[data-theme="cyber"] .input-col .actions #go{
+  height:54px;font-size:13px;letter-spacing:2px;
+  background:linear-gradient(180deg,rgba(0,229,255,.30),rgba(0,229,255,.10));
+  box-shadow:0 0 18px rgba(0,229,255,.28)}
+html[data-theme="cyber"] .input-col .actions #go::before{content:"// ";color:#7ff3ff}
+
+/* ---- 窄屏回退 ---- */
+@media (max-width:1100px){
+  html[data-theme="pixel"] .wrap{padding-right:16px}
+  html[data-theme="pixel"] .input-col .actions{
+    position:static;top:auto;right:auto;width:auto;box-shadow:6px 6px 0 rgba(138,211,79,.16)}
+  html[data-theme="cyber"] .wrap{padding-right:22px}
+  html[data-theme="cyber"] .input-col .actions{
+    position:static;top:auto;right:auto;transform:none;width:auto;
+    flex-direction:row;flex-wrap:wrap;border-left:0;border:1px solid rgba(0,229,255,.25);box-shadow:none}
+  html[data-theme="cyber"] .input-col .actions button{flex:1 1 45%}
+  html[data-theme="paper"] .wrap{grid-template-columns:1fr}
+  html[data-theme="paper"] .input-col{order:1}
+  html[data-theme="paper"] .result-col{order:2}
+}
+@media (max-width:900px){
+  html[data-theme="naiwa"] .wrap{grid-template-columns:1fr}
+  html[data-theme="naiwa"] #buddy{width:118px;right:4px;bottom:4px}
+  html[data-theme="naiwa"] #buddy .frog{width:110px}
+  html[data-theme="naiwa"] #buddyMini{display:none}
+  html[data-theme="naiwa"] #naiwaTip{display:none}
+}
+
+/* ==================================================================
+   清爽化整理层 v5 —— 作用于全部 7 套主题
+   规则全部追加在文件末尾，不修改 light / dark 原有规则一个字符。
+   ================================================================== */
+
+/* ---------- 1. 留白、分组、层级 ---------- */
+.wrap{gap:20px}
+.card{padding:18px}
+.card h2{margin:0 0 6px;font-size:16px;letter-spacing:.2px}
+.hd-more{color:var(--sub);font-size:12px;margin-left:6px}
+.lead{margin:0 0 14px;color:var(--sub);font-size:12.5px;line-height:1.65}
+.lb{font-weight:600}
+.big-input{min-height:96px;font-size:14px;line-height:1.7}
+.core-row{margin-top:14px}
+/* ---------- v1.5 模式切换 + 约会面板 ---------- */
+.mode-tabs{display:flex;gap:8px;margin-top:14px}
+.mode-btn{flex:1;margin:0;padding:9px 6px;font-size:12.5px;font-weight:700;
+  border-radius:10px;border:1px solid var(--line);background:var(--card);
+  color:var(--sub);cursor:pointer;box-shadow:none;filter:none}
+.mode-btn:hover{filter:none;border-color:var(--accent)}
+.mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+/* v1.6.1 课表锚点行：时间 / 地点 / 事由 / 时长 / 删除 */
+.anchor-row{display:grid;grid-template-columns:86px 1fr 1fr 66px 34px;gap:6px;margin-top:6px}
+.anchor-row input{padding:8px;border:1px solid var(--line);border-radius:8px;
+  background:var(--card);color:inherit;font-size:12.5px;min-width:0}
+.anchor-row .anchor-del{padding:6px 0;font-size:12px}
+.date-panel{margin-top:14px;border:1px dashed var(--accent);background:var(--accent-soft)}
+.date-panel .row{margin-top:8px}
+.date-panel h2{margin-bottom:2px !important}
+.brief-card{margin-bottom:14px;border:1px solid var(--accent);background:var(--accent-soft)}
+.brief-card h2::before{content:"💞 "}
+.brief-line{margin:9px 0 0;font-size:13px;line-height:1.75}
+.brief-tl{margin:6px 0 0;padding-left:4px;list-style:none;font-size:12.5px;line-height:1.95}
+.brief-tl b{color:var(--accent)}
+.form-sec{margin:16px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--line);
+  color:var(--sub);font-size:11.5px;font-weight:700;letter-spacing:1.2px}
+.ck{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--ink);font-size:12.5px;cursor:pointer}
+.ck input{width:auto;margin:0}
+.ck span{color:var(--sub);font-size:11.5px;margin-left:auto}
+.adv-note{margin-top:14px !important;line-height:1.7}
+
+/* ---------- 2. 主按钮放大 / 次要按钮收纳 ---------- */
+.actions{margin-top:20px}
+.actions #go{
+  display:block;width:100%;height:58px;margin:0 0 10px;padding:0;
+  font-size:18px;font-weight:800;letter-spacing:.5px;border-radius:12px;
+  box-shadow:0 6px 18px rgba(0,0,0,.16)}
+.actions #go::before{content:"➤ "}
+.more{display:flex;gap:8px;flex-wrap:wrap}
+.more button{width:auto;flex:1 1 auto;margin:0;padding:8px 10px;
+  font-size:12px;border-radius:8px}
+.mini-hint{margin:12px 0 0;color:var(--sub);font-size:12px;line-height:1.8}
+.mini-sep{margin:0 6px;color:var(--line)}
+.link,button.link{width:auto;margin:0;padding:0;border:0;background:transparent;
+  color:var(--accent);font-size:12px;font-weight:600;text-decoration:underline;cursor:pointer;
+  box-shadow:none;filter:none}
+.link:hover,button.link:hover{text-decoration:none;filter:none}
+/* 纸质杂志的主按钮原本是横排小字，这里单独放大，保证「主要按钮更明显」 */
+html[data-theme="paper"] .input-col .actions #go{
+  height:46px;font-size:15px;letter-spacing:1px;
+  background:var(--accent);color:#fff;border:1px solid var(--accent);
+  padding:0 22px;width:auto;min-width:180px;margin:0 0 10px}
+html[data-theme="paper"] .input-col .actions #go::before{content:"§ "}
+
+/* ---------- 3. 高级设置折叠 ---------- */
+details.adv{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}
+details.adv summary{list-style:none;cursor:pointer;font-size:12.5px;font-weight:600;
+  color:var(--sub);padding:9px 12px;border:1px dashed var(--line);
+  border-radius:9px;background:var(--accent-soft)}
+details.adv summary::-webkit-details-marker{display:none}
+details.adv summary::before{content:"⚙  ";color:var(--accent)}
+details.adv[open] summary{margin-bottom:14px;border-style:solid}
+details.adv[open] summary::before{content:"▾  "}
+.adv-body .row{margin-top:8px}
+
+/* ---------- 4. 空状态 ---------- */
+.empty-state{text-align:center;padding:44px 22px}
+.empty-state .es-icon{font-size:30px;color:var(--accent);opacity:.6;margin-bottom:8px}
+.empty-state h3{margin:0 0 8px;font-size:16px}
+.empty-state p{margin:0 0 14px}
+
+/* ---------- 5. 说明 / 引导界面（用变量，自动适配 7 套主题） ---------- */
+#guide{position:fixed;inset:0;z-index:200;display:flex;align-items:center;
+  justify-content:center;padding:24px}
+.gd-mask{position:absolute;inset:0;background:rgba(12,18,26,.58);backdrop-filter:blur(3px)}
+.gd-panel{position:relative;width:min(880px,96vw);max-height:88vh;overflow:auto;
+  background:var(--card);color:var(--ink);border:1px solid var(--line);
+  border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.32)}
+.gd-head{display:flex;align-items:flex-start;justify-content:space-between;
+  padding:22px 26px 14px;border-bottom:1px solid var(--line)}
+.gd-kicker{color:var(--accent);font-size:11px;font-weight:800;letter-spacing:2px}
+.gd-head h2{margin:4px 0 0;font-size:23px;letter-spacing:.5px}
+.gd-close{width:34px;height:34px;margin:0;padding:0;border-radius:50%;
+  background:transparent;border:1px solid var(--line);color:var(--ink);
+  font-size:20px;line-height:1;box-shadow:none}
+.gd-tabs{display:flex;gap:4px;flex-wrap:wrap;padding:0 20px;border-bottom:1px solid var(--line)}
+.gd-tab{width:auto;margin:0;padding:11px 14px;background:transparent;border:0;
+  border-bottom:2px solid transparent;border-radius:0;color:var(--sub);
+  font-size:13px;box-shadow:none;filter:none}
+.gd-tab.active{color:var(--accent);border-bottom-color:var(--accent);
+  background:transparent;font-weight:700;filter:none}
+.gd-body{padding:24px 26px}
+.gd-intro{margin:0 0 18px;color:var(--sub);font-size:13px;line-height:1.75}
+.gd-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.gd-grid-2{grid-template-columns:repeat(2,1fr)}
+.gd-step,.gd-card{position:relative;background:var(--accent-soft);
+  border:1px solid var(--line);border-radius:12px;padding:16px}
+.gd-num{display:block;color:var(--accent);font:800 22px/1 Georgia,serif;margin-bottom:10px}
+.gd-step h3,.gd-card h3{margin:0 0 8px;font-size:14.5px}
+.gd-step p,.gd-card p{margin:0 0 8px;color:var(--sub);font-size:12.5px;line-height:1.75}
+.gd-card p:last-child{margin-bottom:0}
+.gd-callout{margin-top:16px;padding:12px 14px;border-left:3px solid var(--accent);
+  background:var(--accent-soft);border-radius:6px;font-size:12.5px;line-height:1.8}
+.gd-table{width:100%;border-collapse:collapse;font-size:13px}
+.gd-table th{width:130px;text-align:left;color:var(--accent);
+  font-weight:700;white-space:nowrap;vertical-align:top;padding:10px 12px}
+.gd-table td{color:var(--sub);line-height:1.7;padding:10px 12px}
+.gd-table tr{border-bottom:1px solid var(--line)}
+.gd-themes{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.gd-theme{display:flex;align-items:center;gap:12px;padding:12px 14px;
+  border:1px solid var(--line);border-radius:11px}
+.gd-theme i{width:34px;height:34px;flex:0 0 34px;border:3px solid;border-radius:9px}
+.gd-theme b{font-size:13.5px;white-space:nowrap}
+.gd-theme span{color:var(--sub);font-size:12px;margin-left:auto;text-align:right}
+.gd-stat{padding:12px 0;border-bottom:1px solid var(--line)}
+.gd-stat b{display:block;font-size:12.5px;color:var(--accent);margin-bottom:6px}
+.gd-stat > div,.gd-stat > p{color:var(--sub);font-size:12.5px;line-height:1.8}
+.gd-llm{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.gd-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:16px 26px 22px;border-top:1px solid var(--line)}
+.gd-noauto{display:flex;align-items:center;gap:8px;margin:0;color:var(--sub);font-size:12px}
+.gd-noauto input{width:auto;margin:0}
+.gd-primary{width:auto;margin:0;padding:11px 22px;font-size:13.5px;font-weight:700;
+  border:0;border-radius:10px;background:var(--accent);color:#fff;box-shadow:none}
+.gd-entry{background:var(--accent-soft) !important;border-color:transparent !important;
+  color:var(--accent) !important;font-weight:700}
+@media (max-width:760px){
+  .gd-grid,.gd-grid-2,.gd-themes{grid-template-columns:1fr}
+  .gd-head,.gd-body,.gd-foot{padding-left:18px;padding-right:18px}
+}
+
+/* ---------- 6. 第 7 套主题：原神 · 提瓦特（质量对齐奶蛙） ---------- */
+#ysBuddy,#ysPaimon,#ysTip{display:none}
+html[data-theme="yuanshen"]{
+  --bg:#eaf0f1; --card:#fffdf6; --line:#ddd6c1; --ink:#2b3a42;
+  --sub:#7a8790; --accent:#2f6f8a; --accent-soft:#e7f1f3;
+  --warn:#a8761c; --warn-bg:#fdf4e2; --ok:#3f7f57; --ok-bg:#eaf5ee;
+  --stay:#2f6f8a; --move:#a9b8bd; --wait:#c89a3c; --best:#3f7f57; --best-bg:#eaf5ee;
+}
+html[data-theme="yuanshen"] body{
+  background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='%23c8a45c' fill-opacity='0.10'%3E%3Cpath d='M48 4 L52 44 L92 48 L52 52 L48 92 L44 52 L4 48 L44 44 Z'/%3E%3Ccircle cx='16' cy='16' r='3'/%3E%3Ccircle cx='80' cy='80' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:96px 96px}
+html[data-theme="yuanshen"] header{position:relative;padding:20px 26px;
+  background:linear-gradient(90deg,#fffdf6,#e9f2f2);border-bottom:2px solid #c8a45c}
+html[data-theme="yuanshen"] header h1{font-weight:800;letter-spacing:1px;color:#243b45}
+html[data-theme="yuanshen"] header p{color:#6d818a}
+html[data-theme="yuanshen"] .wrap{grid-template-columns:380px 1fr;gap:20px;padding:18px 236px 48px 26px}
+html[data-theme="yuanshen"] .card{border:1px solid #e4dcc4;border-radius:14px;
+  box-shadow:0 2px 0 rgba(200,164,92,.28),0 10px 26px rgba(43,58,66,.07)}
+html[data-theme="yuanshen"] .card h2{color:#2b3a42}
+html[data-theme="yuanshen"] .card h2::before{content:"✦ ";color:#c8a45c}
+html[data-theme="yuanshen"] .metrics{grid-template-columns:repeat(3,1fr);gap:10px}
+html[data-theme="yuanshen"] .metric{position:relative;overflow:hidden;
+  background:#f4f8f6;border:1px solid #e2ddc7;border-radius:12px}
+html[data-theme="yuanshen"] .metric b{font:800 20px/1.2 "PingFang SC";color:#2b3a42}
+html[data-theme="yuanshen"] .metric::after{content:"✦";position:absolute;right:4px;bottom:-8px;
+  font-size:30px;line-height:1;color:#c8a45c;opacity:.2}
+html[data-theme="yuanshen"] button{border-radius:10px;font-weight:700;
+  background:linear-gradient(180deg,#3a7f9c,#245d78);color:#fff7e2;border:1px solid #1e4c63}
+html[data-theme="yuanshen"] button.ghost{background:#fffdf6;color:#2b3a42;border:1px solid #d8cfb4}
+html[data-theme="yuanshen"] input,html[data-theme="yuanshen"] select,
+html[data-theme="yuanshen"] textarea{border:1px solid #ddd6c1;border-radius:10px;background:#fffefa}
+html[data-theme="yuanshen"] .tabs{gap:8px}
+html[data-theme="yuanshen"] .tab{border-radius:10px;background:#fffdf6;border:1px solid #ddd6c1;color:#6d818a}
+html[data-theme="yuanshen"] .tab.active{background:linear-gradient(180deg,#3a7f9c,#245d78);
+  color:#fff7e2;border-color:#1e4c63}
+html[data-theme="yuanshen"] .tab.active::before{content:"✦ "}
+html[data-theme="yuanshen"] #menubar{background:#fffdf6;border-bottom:2px solid #c8a45c}
+html[data-theme="yuanshen"] .pill{background:#e7f1f3;color:#2f6f8a}
+html[data-theme="yuanshen"] .narr{background:#f4f8f6;border-left:3px solid #c8a45c}
+/* 原神主按钮：金色切角大按钮，明显强于三个次要按钮 */
+html[data-theme="yuanshen"] .input-col .actions #go{
+  height:64px;margin:0 0 12px;font-size:19px;letter-spacing:1px;
+  background:linear-gradient(180deg,#e6c983,#c99f45);color:#2b2410;
+  border:2px solid #a87f2c;box-shadow:0 6px 0 #a87f2c,0 14px 26px rgba(200,164,92,.35);
+  clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),
+                    calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px)}
+html[data-theme="yuanshen"] .input-col .actions #go::before{content:"✦ "}
+html[data-theme="yuanshen"] .input-col .actions .more button{
+  padding:7px 10px;font-size:12px;border-radius:9px}
+
+/* 右下角：元素伙伴立绘 + 对话气泡 + 头像切换 */
+html[data-theme="yuanshen"] #ysBuddy{
+  display:block;position:fixed;right:12px;bottom:6px;z-index:70;width:214px;
+  pointer-events:none;animation:ysFloat 4s ease-in-out infinite}
+@keyframes ysFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+html[data-theme="yuanshen"] #ysBuddy .ys-bubble{
+  background:#fffdf6;border:2px solid #c8a45c;border-radius:14px;padding:7px 10px;
+  font:700 12px/1.5 "PingFang SC";color:#2b3a42;text-align:center;
+  margin-bottom:4px;box-shadow:0 3px 0 #eadfc0;min-height:34px}
+html[data-theme="yuanshen"] #ysBuddy .ys-frame{
+  height:244px;display:flex;align-items:flex-end;justify-content:center}
+html[data-theme="yuanshen"] #ysBuddy .ys-hero{display:none;height:244px;width:auto;
+  filter:drop-shadow(0 8px 12px rgba(30,60,70,.25))}
+html[data-theme="yuanshen"] #ysBuddy .ys-hero.on{display:block}
+html[data-theme="yuanshen"] #ysBuddy .ys-name{
+  text-align:center;font:700 12px/1.6 "PingFang SC";color:#7a5c18;margin:2px 0 6px}
+html[data-theme="yuanshen"] #ysBuddy .ys-picks{
+  display:flex;gap:6px;justify-content:center;pointer-events:auto}
+html[data-theme="yuanshen"] #ysBuddy .ys-pick{
+  width:34px;height:34px;min-width:34px;margin:0;padding:0;border-radius:50%;
+  overflow:hidden;background:#fffdf6;border:2px solid #e1d6b8;box-shadow:none}
+html[data-theme="yuanshen"] #ysBuddy .ys-pick.on{border-color:#c8a45c;
+  box-shadow:0 0 0 2px rgba(200,164,92,.4)}
+html[data-theme="yuanshen"] #ysBuddy .ys-pick img{width:100%;height:100%;object-fit:cover;display:block}
+/* 页头派蒙 + 左下贴士 */
+html[data-theme="yuanshen"] #ysPaimon{
+  display:flex;align-items:center;gap:8px;position:absolute;right:26px;top:12px;
+  font:700 12px/1.4 "PingFang SC";color:#8a6a20;pointer-events:none}
+html[data-theme="yuanshen"] #ysPaimon img{width:54px;height:54px;display:block;
+  border-radius:14px;background:#fffdf6;border:2px solid #c8a45c;
+  box-shadow:0 2px 8px rgba(120,90,30,.18)}
+html[data-theme="yuanshen"] #ysTip{
+  display:flex;align-items:center;gap:8px;position:fixed;left:14px;bottom:12px;z-index:69;
+  max-width:340px;padding:6px 14px 6px 6px;background:#fffdf6;border:2px solid #c8a45c;
+  border-radius:999px;box-shadow:0 4px 0 #eadfc0;
+  font:600 12px/1.5 "PingFang SC";color:#2b3a42;pointer-events:none}
+html[data-theme="yuanshen"] #ysTip img{width:28px;height:28px;flex:0 0 28px}
+@media (max-width:1100px){
+  html[data-theme="yuanshen"] .wrap{grid-template-columns:1fr;padding-right:22px}
+  html[data-theme="yuanshen"] #ysBuddy{width:132px;right:4px;bottom:4px}
+  html[data-theme="yuanshen"] #ysBuddy .ys-frame,
+  html[data-theme="yuanshen"] #ysBuddy .ys-hero{height:160px}
+  html[data-theme="yuanshen"] #ysPaimon{display:none}
+  html[data-theme="yuanshen"] #ysTip{display:none}
+}
+
+/* ==================================================================
+   提瓦特 Trip Planner · v6
+   所有新元素先全局 display:none，再在 yuanshen 主题内放开；
+   其余 6 套主题的渲染完全不受影响。
+   ================================================================== */
+#teyvatHud,#teyvatBoard{display:none}
+
+/* ---- 品牌：原神主题下换一套标题文案 ---- */
+html[data-theme="yuanshen"] header h1{font-size:0}
+html[data-theme="yuanshen"] header h1::after{
+  content:"提瓦特 · Trip Planner";font-size:23px;font-weight:800;
+  letter-spacing:1px;color:#243b45}
+html[data-theme="yuanshen"] header p{font-size:0}
+html[data-theme="yuanshen"] header p::after{
+  content:"今日委托 · 传送锚点 · 元素伙伴，陪你把一天安排妥当";
+  font-size:12.5px;color:#6d818a}
+
+/* ---- 冒险终端 HUD ---- */
+html[data-theme="yuanshen"] #teyvatHud{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  margin:14px 26px 0;padding:10px 16px;
+  background:linear-gradient(90deg,#fffdf6,#edf4f3);
+  border:1px solid #ddd6c1;border-left:4px solid #c8a45c;border-radius:12px;
+  box-shadow:0 3px 12px rgba(43,58,66,.06)}
+.tv-hud-item{display:flex;flex-direction:column;min-width:96px}
+.tv-hud-item.tv-hud-wide{flex:1;min-width:170px}
+.tv-hud-k{font-size:10.5px;letter-spacing:1px;color:#7a8790}
+.tv-hud-item b{font:800 15px/1.5 "PingFang SC";color:#2b3a42}
+.tv-exp{width:88px;height:4px;background:#dfe7e6;border-radius:99px;overflow:hidden;margin-top:2px}
+.tv-exp i{display:block;height:100%;width:0;background:linear-gradient(90deg,#e6c983,#c89a3c);border-radius:99px}
+html[data-theme="yuanshen"] .tv-hud-btn{width:auto;margin:0;padding:7px 12px;font-size:11.5px;
+  border-radius:8px;background:#fffdf6;color:#2b3a42;border:1px solid #d8cfb4;
+  box-shadow:none;white-space:nowrap}
+
+/* ---- 每日委托 + 元素队伍 ---- */
+html[data-theme="yuanshen"] #teyvatBoard{
+  display:grid;grid-template-columns:1.35fr 1fr;gap:14px;margin-bottom:14px}
+.tv-card{background:var(--card);border:1px solid #e4dcc4;border-radius:14px;padding:16px;
+  box-shadow:0 2px 0 rgba(200,164,92,.22),0 8px 20px rgba(43,58,66,.05)}
+.tv-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tv-card-head h3{margin:0;font-size:14.5px;color:#2b3a42}
+.tv-card-head h3::before{content:"✦ ";color:#c8a45c}
+.tv-badge{padding:2px 10px;border-radius:99px;background:#e7f1f3;color:#2f6f8a;
+  font-size:11.5px;font-weight:700;white-space:nowrap}
+.tv-card-sub{margin:6px 0 12px;color:var(--sub);font-size:11.5px;line-height:1.6}
+.tv-com-list{display:flex;flex-direction:column;gap:6px}
+.tv-com{display:flex;align-items:center;gap:9px;padding:7px 10px;border:1px solid #eae2cc;
+  border-radius:9px;background:#fffdf6;font-size:12.5px;cursor:pointer}
+.tv-com input{width:auto;margin:0;accent-color:#c89a3c}
+.tv-com .tv-time{color:#a8842c;font-weight:700;font-variant-numeric:tabular-nums}
+.tv-com .tv-name{flex:1;color:#2b3a42}
+.tv-com .tv-tag{color:#7a8790;font-size:11px}
+.tv-com.done .tv-name{text-decoration:line-through;color:#9aa6ab}
+.tv-empty{margin:0;color:var(--sub);font-size:12px;line-height:1.7}
+.tv-progress{height:7px;margin-top:12px;background:#e9eee9;border-radius:99px;overflow:hidden}
+.tv-progress i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,#e6c983,#c89a3c);transition:width .25s}
+.tv-reward{margin-top:10px;padding:8px 10px;border-radius:8px;background:#fdf4dd;
+  border:1px solid #ecd9a6;color:#8a6a20;font-size:11.5px;font-weight:700}
+.tv-team-hero{display:flex;align-items:center;gap:10px;margin:4px 0 8px}
+.tv-elem{display:flex;align-items:center;justify-content:center;width:36px;height:36px;
+  border-radius:10px;background:#f4ead0;border:1px solid #d9bd7b;color:#a8842c;font-size:19px}
+.tv-team-hero b{font-size:14px;color:#2b3a42}
+.tv-team-line{margin:0 0 10px;color:#6d818a;font-size:12px;line-height:1.65;font-style:italic}
+.tv-team-tip{padding:9px 10px;border-radius:9px;background:#f4f8f6;
+  border:1px dashed #d8cfb4;color:#6d818a;font-size:11.5px;line-height:1.7}
+.tv-team-tip b{color:#2f6f8a}
+
+/* ---- 提瓦特大陆地图 ---- */
+.tv-map-card{background:var(--card);border:1px solid #e4dcc4;border-radius:14px;
+  padding:16px;box-shadow:0 2px 0 rgba(200,164,92,.22)}
+.tv-map-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+.tv-map-head h3{margin:0;font-size:15px;color:#2b3a42}
+.tv-map-head h3::before{content:"✦ ";color:#c8a45c}
+.tv-map-head span{color:var(--sub);font-size:11.5px}
+.tv-map{width:100%;height:auto;display:block;border:1px solid #d9cfb0;
+  border-radius:12px;background:#e8f1f1;overflow:hidden}
+.tv-land{fill:#eee7ce;stroke:#bda671;stroke-width:2;stroke-linejoin:round}
+.tv-land-2{fill:#e6e2c6;stroke:#bda671;stroke-width:2;stroke-linejoin:round}
+.tv-region{fill:#8a8063;font:600 15px "PingFang SC",sans-serif;letter-spacing:3px;
+  text-anchor:middle;opacity:.85}
+.tv-sea-label{fill:#8fb0b5;font:600 12px "PingFang SC",sans-serif;letter-spacing:4px}
+.tv-title{fill:#3c5a63;font:800 17px "PingFang SC",sans-serif;letter-spacing:1px}
+.tv-route{fill:none;stroke:#c08f2f;stroke-width:3;stroke-dasharray:9 7;
+  stroke-linecap:round;opacity:.9}
+.tv-pin{cursor:pointer}
+.tv-pin .tv-glow{fill:#f7e2a6;opacity:.35}
+.tv-pin .tv-diamond{fill:#fff7dc;stroke:#b8892f;stroke-width:2.2}
+.tv-pin .tv-star{fill:#c08f2f}
+.tv-pin .tv-seq{fill:#6b4f14;font:800 11px "PingFang SC",sans-serif;text-anchor:middle}
+.tv-pin .tv-label{fill:#3c4a4f;font:700 12px "PingFang SC",sans-serif;text-anchor:middle;
+  paint-order:stroke;stroke:#fffdf6;stroke-width:3.5px;stroke-linejoin:round}
+.tv-pin .tv-beam{stroke:#c8a45c;stroke-width:1.5;stroke-dasharray:4 5;opacity:.55}
+.tv-pin.on .tv-diamond{fill:#ffe9a8;stroke:#8a6410;stroke-width:3}
+.tv-pin.on .tv-glow{opacity:.8;fill:#f4cf6c}
+.tv-pin:hover .tv-diamond{fill:#ffe9a8}
+.tv-domain{display:none}
+.show-domains .tv-domain{display:inline}
+.tv-domain .tv-dm{fill:#e9dcff;stroke:#8d6bb5;stroke-width:2}
+.tv-domain .tv-st{fill:#fffdf0;stroke:#c8a45c;stroke-width:2}
+.tv-domain text{fill:#6b5a86;font:600 10px "PingFang SC",sans-serif;text-anchor:middle}
+.tv-compass{fill:none;stroke:#6b8b91;stroke-width:1.5}
+.tv-compass-t{fill:#3c5a63;font:700 12px Georgia,serif;text-anchor:middle}
+.tv-scale{stroke:#6b8b91;stroke-width:2}
+.tv-scale-t{fill:#6b8b91;font:600 10px "PingFang SC",sans-serif}
+.tv-info{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;
+  padding:10px 14px;border-radius:10px;background:#f4f8f6;border:1px dashed #d8cfb4;
+  color:#6d818a;font-size:12px;min-height:22px}
+.tv-info b{color:#2b3a42;font-size:13px}
+.tv-info span{padding-left:12px;border-left:1px solid #d8cfb4}
+.tv-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;color:var(--sub);font-size:11.5px}
+.tv-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+/* ---- 提瓦特化文案：只换可见文字，不动任何 id / JS 依赖 ---- */
+html[data-theme="yuanshen"] #menubar .brand{font-size:0}
+html[data-theme="yuanshen"] #menubar .brand::after{
+  content:"提瓦特";font-size:14px;font-weight:700;letter-spacing:.5px}
+html[data-theme="yuanshen"] .input-col h2{font-size:0}
+html[data-theme="yuanshen"] .input-col h2::before{font-size:16px}
+html[data-theme="yuanshen"] .input-col h2::after{
+  content:"冒险委托";font-size:16px;letter-spacing:.2px}
+html[data-theme="yuanshen"] .input-col .lead{font-size:0}
+html[data-theme="yuanshen"] .input-col .lead::after{
+  content:"用一句话写下今天想做的事，派蒙帮你排好路线。";font-size:12.5px;color:var(--sub)}
+html[data-theme="yuanshen"] .input-col .actions #go{font-size:0}
+html[data-theme="yuanshen"] .input-col .actions #go::before{
+  content:"✦ 开始冒险";font-size:19px;letter-spacing:1px}
+html[data-theme="yuanshen"] .tab{font-size:0}
+html[data-theme="yuanshen"] .tab::after{font-size:13px;font-weight:600}
+html[data-theme="yuanshen"] .tab::before{font-size:13px}
+html[data-theme="yuanshen"] .tab[data-tab="detail"]::after{content:"冒险手记"}
+html[data-theme="yuanshen"] .tab[data-tab="list"]::after{content:"冒险日志"}
+html[data-theme="yuanshen"] .tab[data-tab="timeline"]::after{content:"时序"}
+html[data-theme="yuanshen"] .tab[data-tab="map"]::after{content:"传送图"}
+html[data-theme="yuanshen"] .tab[data-tab="compare"]::after{content:"路线推演"}
+@media (max-width:900px){
+  html[data-theme="yuanshen"] #teyvatBoard{grid-template-columns:1fr}
+  html[data-theme="yuanshen"] #teyvatHud{margin:12px 16px 0}
+}
+
+/* ================ v7：交互反馈（所有主题共用，仍走 CSS 变量） ================ */
+#guideHint{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;
+  margin:0 auto 14px;padding:10px 16px;border:1px solid var(--line);border-radius:12px;
+  background:var(--accent-soft);color:var(--ink);font-size:13px;line-height:1.5;
+  box-shadow:0 4px 16px rgba(0,0,0,.05)}
+#guideHint .gh-ico{color:var(--accent);font-size:17px}
+#guideHint b{color:var(--accent)}
+.gh-btn{width:auto;margin:0;padding:6px 13px;border-radius:8px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);font-size:12.5px;font-weight:700;box-shadow:none;filter:none}
+.gh-btn.gh-go{background:var(--accent);border-color:var(--accent);color:#fff}
+.gh-x{width:26px;height:26px;margin:0;padding:0;border:0;border-radius:50%;
+  background:transparent;color:var(--sub);font-size:19px;line-height:1;box-shadow:none;filter:none}
+.mb-teyvat{font-weight:700;color:var(--accent)}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:300;
+  display:flex;gap:12px;align-items:center;max-width:min(680px,92vw);
+  padding:11px 14px;border:1px solid var(--line);border-radius:12px;
+  background:var(--card);color:var(--ink);font-size:13px;font-weight:600;
+  box-shadow:0 14px 40px rgba(0,0,0,.24)}
+#toast button{width:auto;margin:0;padding:5px 12px;border:1px solid var(--accent);
+  border-radius:8px;background:var(--accent);color:#fff;font-size:12.5px;
+  font-weight:700;box-shadow:none;filter:none;white-space:nowrap}
+#toast button.ts-x{margin-left:auto;padding:0;width:24px;height:24px;border:0;border-radius:50%;
+  background:transparent;color:var(--sub);font-size:18px}
+#tabs{scroll-margin-top:18px}
+#pane-map.map-focus .tv-map-card,#pane-map.map-focus>.card{
+  animation:mapPulse 1.05s ease-out 1}
+@keyframes mapPulse{
+  0%{box-shadow:0 0 0 0 rgba(200,164,92,.85)}
+  100%{box-shadow:0 0 0 20px rgba(200,164,92,0)}}
+.tv-head-cur{margin-left:auto;padding:4px 11px;border-radius:99px;
+  background:#f4ead0;border:1px solid #d9bd7b;color:#8a6a20;font-size:12px;font-weight:800}
+.tv-map-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#tvGoMap{background:#2f6f8a;border-color:#2f6f8a;color:#fff}
+html[data-theme="yuanshen"] .tv-hud-btn#tvGoMap{background:#2f6f8a;border:1px solid #2f6f8a;color:#fff}
+
+/* ================ v8：普通地图的离线示意底图 ================ */
+#pane-map .cm-base{pointer-events:none}
+/* 建筑名做得比站点名小且淡，避免和真实站点标签抢视觉 */
+#pane-map .cm-lbl{font:600 10px "PingFang SC","Microsoft YaHei",sans-serif;
+  text-anchor:start;fill:var(--sub,#7b8a7e);opacity:.62}
+#pane-map .cm-tiny{font:500 10px "PingFang SC","Microsoft YaHei",sans-serif;
+  fill:var(--sub,#7b8a7e);opacity:.8}
+#pane-map .cm-north{fill:var(--accent)}
+#pane-map .cm-badge{font:700 10px "PingFang SC",sans-serif;
+  text-anchor:middle;fill:var(--accent)}
+
+/* ================ v9：主题细节修复（全量复核后） ================ */
+/* pixel：非激活页签被 button 的深色字压成隐形，按页签自身底色补回可读色 */
+html[data-theme="pixel"] .tab{color:var(--sub)}
+html[data-theme="pixel"] .tab:hover{color:var(--ink);border-color:var(--accent)}
+html[data-theme="pixel"] .tab.active{color:#0f1210}
+/* 站点名在 mapHtml 里写死了 fill="#1f2328" + stroke="#fbfcfe"，
+   深色系主题（dark / pixel / cyber）会变成「白边糊字」。CSS 的 fill/stroke
+   优先级高于 presentation attribute，这里直接按主题变量改回可读配色。 */
+#pane-map svg text[fill="#1f2328"]{fill:var(--ink,#1f2328);stroke:var(--bg,#fbfcfe);
+  stroke-width:3px;font-weight:700}
+/* 「✦ 提瓦特地图」在已是提瓦特主题时高亮，避免误以为没生效 */
+#menubar .mb.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+html[data-theme="naiwa"] #menubar .mb.on{color:#4a3710}
+html[data-theme="pixel"] #menubar .mb.on{color:#0f1210}
+html[data-theme="paper"] #menubar .mb.on{color:#fffdf7}
+</style>
 </head>
 <body>
+<nav id="menubar">
+  <span class="brand">AI 出行</span>
+  <span class="sep"></span>
+  <span class="lab">模型</span>
+  <select id="modelSel" title="第一项＝自动匹配（按需求难度挑）；往下选具体模型＝手动锁定"><option value="">自动匹配模型（按需求难度挑）</option></select>
+  <span class="hint" id="routerHint">自动路由</span>
+  <span class="sp"></span>
+  <span class="lab">主题</span>
+  <select id="themeSel" title="界面风格">
+    <option value="light">浅色</option>
+    <option value="dark">暗夜仪表盘</option>
+    <option value="paper">纸质杂志</option>
+    <option value="naiwa">奶蛙</option>
+    <option value="pixel">像素复古</option>
+    <option value="cyber">赛博霓虹</option>
+    <option value="yuanshen">原神 · 提瓦特</option>
+  </select>
+  <span class="sep"></span>
+  <button class="mb" id="mbMap">地图</button>
+  <button class="mb mb-teyvat" id="mbTeyvat">✦ 提瓦特地图</button>
+  <button class="mb" id="mbAb">模型对比</button>
+  <button class="mb" id="mbCheck">体检</button>
+  <button class="mb gd-entry" id="mbHelp">? 使用指南</button>
+</nav>
+
+
+<!-- ===== v7：首次访问用非阻塞引导条，不再用全屏遮罩挡住整页 ===== -->
+<div id="guideHint" hidden>
+  <span class="gh-ico">✦</span>
+  <span>第一次用？<b>30 秒引导</b>里有玩法、参数说明和主题图鉴；也可以直接去看提瓦特传送图。</span>
+  <button class="gh-btn" id="ghOpen" type="button">查看使用指南</button>
+  <button class="gh-btn gh-go" id="ghTeyvat" type="button">✦ 直接打开提瓦特地图</button>
+  <button class="gh-x" id="ghClose" type="button" aria-label="关闭提示">×</button>
+</div>
+<div id="toast" hidden aria-live="polite"></div>
 <header>
   <h1>AI 出行与规划</h1>
-  <p>多城市 · 可换算法 · 时间轴 / 地图 / 算法对比 · 结果可导出（JSON / Markdown / CSV）</p>
+  <p>一句话说清需求，自动生成行程、时间轴与地图。<span class="hd-more">详细用法见右上角「使用指南」。</span></p>
 </header>
 
+<!-- ===== 奶蛙形象（默认隐藏，仅「奶蛙」主题显示） ===== -->
+<div id="buddy" aria-hidden="true">
+  <div class="bubble">今天想去哪儿呀？</div>
+  <img class="frog" src="naiwa-buddy.png" alt="">
+</div>
+<div id="buddyMini" aria-hidden="true"><img src="naiwa-buddy.png" alt=""></div>
+<div id="naiwaTip" aria-hidden="true">
+  <img src="naiwa-buddy.png" alt="">
+  <span>奶蛙小贴士：需求里写「别太赶」，它会自动把每站停留时间拉长。</span>
+</div>
+
+<!-- ===== 原神主题人物（默认隐藏，仅「原神」主题显示） ===== -->
+<div id="ysBuddy" aria-hidden="true">
+  <div class="ys-bubble" id="ysBubble">出发吧！今天的路线交给我来探路～</div>
+  <div class="ys-frame">
+    <img class="ys-hero on" data-hero="klee" src="ys-klee.png" alt="">
+    <img class="ys-hero" data-hero="venti" src="ys-venti.png" alt="">
+    <img class="ys-hero" data-hero="zhongli" src="ys-zhongli.png" alt="">
+    <img class="ys-hero" data-hero="nahida" src="ys-nahida.png" alt="">
+    <img class="ys-hero" data-hero="ambor" src="ys-ambor.png" alt="">
+  </div>
+  <div class="ys-name" id="ysName">可莉 · 火</div>
+  <div class="ys-picks">
+    <button class="ys-pick on" data-hero="klee" title="可莉 · 火"><img src="ys-av-klee.png" alt=""></button>
+    <button class="ys-pick" data-hero="venti" title="温迪 · 风"><img src="ys-av-venti.png" alt=""></button>
+    <button class="ys-pick" data-hero="zhongli" title="钟离 · 岩"><img src="ys-av-zhongli.png" alt=""></button>
+    <button class="ys-pick" data-hero="nahida" title="纳西妲 · 草"><img src="ys-av-nahida.png" alt=""></button>
+    <button class="ys-pick" data-hero="ambor" title="安柏 · 火"><img src="ys-av-ambor.png" alt=""></button>
+  </div>
+</div>
+<div id="ysPaimon" aria-hidden="true"><img src="ys-paimon.png" alt=""><span>向导 · 派蒙</span></div>
+<div id="ysTip" aria-hidden="true">
+  <img src="ys-paimon.png" alt="">
+  <span>提瓦特小贴士：点右下角头像，可以换一位元素伙伴陪你规划。</span>
+</div>
+
+<!-- ===== 提瓦特冒险终端 · HUD（默认隐藏，仅「原神」主题显示） ===== -->
+<div id="teyvatHud" aria-hidden="true">
+  <div class="tv-hud-item"><span class="tv-hud-k">冒险等阶</span>
+    <b id="tvLevel">42</b><div class="tv-exp"><i id="tvExpBar"></i></div></div>
+  <div class="tv-hud-item"><span class="tv-hud-k">原粹树脂</span><b id="tvResin">120 / 160</b></div>
+  <div class="tv-hud-item"><span class="tv-hud-k">今日委托</span><b id="tvHudCom">0 / 4</b></div>
+  <div class="tv-hud-item tv-hud-wide"><span class="tv-hud-k">当前传送锚点</span><b id="tvCurPin">尚未选择</b></div>
+  <button class="tv-hud-btn" id="tvGoMap" onclick="openMapTab()">✦ 打开传送图</button>
+  <button class="tv-hud-btn" id="tvToggle" onclick="teyvatToggleDomainsV7()">显示秘境与神像</button>
+</div>
 <div class="wrap">
-  <!-- 左：输入 -->
-  <div class="card">
+  <!-- 左：只留核心输入，次要参数收进「高级设置」 -->
+  <div class="card input-col">
     <h2>出行需求</h2>
-    <label>一句话需求</label>
-    <textarea id="q">上午去图书馆自习，中午食堂吃饭，顺便取快递，别太赶</textarea>
+    <p class="lead">写一句话，说清今天想做什么、想去哪、有什么忌讳。</p>
 
-    <div class="row">
-      <div>
-        <label>城市</label>
-        <select id="city"></select>
-      </div>
-      <div>
-        <label>场景</label>
-        <select id="scenario"></select>
-      </div>
+    <label class="lb">一句话需求</label>
+    <textarea id="q" class="big-input">上午去图书馆自习，中午食堂吃饭，顺便取快递，别太赶</textarea>
+
+    <div class="row core-row" id="campusFields">
+      <div><label>高校</label><select id="city"></select></div>
+      <div><label>场景</label><select id="scenario"></select></div>
     </div>
 
-    <div class="row">
-      <div>
-        <label>算法</label>
-        <select id="strategy"></select>
+    <!-- v1.6.1 两模式：「校园行程」（内含身份开关）+ 「城市约会」。
+         身份开关决定场景映射：学生=daily（效率优先 + 校园日常内容），
+         访客=visit（体验优先 + 入校预约须知）。接口契约零改动。 -->
+    <div class="mode-tabs" id="modeTabs">
+      <button class="mode-btn active" data-mode="campus" type="button">🏫 校园行程</button>
+      <button class="mode-btn" data-mode="date" type="button">💞 城市约会</button>
+    </div>
+    <div class="mode-tabs" id="identityTabs" style="margin-top:8px">
+      <button class="mode-btn" data-id="student" type="button">🎓 我是校内学生</button>
+      <button class="mode-btn" data-id="visitor" type="button">🎫 我是校外访客</button>
+    </div>
+
+    <!-- 校园行程专属面板：课表 / 固定安排锚点（可选） -->
+    <div class="card date-panel" id="campusPanel" hidden>
+      <h2>课表 / 固定安排（可选）</h2>
+      <p class="muted" style="margin:2px 0 0;font-size:12px">把今天雷打不动的事填进来（上课、组会、取件），行程会把这些时刻钉死，其余安排围绕它们展开。地点写校内点位名（如「一教」「学一食堂」），认不出会被如实报「未排入」。</p>
+      <div id="anchorRows"></div>
+      <button class="ghost" id="addAnchor" type="button" style="width:100%;margin-top:6px">＋ 添加一条固定安排</button>
+      <p class="muted" id="campusHint" style="margin:8px 0 0"></p>
+    </div>
+
+    <!-- 约会模式专属面板：城市 + 商圈 + 场次 + 订座，其余照旧走高级设置。
+         v1.6.3：地点以「城市」为准（不再是高校）；场次支持自定义时间；
+         支持自定义固定安排；一句话行程里写明的时刻/地点优先于这里的筛选。 -->
+    <div class="card date-panel" id="datePanel" hidden>
+      <h2>约会设置</h2>
+      <p class="muted" style="margin:2px 0 0;font-size:12px">选好城市、商圈和场次，行程会把这些时刻钉死，周边安排围绕它们展开。上方那句话里写明了的时间、地点会覆盖这里的筛选。</p>
+      <div class="row">
+        <div><label>城市</label><select id="dateCity"></select></div>
+        <div><label>商圈</label><select id="dateZone"></select></div>
       </div>
-      <div>
-        <label>节奏</label>
-        <select id="pace">
-          <option value="relaxed">轻松</option>
-          <option value="normal" selected>正常</option>
-          <option value="packed">紧凑</option>
+      <div class="row">
+        <div><label>开始时间</label><input id="dateStart" type="time" value="13:00"></div>
+        <div><label>出发地（可选）</label><input id="dateOrigin" placeholder="如：黑石礁公园"></div>
+      </div>
+      <div class="row">
+        <div><label>电影（可选）</label><select id="dateCinema"></select></div>
+        <div><label>场次</label><select id="dateShow"></select></div>
+      </div>
+      <div class="row" id="dateShowCustomRow" hidden>
+        <div><label>自定义开场时间</label><input id="dateShowCustom" type="time" value="19:00"></div>
+      </div>
+      <div class="row">
+        <div><label>晚餐订座（可选）</label><select id="dateDinner"></select></div>
+        <div><label>订座时间</label><input id="dateDinnerTime" type="time" value="18:00"></div>
+      </div>
+      <div id="dateAnchorRows"></div>
+      <button class="ghost" id="addDateAnchor" type="button" style="width:100%;margin-top:6px">＋ 添加自定义固定安排（任意地点 + 时刻）</button>
+      <div class="row" style="grid-template-columns:auto 1fr;align-items:end;margin-top:8px">
+        <button class="ghost" id="dateLocate" type="button"
+                style="margin:0;width:auto;padding:9px 14px">📍 我在这里</button>
+      </div>
+      <p class="muted" id="dateHint" style="margin:8px 0 0"></p>
+    </div>
+
+    <div class="actions">
+      <button id="go" class="primary">生成行程</button>
+      <div class="more">
+        <button class="ghost" id="ab">模型对比</button>
+        <button class="ghost" id="cmp">算法对比</button>
+        <button class="ghost" id="reload">清缓存</button>
+      </div>
+    </div>
+    <p class="mini-hint">需要细调？<button class="link" id="openAdvanced">展开高级设置</button>
+      <span class="mini-sep">·</span><button class="link" id="openGuideLink">看使用指南</button></p>
+
+    <details class="adv" id="advanced">
+      <summary>高级设置 · 算法 / 时间 / 预算 / 开关</summary>
+      <div class="adv-body">
+        <div class="form-sec">路线偏好</div>
+        <div class="row">
+          <div><label>算法</label><select id="strategy"></select></div>
+          <div><label>节奏</label>
+            <select id="pace">
+              <option value="relaxed">轻松</option>
+              <option value="normal" selected>正常</option>
+              <option value="packed">紧凑</option>
+            </select>
+          </div>
+        </div>
+        <label>出行方式（影响在途时间估算）</label>
+        <select id="mobility">
+          <option value="transit">公共交通</option>
+          <option value="walk" selected>步行</option>
+          <option value="drive">驾车</option>
         </select>
+
+        <div class="form-sec">时间与规模</div>
+        <div class="row">
+          <div><label>天数</label><input id="days" type="number" min="1" max="7" value="1"></div>
+          <div><label>每天站点数</label><input id="top_n" type="number" min="1" max="8" value="4"></div>
+        </div>
+        <div class="row">
+          <div><label>出发</label><input id="start" type="time" value="07:30"></div>
+          <div><label>返回</label><input id="end" type="time" value="20:00"></div>
+        </div>
+        <div class="row">
+          <div><label>每日预算（0 = 不限制）</label><input id="budget" type="number" min="0" step="10" value="0"></div>
+          <div><label>最晚离校（可选）</label><input id="mustLeave" type="time"></div>
+        </div>
+
+        <div class="form-sec">开关</div>
+        <label class="ck"><input type="checkbox" id="rt" checked>使用实时天气<span>雨天自动改室内</span></label>
+        <label class="ck"><input type="checkbox" id="detailed" checked>详细行程<span>逐站看什么 / 怎么走 / 为什么 / 事实来源</span></label>
+        <label class="ck"><input type="checkbox" id="narrate" checked>生成解说<span>没配 Key 就用规则模板</span></label>
+        <label class="ck"><input type="checkbox" id="noLlm">只用规则<span>两次结果一致，不花额度</span></label>
+        <p class="muted adv-note">参数默认「跟随需求文本」：只有手动改过的那一项，才会覆盖文本解析结果。</p>
       </div>
-    </div>
-
-    <label>出行方式（影响在途时间估算）</label>
-    <select id="mobility">
-      <option value="transit">公共交通</option>
-      <option value="walk" selected>步行</option>
-      <option value="drive">驾车</option>
-    </select>
-
-    <div class="row">
-      <div>
-        <label>天数</label>
-        <input id="days" type="number" min="1" max="7" value="1">
-      </div>
-      <div>
-        <label>每天站点数</label>
-        <input id="top_n" type="number" min="1" max="8" value="4">
-      </div>
-    </div>
-
-    <div class="row">
-      <div>
-        <label>出发</label>
-        <input id="start" type="time" value="07:30">
-      </div>
-      <div>
-        <label>返回</label>
-        <input id="end" type="time" value="20:00">
-      </div>
-    </div>
-
-    <label>每日预算（0 = 不限制）</label>
-    <input id="budget" type="number" min="0" step="10" value="0">
-
-    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--ink)">
-      <input type="checkbox" id="rt" checked style="width:auto">
-      使用实时天气（雨天自动改室内；抓不到自动降级）
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--ink)">
-      <input type="checkbox" id="narrate" checked style="width:auto">
-      生成解说（没配大模型 Key 时用规则模板）
-    </label>
-    <p class="muted" style="margin:8px 0 0">参数默认「跟随需求文本」：只有你手动改过的那一项，才会覆盖文本解析的结果。</p>
-
-    <button id="go">生成行程</button>
-    <button class="ghost" id="cmp">算法对比（同一份需求，各算法跑一遍）</button>
-    <button class="ghost" id="reload">清空数据缓存（改了 CSV 后点）</button>
-    <p class="muted" style="margin-top:10px">接口状态：<span id="health">…</span></p>
-    <p class="muted" id="shareLine" style="display:none"></p>
+    </details>
   </div>
 
   <!-- 右：结果 -->
-  <div>
+  <div class="result-col">
     <div id="summary"></div>
+    <!-- ===== 每日委托 + 元素队伍（默认隐藏，仅「原神」主题显示） ===== -->
+    <section id="teyvatBoard" aria-hidden="true">
+      <div class="tv-card">
+        <div class="tv-card-head"><h3>每日委托</h3>
+          <span class="tv-badge" id="tvComCount">0 / 4</span></div>
+        <p class="tv-card-sub">今天的行程就是今天的委托，逐站完成后可领取奖励。</p>
+        <div class="tv-com-list" id="tvComList"></div>
+        <div class="tv-progress"><i id="tvComBar"></i></div>
+        <div class="tv-reward" id="tvComReward" hidden>✦ 委托全部完成 · 原石 ×60 / 冒险阅历 ×250</div>
+      </div>
+      <div class="tv-card tv-team">
+        <div class="tv-card-head"><h3>元素队伍</h3><span class="tv-badge">共鸣</span></div>
+        <p class="tv-card-sub">陪你规划路线的伙伴，可在右下角切换。</p>
+        <div class="tv-team-hero"><span class="tv-elem">✦</span>
+          <b id="tvTeamName">可莉 · 火</b></div>
+        <p class="tv-team-line" id="tvTeamLine">「出发吧！今天的路线交给我来探路～」</p>
+        <div class="tv-team-tip">队伍共鸣：<b>元素共鸣 · 迅捷之旅</b><br>切换伙伴会同步更新这里的台词。</div>
+      </div>
+    </section>
+
 
     <div class="card" id="adjustBar" hidden style="margin-bottom:14px">
       <h2>一句话调整</h2>
       <div class="row" style="grid-template-columns:1fr auto;align-items:end">
-        <div>
-          <label>只改被点名的那一站，其余保持不动</label>
-          <input id="adjText" placeholder="第2站太贵了换一个 / 删掉第3站 / 再加一站 / 太赶了">
-        </div>
+        <div><label>只改被点名的那一站</label>
+          <input id="adjText" placeholder="第2站太贵了换一个 / 删掉第3站 / 再加一站 / 太赶了"></div>
         <button id="adjGo" style="margin:0;width:auto;padding:9px 16px">应用调整</button>
       </div>
       <p class="muted" id="adjNote" style="margin:8px 0 0"></p>
     </div>
 
     <nav class="tabs" id="tabs" hidden>
-      <button class="tab active" data-tab="list">行程表</button>
+      <button class="tab active" data-tab="detail">详细行程</button>
+      <button class="tab" data-tab="list">行程表</button>
       <button class="tab" data-tab="timeline">时间轴</button>
       <button class="tab" data-tab="map">地图</button>
       <button class="tab" data-tab="compare">算法对比</button>
     </nav>
 
-    <div class="pane" id="pane-list">
-      <div class="card"><p class="muted">填好需求后点「生成行程」。</p></div>
+    <div class="pane" id="pane-detail">
+      <div class="card empty-state">
+        <div class="es-icon">✦</div>
+        <h3>还没有详细行程</h3>
+        <p class="muted">在左边写一句话，点「生成行程」：每一站都会给出看什么、怎么走、为什么排在这、可达性、备选和事实来源。</p>
+      </div>
+    </div>
+    <div class="pane" id="pane-list" hidden>
+      <div class="card empty-state">
+        <div class="es-icon">➤</div>
+        <h3>还没有行程</h3>
+        <p class="muted">在左边写一句话，点「生成行程」就能看到完整安排。</p>
+        <button class="link" id="esGuide">第一次用？看 30 秒引导</button>
+      </div>
     </div>
     <div class="pane" id="pane-timeline" hidden></div>
     <div class="pane" id="pane-map" hidden></div>
     <div class="pane" id="pane-compare" hidden></div>
+  </div>
+</div>
+
+<!-- ===== 说明 / 引导界面：把次要信息全部收进来，主界面只留核心 ===== -->
+<div id="guide" hidden>
+  <div class="gd-mask" data-close="1"></div>
+  <div class="gd-panel" role="dialog" aria-modal="true" aria-label="使用指南">
+    <div class="gd-head">
+      <div>
+        <div class="gd-kicker">GETTING STARTED · 30 秒上手</div>
+        <h2>使用指南</h2>
+      </div>
+      <button class="gd-close" id="guideClose" aria-label="关闭">×</button>
+    </div>
+    <nav class="gd-tabs">
+      <button class="gd-tab active" data-gtab="start">快速开始</button>
+      <button class="gd-tab" data-gtab="params">参数说明</button>
+      <button class="gd-tab" data-gtab="model">模型与算法</button>
+      <button class="gd-tab" data-gtab="themes">主题图鉴</button>
+      <button class="gd-tab" data-gtab="status">运行状态</button>
+    </nav>
+    <div class="gd-body">
+
+      <section data-gpane="start">
+        <p class="gd-intro">三步就能得到一份可以带走的行程，其余设置都可以先不管。</p>
+        <div class="gd-grid">
+          <div class="gd-step"><span class="gd-num">01</span><h3>写一句话需求</h3>
+            <p>例如「上午去图书馆自习，中午食堂吃饭，顺便取快递，别太赶」。系统会自动解析地点、时间与节奏。</p></div>
+          <div class="gd-step"><span class="gd-num">02</span><h3>点「生成行程」</h3>
+            <p>左侧那个最大的按钮。高校、场景保持自动即可；想细调再展开「高级设置」。</p></div>
+          <div class="gd-step"><span class="gd-num">03</span><h3>看结果 / 导出</h3>
+            <p>右侧可切换行程表、时间轴、地图、算法对比；满意后导出 JSON / Markdown / CSV。</p></div>
+        </div>
+        <div class="gd-callout"><b>想看得更清楚？</b> 顶部「主题」下拉有 7 套界面：
+          浅色 / 深色是基准，纸质、奶蛙、像素、赛博、原神各有不同的按钮位置与大小。</div>
+        <div class="gd-callout"><b>地图 / 提瓦特传送图</b> 顶部「✦ 提瓦特地图」会一键切到原神主题并直接跳到传送图；
+          点菱形锚点可设为当前传送点，冒险 HUD 上的「显示秘境与神像」会解锁七天神像与秘境。
+          普通「地图」按钮 / 页签也会自动滚动并高亮地图卡片，不会再点了看不见变化。</div>
+      </section>
+
+      <section data-gpane="params" hidden>
+        <p class="gd-intro">高级设置里的每一项都在下面。默认「跟随需求文本」，只有你手动改过的那项才生效。</p>
+        <table class="gd-table">
+          <tr><th>算法</th><td>贪心 / 2-opt / 随机，决定站点排序方式；「算法对比」会把三种都跑一遍。</td></tr>
+          <tr><th>节奏</th><td>轻松 / 正常 / 紧凑，影响每站停留时间；需求里写「别太赶」会自动放宽。</td></tr>
+          <tr><th>出行方式</th><td>步行 / 公共交通 / 驾车，用来估算在途时间。</td></tr>
+          <tr><th>天数 · 站点数</th><td>1–7 天、每天 1–8 站，控制行程规模。</td></tr>
+          <tr><th>出发 · 返回</th><td>当天可用时间窗，超出会自动压缩或提示。</td></tr>
+          <tr><th>每日预算</th><td>填 0 表示不限制；超预算会在结果里标红。</td></tr>
+          <tr><th>最晚离校</th><td>选填。填了会额外给出「最晚几点到校」。</td></tr>
+          <tr><th>实时天气</th><td>抓到雨天自动把户外站换成室内；抓不到自动降级为规则，不报错。</td></tr>
+          <tr><th>生成解说</th><td>给行程配一段讲解词；没配大模型 Key 时用规则模板兜底。</td></tr>
+          <tr><th>只用规则</th><td>一个模型都不调：同一请求两次结果完全一样，也不花额度，适合做对照实验。</td></tr>
+        </table>
+      </section>
+
+      <section data-gpane="model" hidden>
+        <div class="gd-grid gd-grid-2">
+          <div class="gd-card"><h3>模型：自动 or 手动</h3>
+            <p>下拉第一项 <b>自动匹配模型</b>＝按需求难度路由（快 / 推理 / 长上下文 / 看图）。</p>
+            <p>往下选具体模型＝<b>手动锁定</b>，整次请求都用同一个，结果更可预期。原型内置 21 个演示模型，分「推荐」与「全部模型」两组。</p></div>
+          <div class="gd-card"><h3>三种算法</h3>
+            <p><b>贪心</b>：每步选眼前最优，快。<b>2-opt</b>：在贪心基础上交换站点做局部优化。<b>随机</b>：作为基线对照。</p>
+            <p>「算法对比」用同一份需求跑三遍，直接看满意度 / 成本 / 时间 / 距离的差异。</p></div>
+          <div class="gd-card"><h3>模型对比 / 体检</h3>
+            <p>「模型对比」把同一句话跑两遍（规则解析 vs 模型解析），看模型到底读懂了什么。</p>
+            <p>「体检」让模型检查行程里的硬冲突（时间窗、预算、往返）。</p></div>
+          <div class="gd-card"><h3>导出与分享</h3>
+            <p>结果可导出 JSON / Markdown / CSV；有内网 IP 时会生成一条可直接发给同学的链接。</p>
+            <p>「清缓存」用于改了站点 CSV 之后重新加载数据。</p></div>
+        </div>
+      </section>
+
+      <section data-gpane="themes" hidden>
+        <p class="gd-intro">7 套主题共用同一套功能，差别在版式语言与按钮位置，不只是配色。</p>
+        <div class="gd-themes">
+          <div class="gd-theme"><i style="background:#f6f7f9;border-color:#2563eb"></i><b>浅色</b><span>浅色基准 · 清爽直白</span></div>
+          <div class="gd-theme"><i style="background:#0f1216;border-color:#4f8cff"></i><b>暗夜仪表盘</b><span>深色基准 · 低亮度</span></div>
+          <div class="gd-theme"><i style="background:#f7f4ec;border-color:#b23a2f"></i><b>纸质杂志</b><span>左右列互换 · 刊头按钮条</span></div>
+          <div class="gd-theme"><i style="background:#fbf4df;border-color:#d3941c"></i><b>奶蛙</b><span>奶黄 + 抠图奶蛙 · 超大胶囊主按钮</span></div>
+          <div class="gd-theme"><i style="background:#12160f;border-color:#8ad34f"></i><b>像素复古</b><span>右上角固定游戏按键板</span></div>
+          <div class="gd-theme"><i style="background:#060a12;border-color:#00e5ff"></i><b>赛博霓虹</b><span>右侧竖向霓虹按钮栏</span></div>
+          <div class="gd-theme"><i style="background:#eaf0f1;border-color:#c8a45c"></i><b>原神 · 提瓦特</b><span>青金配色 · 元素伙伴立绘可切换</span></div>
+        </div>
+        <div class="gd-callout"><b>原神主题怎么玩：</b> 右下角站着一位元素伙伴（默认可莉），
+          点下方 5 个圆形头像可切换温迪 / 钟离 / 纳西妲 / 安柏，页头与贴士是向导派蒙。</div>
+      </section>
+
+      <section data-gpane="status" hidden>
+        <p class="gd-intro">接口的真实状态都收在这里，不占主界面空间。</p>
+        <div class="gd-stat"><b>接口状态</b><div id="health">…</div></div>
+        <div class="gd-stat"><b>分享链接</b><p class="muted" id="shareLine" style="display:none"></p></div>
+        <div class="gd-stat"><b>模型调用</b>
+          <div class="gd-llm"><span id="llmLine">…</span>
+            <button class="ghost" id="llmRefresh" style="padding:2px 8px;font-size:12px;width:auto;margin:0">刷新</button></div>
+        </div>
+        <div class="gd-stat"><b>最近调用</b><div id="llmRecent"></div></div>
+      </section>
+
+    </div>
+    <div class="gd-foot">
+      <label class="gd-noauto"><input type="checkbox" id="guideNoAuto"> 不再显示首次提示条</label>
+      <button class="gd-primary" id="guideStart">明白了，开始规划 →</button>
+    </div>
   </div>
 </div>
 
@@ -216,7 +1304,11 @@ let PLAN = null;        // 最近一次的规划结果
 let PTS = [];           // 地图点
 let CMP = null;         // 最近一次的算法对比结果
 let OPTS = null;        // /api/options 的原始返回（切场景时要用）
+let JS_KEY = '';        // 高德 Web端(JS API) Key：为空则地图保持离线 SVG
+let SEC_CODE = '';      // 同上那把 Key 的安全密钥（2.0 SDK 必配，否则 INVALID_USER_SCODE）
 let ADJ = [];           // 本份行程已经下过的调整指令，按顺序重放
+let LAST_BRIEF = null;  // 约会模式的简报（/api/date/brief 返回），daily/visit 下恒为 null
+let DATE_INFO = null;   // /api/date/info 的返回：商圈 / 影院 / 场次（切进约会模式才拉）
 
 /* 所有拼进 innerHTML 的外部文本都要过一遍 —— 站点名里出现 & 或 < 时页面不能崩 */
 function esc(s){
@@ -299,23 +1391,63 @@ function showShareLine(h) {
   }
 }
 
+/* 模型调用面板：说清"这次是哪个模型、怎么选的、花了多久、有没有失败"。
+   数据来自 /api/llm；后端只保留最近 20 条，不落盘。 */
+async function loadLlmPanel() {
+  const line = $('llmLine'), list = $('llmRecent');
+  if (!line || !list) return;
+  let d;
+  try {
+    d = await api('/api/llm');
+  } catch (e) {
+    line.textContent = '读不到（后端没重启？）';
+    return;
+  }
+  if (!d.enabled) {
+    line.textContent = '未启用（没配 Key，解说/解析全部走规则）';
+    list.innerHTML = '';
+    return;
+  }
+  const modeTxt = d.router_mode === 'llm' ? '规则+裁判'
+                : d.router_mode === 'rules' ? '仅规则' : '不分流';
+  line.textContent = '已启用 · 默认 ' + d.model + ' · 路由：' + modeTxt;
+
+  const rs = d.recent || [];
+  if (!rs.length) {
+    list.innerHTML = '还没有调用记录 —— 同一个输入第二次会命中缓存、不再重复调模型；换个说法再试。';
+    return;
+  }
+  list.innerHTML = rs.map(r => {
+    const pct = r.ok ? '' : ' <b style="color:#a32d2d">失败</b>';
+    const hint = r.why ? '（' + esc(r.why) + '）' : '';
+    return '· ' + esc(r.time) + ' ' + esc(r.task) + ' → ' + esc(r.model)
+         + ' [' + esc(r.source) + '] ' + r.ms + 'ms' + pct + hint;
+  }).join('<br>');
+}
+
 async function boot() {
   try {
     const h = await api('/api/health');
     $('health').textContent = h.ok
-      ? ('正常 · 城市 ' + h.cities + ' 个 · 高德'
+      ? ('正常 · 高校 ' + h.cities + ' 个 · 高德'
          + ((h.amap && h.amap.configured) ? ('已接入（' + h.amap.cached_points + ' 条真实路线）') : '未配置'))
       : ('异常：' + h.error);
     showShareLine(h);
   } catch (e) {
     $('health').textContent = '连不上后端（用 python -m api.server 启动）';
   }
+  loadLlmPanel();
+  if ($('llmRefresh')) $('llmRefresh').onclick = () => loadLlmPanel();
   try {
     const o = await api('/api/options');
     OPTS = o;
+    JS_KEY = (o.map && o.map.js_key) || '';
+    SEC_CODE = (o.map && o.map.security_code) || '';
+    fillModels(o);
     fill('city', o.cities, o.default_city, c => [c.key, c.name + '（' + c.key + '）']);
     fill('scenario', o.scenarios, o.default_scenario, s => [s, s]);
     fill('strategy', o.strategies, o.default_strategy, s => [s, s]);
+    syncModeTabs();               // 默认场景若恰好是 date，把模式页签与面板对齐
   } catch (e) { /* 选项拉不到就用空下拉，页面不至于打不开 */ }
 }
 
@@ -371,12 +1503,22 @@ function collect() {
   if (TOUCHED.end) ov.end_time = $('end').value;
   if (TOUCHED.budget) ov.daily_budget = Number($('budget').value) || 0;
 
+  /* v1.6.1 校园行程：课表锚点走 overrides.anchors（build_request 会清洗形状） */
+  if (isCampusScenario($('scenario').value)) {
+    const anchors = collectAnchors();
+    if (anchors.length) ov.anchors = anchors;
+  }
+
   return {
     query: $('q').value.trim(),
     scenario: $('scenario').value,
     strategy: $('strategy').value,
     realtime: $('rt').checked,
+    detailed: $('detailed') ? $('detailed').checked : true,
     narrate: $('narrate').checked,
+    no_llm: $('noLlm').checked,
+    model: ($('modelSel') && $('modelSel').value) || undefined,
+    must_leave: ($('mustLeave') && $('mustLeave').value) || undefined,
     overrides: ov
   };
 }
@@ -398,7 +1540,9 @@ document.querySelectorAll('.tab').forEach(b => {
 
 async function plan() {
   const payload = collect();
+  if (payload.scenario === 'date') return planDate(payload);   // 约会模式：锚点走专用接口
   LAST = payload;
+  LAST_BRIEF = null;                    // 换回普通模式就不该再显示上一场的约会简报
   $('go').disabled = true;
   $('summary').innerHTML = '<div class="card"><p class="muted">规划中…</p></div>';
   let res;
@@ -416,21 +1560,41 @@ async function plan() {
   }
   PLAN = res.plan;
   PTS = res.map || [];
+  LAST_REV = res.reverse || null;
   ADJ = [];                    // 新行程 = 调整历史的新起点
+  noteModel(PLAN);
   renderPlan();
-  showTab('list');
+  /* 详细行程是默认视图：用户第一眼要看到逐站说明，而不是一张光秃秃的表 */
+  showTab($('detailed') && $('detailed').checked ? 'detail' : 'list');
+}
+
+/* 把"这次到底用了哪个模型"写到菜单栏上 —— 自动路由时这是唯一能看见它的地方 */
+function noteModel(plan){
+  const hint = $('routerHint');
+  if (!hint) return;
+  const sel = $('modelSel');
+  if (sel && sel.value) { hint.textContent = '已锁定：' + sel.value; return; }
+  const r = (plan && plan.meta && plan.meta.router) || null;
+  hint.textContent = r && r.model
+    ? ('本次：' + r.model + (r.role ? '（' + r.role + '）' : ''))
+    : (sel ? '自动路由' : '');
 }
 
 function renderPlan(){
   $('tabs').hidden = false;
-  $('adjustBar').hidden = false;
-  $('summary').innerHTML = '<div class="card">' + narrativeHtml(PLAN) + metricsHtml(PLAN)
+  $('adjustBar').hidden = false;  $('summary').innerHTML = (LAST_BRIEF ? briefCard(LAST_BRIEF) : '')
+                         + '<div class="card">' + narrativeHtml(PLAN) + metricsHtml(PLAN)
                          + metaLine(PLAN) + realtimeNote(PLAN) + dataNote(PLAN)
+                         + dateQueryNote(PLAN) + budgetHtml(PLAN) + planBHtml(PLAN)
                          + warningsHtml(PLAN) + pendingHtml(PLAN) + exportBar() + '</div>';
+  $('pane-detail').innerHTML = detailHtml(PLAN);
   $('pane-list').innerHTML = listHtml(PLAN);
   $('pane-timeline').innerHTML = timelineHtml(PLAN);
-  $('pane-map').innerHTML = mapHtml(PTS);
+  renderMapPane(PTS);
   if (CMP) $('pane-compare').innerHTML = compareHtml(CMP);
+  renderExtras();               // 智能工具条：倒排 / 口吻 / 讲解词 / 省钱方案
+  loadLlmPanel();               // 生成完顺手刷新模型面板，看得到刚才的调用
+  if (typeof teyvatSync === 'function') teyvatSync();
 }
 
 /* 解说：模型写的就标「模型」，规则拼的标「规则」—— 不假装哪句是模型说的 */
@@ -454,6 +1618,12 @@ function metric(label, v) {
   return '<div class="metric"><b>' + n + '</b><span>' + label + '</span></div>';
 }
 
+/* v1.6.3 约会模式以城市为地点：date 场景显示「城市 大连」，其余照旧显示高校 */
+function cityNameOf(key){
+  const list = (OPTS && (OPTS.date_cities || OPTS.cities)) || [];
+  const hit = list.find(c => c.key === key);
+  return (hit && hit.name) || key || '';
+}
 function metaLine(plan){
   /* 开了模型路由时多一个"模型"标签：悬停能看到为什么选它（rule/judge/fallback） */
   const rt = (plan.meta && plan.meta.router) || null;
@@ -461,9 +1631,11 @@ function metaLine(plan){
     ? '模型 <span class="pill" title="' + esc(rt.source + ' · ' + rt.why) + '">'
       + esc(rt.model) + '</span>'
     : '';
+  const isDate = plan.scenario === 'date';
   return '<p class="muted">场景 <span class="pill">' + esc(plan.scenario) + '</span>'
        + '算法 <span class="pill">' + esc(plan.strategy) + '</span>'
-       + (plan.city ? '城市 <span class="pill">' + esc(plan.city) + '</span>' : '')
+       + (plan.city ? (isDate ? '城市' : '高校') + ' <span class="pill">'
+           + esc(isDate ? cityNameOf(plan.city) : plan.city) + '</span>' : '')
        + rtHtml
        + '生成于 ' + esc(plan.generated_at) + '</p>';
 }
@@ -486,16 +1658,71 @@ function realtimeNote(plan) {
 }
 
 /* 数据覆盖这一行：矩阵有多少条实测边，如实说。
- * 没有实测路网时必须承认"在途时间是直线估算"，不能让用户以为分钟数是量出来的。 */
+ * 没有实测路网时必须承认"在途时间是直线估算"，不能让用户以为分钟数是量出来的。
+ * 约会模式以城市为地点，措辞用「城市」而不是「校」。 */
 function dataNote(plan){
   const d = (plan.meta && plan.meta.data) || null;
+  const place = plan.scenario === 'date' ? '该城市' : '该校';
   if (!d) return '';
   if (!d.matrix_edges) {
-    return '<p class="muted">🧭 该城市暂无实测路网：在途时间全部按直线距离 + 配置时速估算。</p>';
+    return '<p class="muted">🧭 ' + place + '暂无实测路网：在途时间全部按直线距离 + 配置时速估算。</p>';
   }
   const modes = (d.matrix_modes || []).join('/') || '未知方式';
   return '<p class="muted">🧭 实测路网 ' + d.matrix_edges + ' 条边（' + esc(modes)
        + '），其余在途时间为直线估算。</p>';
+}
+
+/* 一句话覆盖留痕：面板筛选与一句话行程冲突时，以一句话为准 —— 改了什么要说出来 */
+function dateQueryNote(plan){
+  const q = (plan.meta && plan.meta.date_query_overrides) || null;
+  if (!q) return '';
+  let h = '';
+  if (q.conflicts && q.conflicts.length) {
+    h += '<div class="ok" style="margin-top:6px"><b>已按一句话行程调整</b><br>'
+       + q.conflicts.map(x => '· ' + esc(x)).join('<br>') + '</div>';
+  } else if (q.picked && q.picked.length) {
+    h += '<p class="muted">📝 一句话里认出了：' + esc(q.picked.join('、')) + '。</p>';
+  }
+  return h;
+}
+
+/* 预算明细：站点花费按分类汇总、交通单列 —— 对齐详细行程单的"预算明细"一节。
+ * 只在确实产生了花费时显示，免费行程不占地方。 */
+function budgetHtml(plan){
+  const byCat = {};
+  let transport = 0, total = 0;
+  ((plan && plan.days) || []).forEach(d => (d.items || []).forEach(it => {
+    const c = it.category || '未分类';
+    byCat[c] = (byCat[c] || 0) + (it.cost || 0);
+    transport += (it.transport && it.transport.cost) || 0;
+  }));
+  total = ((plan && plan.days) || []).reduce((s, d) => s + (d.total_cost || 0), 0);
+  if (!total) return '';
+  const rows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(c =>
+    '<tr><td>' + esc(c) + '（站点）</td><td class="num">' + byCat[c].toFixed(2) + '</td></tr>').join('');
+  const ppl = (plan.request && plan.request.travelers) || 1;
+  const perPerson = (ppl > 1 && plan.request.budget_basis !== 'group')
+    ? '<tr><td>人均（' + ppl + ' 人）</td><td class="num">'
+      + (total / ppl).toFixed(2) + '</td></tr>' : '';
+  return '<div class="warn" style="background:#f8fafc;border-color:#e3e6ea;color:#475569">'
+    + '<b>预算明细（合计 ' + total.toFixed(2) + ' 元）</b><br>'
+    + '<table><thead><tr><th>项目</th><th class="num">金额（元）</th></tr></thead><tbody>'
+    + rows
+    + '<tr><td>交通</td><td class="num">' + transport.toFixed(2) + '</td></tr>'
+    + '<tr><td><b>合计</b></td><td class="num"><b>' + total.toFixed(2) + '</b></td></tr>'
+    + perPerson
+    + '</tbody></table>'
+    + '<span class="muted">站点花费为数据里的人均估算，交通费来自实测矩阵或配置单价，均为预估。</span></div>';
+}
+
+/* Plan B 速查：引擎从候选池推导的室内备选（meta.plan_b），对齐导出行程单同名一节 */
+function planBHtml(plan){
+  const list = (plan && plan.meta && plan.meta.plan_b) || [];
+  if (!list.length) return '';
+  return '<div class="warn" style="margin-top:6px"><b>Plan B 速查</b><br>'
+    + list.map(b => '· ' + esc(b.reason || '天气差时') + '：<b>' + esc((b.instead_of || []).join('、'))
+      + '</b> 改为 ' + esc((b.backups || []).join(' 或 '))).join('<br>')
+    + '</div>';
 }
 
 function warningsHtml(plan){
@@ -525,6 +1752,219 @@ function exportBar(){
     + '<button class="ghost" onclick="download(\'md\')">下载 Markdown</button>'
     + '<button class="ghost" onclick="download(\'csv\')">下载 CSV</button>'
     + '</div>';
+}
+
+/* ==================================================================
+   详细行程 v1.6
+   三层信息分开展示，任何一句都能追溯到出处：
+     · 规则引擎   → 时刻 / 停留 / 在途 / 成本 / 顺序 / 评分
+     · 校区事实层 → 入校准备 / 看什么 / 可达性 / 来源与查阅日期
+     · 大模型     → 导览词 / 为什么这样排 / 备选与取舍（没启用则是规则模板）
+   ================================================================== */
+function diList(arr){
+  if(!arr || !arr.length) return '';
+  return '<ul>' + arr.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+}
+
+function diStepHtml(s){
+  const tp = s.transport || {}, ac = s.access || {}, src = s.source || {};
+  let h = '<div class="di-step"><div class="di-step-head">'
+    + '<span class="di-seq">' + esc(s.seq) + '</span>'
+    + '<h3>' + esc(s.name) + '</h3>'
+    + '<span class="di-meta">' + esc(s.arrive) + '–' + esc(s.leave)
+    + ' · 停留 ' + esc(s.stay_min) + ' 分 · '
+    + (s.cost ? esc(s.cost.toFixed(0)) + ' 元' : '免费')
+    + ' · ' + esc(s.category || '未分类') + '</span>'
+    + (s.enhanced_by === 'llm'
+        ? '<span class="di-badge on">模型导览</span>'
+        : '<span class="di-badge">规则模板</span>')
+    + '</div><div class="di-body">';
+
+  h += '<div class="di-blk">'
+    + '<h4>怎么走</h4><p>' + esc(tp.text || '当天起点') + '</p>'
+    + '<p>' + esc(s.how_to_walk || '') + '</p>'
+    + '<h4>时间提示</h4><p>' + esc(s.timing_tip || '') + '</p>'
+    + '</div>';
+
+  h += '<div class="di-blk">'
+    + '<h4>看什么 / 做什么（校区事实卡）</h4>' + diList(s.what_to_see)
+    + '<div class="di-tags"><span class="di-access'
+    + (ac.level && ac.level !== 'open' ? ' warn' : '') + '">' + esc(ac.label || '') + '</span>'
+    + '<span class="muted">' + esc(ac.note || '') + '</span></div>'
+    + '<h4 style="margin-top:8px">为什么排在这</h4><p>' + esc(s.why_here || '') + '</p>'
+    + '<h4>备选 / 兜底</h4><p>' + esc(s.backup || '') + '</p>'
+    + '</div>';
+
+  if(s.enhanced_by === 'llm'){
+    h += '<div class="di-llm"><h4>✦ 大模型导览与编排（措辞层，不新增事实）</h4>';
+    if(s.llm_guide)    h += '<p><b>现场导览</b>：' + esc(s.llm_guide) + '</p>';
+    if(s.llm_why_here) h += '<p><b>排在这的理由</b>：' + esc(s.llm_why_here) + '</p>';
+    if(s.llm_backup)   h += '<p><b>临时变化</b>：' + esc(s.llm_backup) + '</p>';
+    h += '</div>';
+  }
+
+  h += '<div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts">';
+  (s.facts || []).forEach(f => {
+    h += '<div><b>' + esc(f.label) + '</b>：' + esc(f.value)
+       + ' <span class="muted">← ' + esc(f.from) + '</span></div>';
+  });
+  h += '<div class="di-src">点位数据：' + esc(src.provider || '未标注') + ' · '
+     + (src.verified ? '核对于 ' + esc(src.source_date) : '未标注来源适用日期（列入待核实）')
+     + (src.address ? ' · 地址 ' + esc(src.address) : '') + '</div>';
+  return h + '</div></div></div></div>';
+}
+
+function detailHtml(plan){
+  const d = (plan.meta && plan.meta.detailed_itinerary) || null;
+  if(!d) return '<div class="card"><p class="muted">本次未生成详细行程：在左侧高级参数里勾选「详细行程」再生成一次即可。</p></div>';
+  if(d.error) return '<div class="card"><div class="warn"><b>' + esc(d.headline)
+    + '</b><br>' + esc(d.error) + '<br>主行程仍然有效，可切到「行程表」查看。</div></div>';
+
+  const A = d.architecture || {}, B = d.before_you_go || {}, O = d.overview || {};
+  const R = d.rules_vs_llm || {}, MS = d.model_status || {};
+  const CL = d.campus_life || {};
+  /* 是否含有访客入校信息：决定第①区渲染哪种内容（学生=生活提示，访客=进校动作） */
+  const hasVisitorEntry = (B.booking || []).length || B.need_booking
+    || (B.requires || []).length || B.approval || B.on_arrival
+    || (B.transit || []).length || B.policy_note || B.lead_time;
+  let h = '<div class="card">';
+
+  /* 头部 */
+  h += '<div class="di-hero"><h2>' + esc(d.headline || '详细行程') + '</h2><p>'
+     + '<span class="di-badge on">'
+     + esc(MS.label || (d.generated_by === 'rules+llm' ? '规则 + 大模型' : '规则引擎（模板兜底）')) + '</span>'
+     + '<span class="di-badge">' + esc(d.campus || '') + '</span>'
+     + (d.model_active && d.model ? '<span class="di-badge">模型 ' + esc(d.model) + '</span>' : '')
+     + '<span class="di-badge">' + esc(O.stops || 0) + ' 站</span>'
+     + '<span class="di-badge">' + esc(O.start || '') + '–' + esc(O.end || '') + '</span>'
+     + (O.audience_hint ? '<span class="di-badge">' + esc(O.audience_hint) + '</span>' : '')
+     + '</p><p class="muted">'
+     + (hasVisitorEntry
+        ? '事实与措辞分开展示：时刻、渠道、电话、来源由规则引擎与校区事实卡给出；导览词与编排解释由大模型给出（未启用时为规则模板）。'
+        : '事实与措辞分开展示：时刻、来源由规则引擎与校园数据给出；导览词与编排解释由大模型给出（未启用时为规则模板）。')
+     + '</p>';
+  if(MS.state){
+    h += '<div class="di-model-note' + (MS.active ? ' ok' : '') + '"><b>本次模型状态 · '
+       + esc(MS.label) + '</b><br>' + esc(MS.reason)
+       + (MS.hint ? '<span class="muted">' + esc(MS.hint) + '</span>' : '')
+       + '</div>';
+  }
+  h += '</div>';
+
+  /* 三层架构 */
+  if(A.engine || A.facts || A.llm){
+    h += '<div class="di-sec">这套行程是怎么来的 · 三层分工</div><div class="di-arch">';
+    [['engine','规则引擎'], ['facts','校区事实层'], ['llm','大模型编排层']].forEach(pair => {
+      const c = A[pair[0]] || {};
+      h += '<div class="di-arch-col"><b>' + esc(c.label || pair[1]) + '</b>' + diList(c.does);
+      if(c.guarantees) h += '<span class="muted">保证：'
+        + c.guarantees.map(x => esc(x)).join('；') + '</span>';
+      if(c.forbidden)  h += '<span class="muted">禁止：'
+        + c.forbidden.map(x => esc(x)).join('；') + '</span>';
+      if(c.updated)    h += '<span class="muted">事实卡更新 ' + esc(c.updated)
+        + '　点位 ' + esc((c.counts || {}).spots) + ' 条 / 来源 '
+        + esc((c.counts || {}).sources) + ' 条</span>';
+      if(c.file)       h += '<span class="muted" style="word-break:break-all">'
+        + esc(c.file) + '</span>';
+      if(c.note)       h += '<span class="muted">' + esc(c.note) + '</span>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  /* ① 出发前/进校动作：仅访客（学生场景 before_you_go 为空，不渲染） */
+  if(hasVisitorEntry){
+    h += '<div class="di-sec">① 出发前 / 进校动作（校区事实卡 · 规则模板，不经模型改写）</div><div class="di-box">';
+    h += '<p><b>是否需要预约：'
+     + (B.need_booking ? '需要' : '多数时段免预约，仍须核对当日公告') + '</b></p>';
+    (B.booking || []).forEach((c, i) => {
+      h += '<p><b>' + (i + 1) + '. ' + esc(c.name) + '</b><br>' + esc(c.how)
+         + (c.note ? '<br><span class="muted">' + esc(c.note) + '</span>' : '') + '</p>';
+    });
+    if((B.requires || []).length) h += '<p><b>要准备的材料</b>' + diList(B.requires) + '</p>';
+    if(B.approval)   h += '<p><b>审批</b>：' + esc(B.approval) + '</p>';
+    if(B.lead_time)  h += '<p><b>提前量</b>：' + esc(B.lead_time) + '</p>';
+    if(B.on_arrival) h += '<p><b>到校动作</b>：' + esc(B.on_arrival) + '</p>';
+    if((B.transit || []).length) h += '<p><b>怎么到校</b>' + diList(B.transit) + '</p>';
+    const V = B.vehicle || {};
+    if(V.rule) h += '<p><b>车辆</b>：' + esc(V.rule)
+      + (V.advice ? '（' + esc(V.advice) + '）' : '') + '</p>';
+    if(B.policy_note) h += '<p class="muted">政策提示：' + esc(B.policy_note) + '</p>';
+    h += '</div>';
+  }
+
+  /* ①' 今日校园生活提示：仅学生（有本校事实的标「本校」，其余标「通用提示」） */
+  if((CL.tips || []).length){
+    h += '<div class="di-sec">① 今日校园生活提示（' + esc(CL.audience || '校内学生')
+       + ' · 不涉及入校预约）</div><div class="di-box">';
+    if(CL.anchors_hint) h += '<p class="muted">' + esc(CL.anchors_hint) + '</p>';
+    (CL.tips || []).forEach(t => {
+      h += '<p><b>[' + (t.verified ? '本校' : '通用提示') + ']</b> ' + esc(t.tip)
+         + '<br><span class="muted">' + esc(t.source || '') + '</span></p>';
+    });
+    if(CL.source_note) h += '<p class="muted">' + esc(CL.source_note) + '</p>';
+    h += '</div>';
+  }
+
+  /* 访客速览简报（事实层，同样不经模型改写） */
+  const BF = (plan.meta && plan.meta.visitor_briefing) || {};
+  if((BF.before || []).length || BF.headline){
+    h += '<div class="di-box" style="margin-top:10px"><b>访客速览简报 · '
+       + esc(BF.headline || '') + '</b>' + diList(BF.before) + '</div>';
+  }
+
+  /* ② 整体编排 */
+  h += '<div class="di-sec">② 整体编排与为什么这样排</div><div class="di-box">';
+  h += '<p class="muted">' + esc(O.days || 0) + ' 天 / ' + esc(O.stops || 0)
+     + ' 站 · 停留 ' + esc(O.stay_min) + ' 分 · 在途 ' + esc(O.travel_min)
+     + ' 分 · ' + esc(O.distance_km) + ' km · 花费 ' + esc(O.cost)
+     + ' 元 · 满意度 ' + esc(O.satisfaction) + ' / 可行性 ' + esc(O.feasibility)
+     + ' / 总分 ' + esc(O.overall) + '</p>';
+  h += '<p><b>为什么这样排</b><br>' + esc(O.why_this_plan || '') + '</p>';
+  if(O.window_note) h += '<p class="muted">时间窗说明：' + esc(O.window_note) + '</p>';
+  if(d.query) h += '<p class="muted">本次需求原文：' + esc(d.query) + '</p>';
+  h += '</div>';
+
+  /* ③ 逐站 */
+  h += '<div class="di-sec">③ 逐站详细安排（看什么 / 怎么走 / 为什么 / 可达性 / 备选 / 事实溯源）</div>';
+  (d.steps || []).forEach(s => { h += diStepHtml(s); });
+  if(!(d.steps || []).length) h += '<div class="di-box">（空行程，没有可展开的站点）</div>';
+
+  /* ④ ~ ⑦ */
+  if((d.alternatives || []).length){
+    h += '<div class="di-sec">④ 备选方案（不同情况下怎么调）</div><div class="di-box"><ul>'
+       + d.alternatives.map(a => '<li><b>' + esc(a.when) + '</b>：' + esc(a.do) + '</li>').join('')
+       + '</ul></div>';
+  }
+  if((d.notes || []).length){
+    h += '<div class="di-sec">⑤ 校内注意事项</div><div class="di-box">' + diList(d.notes) + '</div>';
+  }
+  if((d.verify || []).length){
+    h += '<div class="di-sec">⑥ 需现场确认 / 以当日公告为准</div><div class="di-box">'
+       + diList(d.verify) + '</div>';
+  }
+  if((d.sources || []).length){
+    h += '<div class="di-sec">⑦ 事实来源与查阅日期</div><div class="di-box"><ul>'
+       + d.sources.map(x => '<li>' + esc(x.fact) + '<br><span class="muted">'
+         + esc(x.url) + '　' + esc(x.date) + '</span></li>').join('')
+       + '</ul></div>';
+  }
+
+  /* ⑧ 规则 vs 模型 */
+  h += '<div class="di-sec">⑧ 规则引擎 vs 大模型：优越性对照</div>';
+  if(MS.state){
+    h += '<div class="di-box" style="margin-bottom:10px"><b>本次运行状态 · ' + esc(MS.label) + '</b>'
+       + '<p>' + esc(MS.reason) + '</p>'
+       + (MS.hint ? '<p class="muted">' + esc(MS.hint) + '</p>' : '')
+       + '</div>';
+  }
+  h += '<div class="di-compare">'
+     + '<div class="di-box"><b>只有规则引擎</b><p>' + esc(R.rules_only || '') + '</p></div>'
+     + '<div class="di-box"><b>大模型额外带来</b>' + diList(R.llm_adds) + '</div></div>'
+     + '<div class="di-box" style="margin-top:10px"><p>' + esc(R.compare_hint || '') + '</p>'
+     + '<p class="muted">' + esc(R.fact_boundary || '') + '</p></div>';
+
+  return h + '</div>';
 }
 
 /* 行程表：表格 + 原始 JSON */
@@ -682,6 +2122,90 @@ const DAY_COLORS = ['#2563eb', '#0d9488', '#c2410c', '#7c3aed', '#db2777', '#036
 /* 两个文本框是否相交（用于站名避让） */
 function boxesHit(a, b) {
   return a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
+}
+
+/* ---------------------------------------------------------------- 地图
+   两种画法，二选一：
+   · 没配 AMAP_JS_KEY → 离线 SVG 手绘（断网也能画，这是默认）
+   · 配了 Key         → 高德真底图；SDK 加载失败/超时/报错一律自动退回 SVG
+   坐标本来就是高德 POI 导出的 GCJ-02，交给 AMap 不用再转换。 */
+
+let AMAP_P = null;      // SDK 加载 Promise：只加载一次
+
+function renderMapPane(pts) {
+  const box = $('pane-map');
+  if (!box) return;
+  if (document.documentElement.dataset.theme === 'yuanshen'
+      && typeof teyvatMapHtml === 'function') {
+    box.innerHTML = teyvatMapHtml(pts, PLAN);
+    return;
+  }
+  if (!JS_KEY) { box.innerHTML = mapHtml(pts); return; }
+
+  box.innerHTML = '<div class="card"><h2>路线图（高德实时底图）</h2>'
+    + '<div id="amapBox" style="width:100%;height:460px;border:1px solid var(--line);border-radius:8px"></div>'
+    + '<p class="muted" style="margin-top:8px">底图来自高德；Key 失效或断网时会自动退回离线示意图。</p></div>';
+
+  initAmap(pts).catch(err => {
+    box.innerHTML = mapHtml(pts);           // 兜底：宁可回到示意图，也不能白屏
+    const h2 = box.querySelector('h2');
+    if (h2) h2.textContent = '路线图（离线绘制）· 高德底图不可用：' + ((err && err.message) || '未知原因');
+  });
+}
+
+function loadAmapSdk() {
+  if (AMAP_P) return AMAP_P;
+  AMAP_P = new Promise((resolve, reject) => {
+    if (window.AMap) { resolve(window.AMap); return; }
+    // 2.0 SDK 强制校验安全密钥；必须在 <script> 插入**之前**设置，顺序反了会报 INVALID_USER_SCODE
+    if (SEC_CODE) window._AMapSecurityConfig = { securityJsCode: SEC_CODE };
+    const s = document.createElement('script');
+    s.src = 'https://webapi.amap.com/maps?v=2.0&key=' + encodeURIComponent(JS_KEY);
+    s.onload = () => (window.AMap ? resolve(window.AMap) : reject(new Error('SDK 未就绪')));
+    s.onerror = () => reject(new Error('SDK 加载失败（检查 Key 与网络）'));
+    document.head.appendChild(s);
+    setTimeout(() => reject(new Error('SDK 加载超时')), 12000);
+  });
+  return AMAP_P;
+}
+
+async function initAmap(pts) {
+  const AMap = await loadAmapSdk();
+  if (!pts || !pts.length) throw new Error('没有可画的点');
+
+  const days = [];
+  pts.forEach(p => { if (days.indexOf(p.day) < 0) days.push(p.day); });
+  days.sort((a, b) => a - b);
+  const color = d => DAY_COLORS[(days.indexOf(d) < 0 ? 0 : days.indexOf(d)) % DAY_COLORS.length];
+
+  const map = new AMap.Map('amapBox', { zoom: 15, center: [pts[0].lon, pts[0].lat], viewMode: '2D' });
+  // 校园场景默认"卫星 + 路网"：矢量底图只有路和色块，看不出操场、河、楼顶；
+  // 卫星叠加路网既能认出是哪栋楼，又保留路名。想换回矢量：把下面两行删掉即可。
+  try {
+    map.add([new AMap.TileLayer.Satellite(), new AMap.TileLayer.RoadNet()]);
+  } catch (e) { /* 卫星层不可用就保持默认矢量，不影响出图 */ }
+  const shapes = [];
+
+  days.forEach(d => {
+    const one = pts.filter(p => p.day === d);
+    if (one.length > 1) {
+      shapes.push(new AMap.Polyline({
+        path: one.map(p => [p.lon, p.lat]),
+        strokeColor: color(d), strokeWeight: 4, strokeOpacity: 0.75, strokeStyle: 'dashed',
+      }));
+    }
+    one.forEach(p => {
+      shapes.push(new AMap.Marker({
+        position: [p.lon, p.lat],
+        title: p.name + ' · 第 ' + p.day + ' 天 · ' + (p.arrive || ''),
+        label: { content: String(p.seq), direction: 'center' },
+      }));
+    });
+  });
+
+  map.add(shapes);
+  if (shapes.length) map.setFitView(shapes);
+  return map;
 }
 
 /* 内联 SVG：等距投影 + cos(lat) 修正 + 等比缩放（不拉伸形状），不发任何外部请求 */
@@ -905,11 +2429,1082 @@ async function adjustPlan(){
 
 $('go').onclick = plan;
 $('cmp').onclick = compare;
+
+/* ---------------------------------------------------------------- 智能工具条
+   四项：反向规划（已随 /api/plan 返回）、讲解词、两种口吻、省钱方案。
+   统一走 /api/extras：数字本地算，模型只写话；没 Key 时后端回模板，这里不用分支。 */
+var LAST_REV = null;
+
+function renderExtras() {
+  const box = $('pane-list');
+  if (!box) return;
+  const old = $('extrasBar');
+  if (old) old.remove();
+  const div = document.createElement('div');
+  div.id = 'extrasBar';
+  div.className = 'card';
+  div.style.marginBottom = '14px';
+  const rev = (LAST_REV && LAST_REV.ok)
+    ? '<div style="padding:8px 10px;background:var(--accent-soft);border-radius:8px;margin-bottom:10px">'
+      + '<b>反向规划</b>　' + esc(LAST_REV.note) + '</div>'
+    : '';
+  div.innerHTML = '<h2 style="margin:0 0 10px">智能工具'
+    + '<span style="font-size:12px;font-weight:400;color:var(--sub)">　数字本地算，模型只写话</span></h2>'
+    + rev
+    + '<div class="row" style="grid-template-columns:repeat(3,1fr);gap:8px">'
+    + '<button class="ghost" id="xSpiel" style="margin:0">讲解词</button>'
+    + '<button class="ghost" id="xPeer" style="margin:0">同学口吻</button>'
+    + '<button class="ghost" id="xParent" style="margin:0">家长口吻</button>'
+    + '</div>'
+    + '<button class="ghost" id="xNeg" style="margin-top:8px">看省钱方案（超支时用）</button>'
+    + '<div id="xOut" style="margin-top:12px"></div>';
+  box.insertBefore(div, box.firstChild);
+  $('xSpiel').onclick = () => runExtra('spiel');
+  $('xPeer').onclick = () => runExtra('audience', { audience: 'peer' });
+  $('xParent').onclick = () => runExtra('audience', { audience: 'parent' });
+  $('xNeg').onclick = () => runExtra('negotiate');
+}
+
+async function runExtra(action, extra) {
+  const out = $('xOut');
+  if (!out) return;
+  out.innerHTML = '<p class="muted">处理中…</p>';
+  try {
+    const r = await api('/api/extras', Object.assign({
+      action: action, plan: PLAN,
+      model: ($('modelSel') && $('modelSel').value) || undefined
+    }, extra || {}));
+    out.innerHTML = extraHtml(action, r);
+    if (action === 'negotiate') {
+      (r.options || []).forEach(o => {
+        const b = $('opt-' + o.id);
+        if (b) b.onclick = () => applyOption(o.overrides);
+      });
+    }
+  } catch (e) {
+    out.innerHTML = '<p class="muted">失败：' + esc(e.message || e) + '</p>';
+  }
+}
+
+function extraHtml(action, r) {
+  const tag = '<span style="font-size:11.5px;color:var(--sub)">· '
+    + (r.source === 'llm' ? '模型' : '规则兜底') + '</span>';
+  if (action === 'spiel') {
+    return '<b>讲解词</b>' + tag + '<ol style="padding-left:20px;margin:8px 0 0">'
+      + (r.stops || []).map(s => '<li style="margin:6px 0"><b>' + esc(s.name)
+        + '</b>（' + esc(s.arrive || '') + '）<div style="color:var(--sub)">'
+        + esc(s.script) + '</div></li>').join('') + '</ol>';
+  }
+  if (action === 'audience') {
+    return '<b>' + (r.audience === 'parent' ? '家长口吻' : '同学口吻') + '</b>' + tag
+      + '<p style="margin:8px 0 0;padding:10px;background:var(--accent-soft);border-radius:8px">'
+      + esc(r.text) + '</p>';
+  }
+  if (action === 'negotiate') {
+    const head = '<b>省钱方案</b>' + tag
+      + '<div class="muted" style="margin:6px 0 0">当前花费 ' + esc(r.cost) + ' 元'
+      + (r.budget ? ('，预算 ' + esc(r.budget) + ' 元') : '')
+      + (r.over_budget ? '　<b style="color:var(--accent)">已超支</b>' : '') + '</div>';
+    return head + (r.options || []).map(o =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;'
+      + 'border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px">'
+      + '<div><b>' + esc(o.label) + '</b>　<span style="color:var(--ok)">省 ' + esc(o.save) + ' 元</span>'
+      + '<div class="muted" style="font-size:12px">' + esc(o.say || o.detail) + '</div></div>'
+      + '<button class="ghost" id="opt-' + esc(o.id) + '" style="width:auto;margin:0;padding:6px 10px">用这个</button>'
+      + '</div>').join('');
+  }
+  return '';
+}
+
+/* 用某个方案重排：只改 overrides，再走一次 /api/plan（数字仍然是算出来的） */
+async function applyOption(ov) {
+  const payload = collect();
+  payload.overrides = Object.assign({}, payload.overrides, ov);
+  const box = $('xOut');
+  if (box) box.innerHTML = '<p class="muted">按这个方案重排…</p>';
+  try {
+    const res = await api('/api/plan', payload);
+    PLAN = res.plan;
+    PTS = res.map || [];
+    LAST_REV = res.reverse || null;
+    ADJ = [];
+    noteModel(PLAN);
+    renderPlan();
+    showTab('list');
+  } catch (e) {
+    if (box) box.innerHTML = '<p class="muted">重排失败：' + esc(e.message || e) + '</p>';
+  }
+}
+
+/* ---------------------------------------------------------------- 顶部菜单栏 */
+
+function fillModels(o) {
+  const sel = $('modelSel');
+  if (!sel) return;
+  const list = (o && o.models) || [];
+  const groups = [], byGroup = {};
+  list.forEach(m => {
+    const g = m.group || '全部模型';
+    if (!byGroup[g]) { byGroup[g] = []; groups.push(g); }
+    byGroup[g].push(m);
+  });
+  groups.forEach(g => {
+    const og = document.createElement('optgroup');
+    og.label = g + '（' + byGroup[g].length + '）';
+    byGroup[g].forEach(m => {
+      const op = document.createElement('option');
+      op.value = m.name;
+      op.textContent = (m.label || m.name) + (m.default ? ' ★主力' : '')
+        + (m.chat === false ? '　（非对话，不可选）' : '');
+      if (m.chat === false) op.disabled = true;
+      og.appendChild(op);
+    });
+    sel.appendChild(og);
+  });
+
+  if (!list.length) {
+    const op = document.createElement('option');
+    op.value = '__empty__';
+    op.textContent = '（后端未返回可选模型：先配 LLM Key）';
+    op.disabled = true;
+    sel.appendChild(op);
+  }
+
+  const mode = (o && o.router_mode) || '';
+  const hint = $('routerHint');
+  const autoText = (mode === 'llm' ? '自动路由：按难度挑' :
+                   (mode === 'rules' ? '规则路由（零额外调用）' : '未启用路由'))
+                   + '　可选 ' + list.length + ' 个';
+  if (hint) hint.textContent = autoText;
+  sel.onchange = () => {
+    if (hint) hint.textContent = sel.value ? ('已锁定：' + sel.value) : autoText;
+    try { localStorage.setItem('trip.model', sel.value || ''); } catch (e) {}
+  };
+  try {
+    const saved = localStorage.getItem('trip.model') || '';
+    if (saved) { sel.value = saved; if (hint) hint.textContent = '已锁定：' + saved; }
+  } catch (e) {}
+}
+
+(function initTheme() {
+  const KEYS = ['light', 'dark', 'paper', 'naiwa', 'pixel', 'cyber', 'yuanshen'];
+  const sel = $('themeSel');
+  const apply = th => {
+    if (KEYS.indexOf(th) < 0) th = 'light';
+    document.documentElement.dataset.theme = th;
+    if (sel) sel.value = th;
+    try { localStorage.setItem('trip.theme', th); } catch (e) {}
+  };
+  let th = 'light';
+  try { th = localStorage.getItem('trip.theme') || 'light'; } catch (e) {}
+  // 支持 ?theme=paper|dark|naiwa|pixel|cyber 直接指定（截图、演示、发链接都用得上）
+  try {
+    const q = new URLSearchParams(location.search).get('theme');
+    if (q && KEYS.indexOf(q) >= 0) th = q;
+  } catch (e) {}
+  apply(th);
+  if (sel) sel.onchange = () => apply(sel.value);
+})();
+
+if ($('mbMap')) $('mbMap').onclick = () => { showTab('map'); renderMapPane(PTS); };
+if ($('mbAb')) $('mbAb').onclick = () => abCompare();
+if ($('mbCheck')) $('mbCheck').onclick = checkupPlan;
+
+/* 行程体检：把排好的行程交给模型挑毛病（不重新规划、不改数字） */
+async function checkupPlan() {
+  if (!PLAN) { alert('先生成一份行程，再点体检。'); return; }
+  const box = $('pane-list');
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<h2>行程体检中…</h2><p class="muted">让模型以带队老师的眼光看一遍。</p>';
+  box.insertBefore(card, box.firstChild);
+  showTab('list');
+  const color = s => s === '高' ? 'var(--accent)' : (s === '中' ? 'var(--warn)' : 'var(--sub)');
+  try {
+    const r = await api('/api/checkup', {
+      plan: PLAN,
+      model: ($('modelSel') && $('modelSel').value) || undefined
+    });
+    const issues = r.issues || [];
+    card.innerHTML = '<h2>行程体检 <span style="font-size:12px;color:var(--sub);font-weight:400">'
+      + (r.source === 'llm' ? '· 模型' : '· 规则兜底') + '</span></h2>'
+      + '<p class="muted" style="margin:0 0 10px">' + esc(r.summary || '没有明显问题') + '</p>'
+      + (issues.length ? issues.map(i =>
+          '<div style="border-left:3px solid ' + color(i.severity) + ';padding:6px 10px;margin:8px 0;background:var(--accent-soft)">'
+          + '<b style="color:' + color(i.severity) + '">[' + esc(i.severity) + '] ' + esc(i.problem) + '</b>'
+          + '<div style="font-size:12.5px;color:var(--sub)">证据：' + esc(i.evidence) + '</div>'
+          + (i.fix ? '<div style="font-size:12.5px">改法：' + esc(i.fix) + '</div>' : '')
+          + '</div>').join('')
+        : '<p class="muted">这一版没挑出硬问题。</p>');
+  } catch (e) {
+    card.innerHTML = '<h2>体检失败</h2><p class="muted">' + esc(e.message || e) + '</p>';
+  }
+}
+/* ================= 说明 / 引导界面（所有主题共用） ================= */
+function openGuide(tab) {
+  const g = $('guide'); if (!g) return;
+  g.hidden = false;
+  if (tab) switchGuideTab(tab);
+  try { document.body.style.overflow = 'hidden'; } catch (e) {}
+}
+function closeGuide() {
+  const g = $('guide'); if (!g) return;
+  g.hidden = true;
+  try { document.body.style.overflow = ''; } catch (e) {}
+}
+function switchGuideTab(tab) {
+  document.querySelectorAll('.gd-tab').forEach(b => {
+    if (b.classList) b.classList.toggle('active', b.dataset.gtab === tab);
+  });
+  document.querySelectorAll('[data-gpane]').forEach(s => {
+    s.hidden = s.dataset.gpane !== tab;
+  });
+}
+if ($('mbHelp')) $('mbHelp').onclick = () => openGuide('start');
+if ($('guideClose')) $('guideClose').onclick = closeGuide;
+if ($('openGuideLink')) $('openGuideLink').onclick = () => openGuide('start');
+if ($('esGuide')) $('esGuide').onclick = () => openGuide('start');
+if ($('guideStart')) $('guideStart').onclick = () => {
+  if ($('guideNoAuto') && $('guideNoAuto').checked) lsSet('guide_seen', '1');
+  closeGuide();
+};
+document.querySelectorAll('.gd-tab').forEach(b => {
+  b.onclick = () => switchGuideTab(b.dataset.gtab);
+});
+document.querySelectorAll('[data-close]').forEach(b => { b.onclick = closeGuide; });
+if (document.addEventListener) {
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGuide(); });
+}
+if ($('openAdvanced') && $('advanced')) {
+  $('openAdvanced').onclick = () => { $('advanced').open = true; };
+}
+
+/* ================= 原神主题：元素伙伴切换 ================= */
+const YS_HEROES = {
+  klee:    { name:'可莉 · 火',   line:'出发吧！今天的路线交给我来探路～' },
+  venti:   { name:'温迪 · 风',   line:'风会带你去最顺路的地方，别急～' },
+  zhongli: { name:'钟离 · 岩',   line:'行程如契约，时间成本与顺序都要讲究。' },
+  nahida:  { name:'纳西妲 · 草', line:'我把每个站点的最优顺序都算好了哦。' },
+  ambor:   { name:'安柏 · 火',   line:'侦察骑兵就位！帮你把绕路都找出来。' }
+};
+function ysPick(key) {
+  const d = YS_HEROES[key]; if (!d) return;
+  const nm = $('ysName'), bb = $('ysBubble');
+  if (nm) nm.textContent = d.name;
+  if (bb) bb.textContent = d.line;
+  if (typeof teyvatOnHero === 'function') teyvatOnHero(key, d);
+  document.querySelectorAll('.ys-hero').forEach(im => {
+    if (im.classList) im.classList.toggle('on', im.dataset.hero === key);
+  });
+  document.querySelectorAll('.ys-pick').forEach(b => {
+    if (b.classList) b.classList.toggle('on', b.dataset.hero === key);
+  });
+}
+document.querySelectorAll('.ys-pick').forEach(b => {
+  b.onclick = () => ysPick(b.dataset.hero);
+});
+/* 首次访问自动弹出引导；勾了「不再自动弹出」后就只在点按钮时出现 */
+if (!lsGet('guide_seen') && !lsGet('hint_never')) { const gh = $('guideHint'); if (gh) gh.hidden = false; lsSet('guide_seen', '1'); }
+
+/* 「模型开/关」对照：同一句话，规则解析 vs 模型解析，看它到底读懂了什么。
+   后端靠 /api/plan 的 no_llm 开关（一个模型都不调），所以这个对比是真实的、可复现的。 */
+async function abCompare() {
+  const base = collect();
+  const box = $('pane-list');
+  const off = Object.assign({}, base, { no_llm: true, narrate: false, realtime: false });
+  const on = Object.assign({}, base, { no_llm: false, narrate: false, realtime: false });
+  box.innerHTML = '<div class="card"><p class="muted">跑两遍：规则一次、模型一次…</p></div>';
+  showTab('list');
+  let a, b;
+  try {
+    const r = await Promise.all([api('/api/plan', off), api('/api/plan', on)]);
+    a = r[0].plan; b = r[1].plan;
+  } catch (e) {
+    box.innerHTML = '<div class="card"><p class="muted">对比失败：' + esc(e.message || e) + '</p></div>';
+    return;
+  }
+  const cnt = p => (p.days || []).reduce((s, d) => s + (d.items || []).length, 0);
+  const cost = p => Math.round((p.days || []).reduce((s, d) => s + (d.total_cost || 0), 0) * 10) / 10;
+  const its = p => ((p.request && p.request.interests) || []).join('、') || '（空）';
+  const row = (k, x, y) => '<tr><td>' + k + '</td><td>' + x + '</td><td>' + y + '</td></tr>';
+  box.innerHTML = '<div class="card"><h2>模型开 / 关，差在哪</h2>'
+    + '<table><thead><tr><th>看什么</th><th>规则（关模型）</th><th>模型（开）</th></tr></thead><tbody>'
+    + row('解析出的兴趣', esc(its(a)), esc(its(b)))
+    + row('节奏 pace', esc(String((a.request || {}).pace || '—')), esc(String((b.request || {}).pace || '—')))
+    + row('站数', cnt(a), cnt(b))
+    + row('花费', cost(a) + ' 元', cost(b) + ' 元')
+    + '</tbody></table>'
+    + '<p class="muted" style="margin-top:10px">规则模式不调用任何模型：断网可用、两次结果逐字节一致、不花额度。'
+    + '模型模式多花的钱，买的就是上面「兴趣」那一行的差别。</p></div>';
+  showTab('list');
+}
+$('ab').onclick = abCompare;
 $('adjGo').onclick = adjustPlan;
 $('adjText').addEventListener('keydown', e => { if (e.key === 'Enter') adjustPlan(); });
 $('reload').onclick = async () => { await api('/api/reload', {}); alert('已清空数据缓存'); };
+
+/* ================================================================
+ * v1.6.1 模式切换：校园行程（身份开关）+ 城市约会
+ * 身份开关只改场景映射（学生=daily / 访客=visit），契约零改动；
+ * 课表锚点是硬约束 —— 后端钉死，前端不许自己加减时间。
+ * ================================================================ */
+const CAMPUS_OF_ID = { student: 'daily', visitor: 'visit' };
+function identityOfScenario(s){ return s === 'visit' ? 'visitor' : 'student'; }
+function isCampusScenario(s){ return s === 'daily' || s === 'visit'; }
+
+function syncModeTabs(){
+  const s = $('scenario').value;
+  const campus = isCampusScenario(s);
+  document.querySelectorAll('#modeTabs .mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === (campus ? 'campus' : s)));
+  document.querySelectorAll('#identityTabs .mode-btn').forEach(b =>
+    b.classList.toggle('active', campus && b.dataset.id === identityOfScenario(s)));
+  // v1.6.3 约会模式完全以「城市」为地点：高校/场景下拉整行让位给约会面板里的城市选择
+  $('campusFields').style.display = (s === 'date') ? 'none' : '';
+  $('datePanel').hidden = (s !== 'date');
+  $('campusPanel').hidden = !campus;
+  if (s === 'date') loadDateInfo();
+}
+
+function applyScenario(sc){
+  $('scenario').value = sc;
+  if (OPTS && OPTS.scenario_strategies && !TOUCHED.strategy) {
+    const st = OPTS.scenario_strategies[sc];
+    if (st) $('strategy').value = st;
+  }
+  syncModeTabs();
+}
+
+/* 模式按钮：校园行程 = 按当前身份映射场景；约会 = date（与场景下拉完全等价） */
+document.querySelectorAll('#modeTabs .mode-btn').forEach(b => {
+  b.onclick = () => {
+    applyScenario(b.dataset.mode === 'campus'
+      ? CAMPUS_OF_ID[identityOfScenario($('scenario').value) || 'student']
+      : b.dataset.mode);
+  };
+});
+/* 身份开关：学生 / 访客 */
+document.querySelectorAll('#identityTabs .mode-btn').forEach(b => {
+  b.onclick = () => applyScenario(CAMPUS_OF_ID[b.dataset.id] || 'daily');
+});
+$('scenario').addEventListener('change', syncModeTabs);
+
+/* ---- 课表锚点编辑器：时间 / 地点 / 事由 / 时长（分钟） ---- */
+function addAnchorRow(a){
+  a = a || {};
+  const row = document.createElement('div');
+  row.className = 'anchor-row';
+  row.innerHTML =
+    '<input class="anchor-time" type="time" value="' + (a.time || '') + '">' +
+    '<input class="anchor-poi" placeholder="地点（如：一教）" value="' + (a.poi || '') + '">' +
+    '<input class="anchor-label" placeholder="事由（如：高数课）" value="' + (a.label || '') + '">' +
+    '<input class="anchor-dur" type="number" min="15" step="5" value="' + (a.duration_min || 90) + '" title="时长（分钟）">' +
+    '<button class="ghost anchor-del" type="button">✕</button>';
+  row.querySelector('.anchor-del').onclick = () => row.remove();
+  $('anchorRows').appendChild(row);
+}
+$('addAnchor').onclick = () => addAnchorRow();
+function collectAnchors(){
+  const out = [];
+  document.querySelectorAll('#anchorRows .anchor-row').forEach(r => {
+    const time = r.querySelector('.anchor-time').value || '';
+    const poi = (r.querySelector('.anchor-poi').value || '').trim();
+    const label = (r.querySelector('.anchor-label').value || '').trim();
+    const dur = Number(r.querySelector('.anchor-dur').value) || 90;
+    if (time && poi) out.push({ poi, time, label: label || '固定安排', duration_min: Math.max(15, dur) });
+  });
+  return out;
+}
+
+/* 约会城市的候选：城市口径（注册表 name，不是校名）。OPTS 没有 date_cities
+ * 时退回 cities —— 老后端也不会让下拉空着。 */
+function fillDateCities(){
+  if ($('dateCity').options.length) return;
+  const list = (OPTS && (OPTS.date_cities || OPTS.cities)) || [];
+  list.forEach(c => {
+    const op = document.createElement('option');
+    op.value = c.key; op.textContent = c.name || c.key;
+    $('dateCity').appendChild(op);
+  });
+  const dflt = (OPTS && OPTS.default_city) || '';
+  if (dflt && Array.from($('dateCity').options).some(o => o.value === dflt)) {
+    $('dateCity').value = dflt;
+  }
+}
+
+/* 城市一换，商圈/影院/场次全部换城市的数据 —— 地点以城市为准 */
+$('dateCity').addEventListener('change', () => { DATE_INFO = null; loadDateInfo(true); });
+
+async function loadDateInfo(force){
+  if (DATE_INFO && !force) return;
+  fillDateCities();
+  const city = $('dateCity').value || 'dalian';
+  $('dateHint').textContent = '正在加载商圈与场次…';
+  try {
+    const r = await api('/api/date/info?city=' + encodeURIComponent(city));
+    if (!r.ok) { $('dateHint').textContent = r.error || '约会数据拉取失败'; return; }
+    DATE_INFO = r;
+    $('dateZone').innerHTML = '';
+    (r.zones || []).forEach(z => {
+      const op = document.createElement('option');
+      op.value = z; op.textContent = z;
+      $('dateZone').appendChild(op);
+    });
+    if (!(r.zones || []).length) {
+      $('dateHint').textContent = '「' + city + '」暂无约会数据包（商圈/影院为空）。'
+        + '约会数据按城市各自建包，不借用别的城市的数据；可切回有数据的城市，或给 data/cities/'
+        + city + '/ 补一份 pois_date.csv。';
+      rebuildDateOptions();
+      return;
+    }
+    rebuildDateOptions();
+    $('dateHint').textContent = (r.source === 'demo')
+      ? '场次为演示数据（updated ' + (r.updated || '') + '），对接真实票务只需替换数据文件。'
+      : '';
+  } catch (e) {
+    $('dateHint').textContent = '约会数据拉取失败：' + (e.message || e);
+  }
+}
+
+/* 商圈一变，影院 / 场次 / 晚餐候选跟着换 —— 候选永远来自当前商圈 */
+function rebuildDateOptions(){
+  if (!DATE_INFO) return;
+  const zone = $('dateZone').value || '';
+  const inZone = x => !zone || x.zone === zone;
+  const cs = $('dateCinema');
+  cs.innerHTML = '<option value="">不看电影</option>';
+  (DATE_INFO.cinemas || []).filter(inZone).forEach(c => {
+    const op = document.createElement('option');
+    op.value = c.poi_id; op.textContent = c.name;
+    cs.appendChild(op);
+  });
+  const ds = $('dateDinner');
+  ds.innerHTML = '<option value="">不订晚餐</option>';
+  (DATE_INFO.restaurants || []).filter(inZone).forEach(r => {
+    const op = document.createElement('option');
+    op.value = r.name;
+    op.textContent = r.name + (r.cost ? '（人均 ¥' + r.cost + '）' : '');
+    ds.appendChild(op);
+  });
+  rebuildShows();
+}
+
+function rebuildShows(){
+  const ss = $('dateShow');
+  ss.innerHTML = '<option value="">（先选影院）</option>';
+  const c = (DATE_INFO && DATE_INFO.cinemas || []).find(x => x.poi_id === $('dateCinema').value);
+  if (!c) { $('dateShowCustomRow').hidden = true; return; }
+  (c.shows || []).forEach(s => {
+    const op = document.createElement('option');
+    op.value = s.time;
+    op.textContent = s.time + ' ' + s.title + ' · ' + s.hall + ' · ¥' + s.price;
+    ss.appendChild(op);
+  });
+  // v1.6.3：数据文件里没有的那一场也要能钉 —— 选「自定义时间…」手填开场时刻
+  const custom = document.createElement('option');
+  custom.value = '__custom'; custom.textContent = '自定义时间…';
+  ss.appendChild(custom);
+  syncShowCustomRow();
+}
+
+function syncShowCustomRow(){
+  $('dateShowCustomRow').hidden = ($('dateShow').value !== '__custom');
+}
+function showTimePicked(){
+  return $('dateShow').value === '__custom' ? ($('dateShowCustom').value || '') : $('dateShow').value;
+}
+$('dateZone').addEventListener('change', rebuildDateOptions);
+$('dateCinema').addEventListener('change', rebuildShows);
+$('dateShow').addEventListener('change', syncShowCustomRow);
+
+/* ---- 自定义固定安排：任意地点 + 时刻（引擎侧与课表锚点同一通道） ---- */
+function addDateAnchorRow(a){
+  a = a || {};
+  const row = document.createElement('div');
+  row.className = 'anchor-row';
+  row.innerHTML =
+    '<input class="anchor-time" type="time" value="' + (a.time || '') + '">' +
+    '<input class="anchor-poi" placeholder="地点（如：星海广场）" value="' + (a.poi || '') + '">' +
+    '<input class="anchor-label" placeholder="事由（如：散步）" value="' + (a.label || '') + '">' +
+    '<input class="anchor-dur" type="number" min="15" step="5" value="' + (a.duration_min || 60) + '" title="时长（分钟）">' +
+    '<button class="ghost anchor-del" type="button">✕</button>';
+  row.querySelector('.anchor-del').onclick = () => row.remove();
+  $('dateAnchorRows').appendChild(row);
+}
+$('addDateAnchor').onclick = () => addDateAnchorRow();
+function collectDateAnchors(){
+  const out = [];
+  document.querySelectorAll('#dateAnchorRows .anchor-row').forEach(r => {
+    const time = r.querySelector('.anchor-time').value || '';
+    const poi = (r.querySelector('.anchor-poi').value || '').trim();
+    const label = (r.querySelector('.anchor-label').value || '').trim();
+    const dur = Number(r.querySelector('.anchor-dur').value) || 60;
+    if (time && poi) out.push({ poi, time, label: label || '固定安排', duration_min: Math.max(15, dur) });
+  });
+  return out;
+}
+
+/* 「我在这里」：浏览器定位 → 后端算最近商圈。定位失败不阻塞，手选即可 */
+$('dateLocate').onclick = () => {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    $('dateHint').textContent = '当前环境不支持定位，手动选商圈即可';
+    return;
+  }
+  $('dateHint').textContent = '正在获取位置…';
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const r = await api('/api/date/locate', {
+        lat: pos.coords.latitude, lon: pos.coords.longitude,
+        city: ($('dateCity').value || 'dalian'),
+      });
+      if (r.ok && r.zone) {
+        const zs = Array.from($('dateZone').options || []).some(o => o.value === r.zone);
+        if (zs) $('dateZone').value = r.zone;
+        rebuildDateOptions();
+        $('dateHint').textContent = '定位成功：最近的商圈是「' + r.zone + '」（约 '
+          + r.distance_km + ' km）' + (zs ? '' : '（该商圈暂无约会数据，已保持当前选择）');
+      } else {
+        $('dateHint').textContent = r.error || '定位解析失败';
+      }
+    } catch (e) {
+      $('dateHint').textContent = '定位请求失败：' + (e.message || e);
+    }
+  }, () => { $('dateHint').textContent = '定位被拒绝或失败，手动选商圈即可'; },
+     { timeout: 8000 });
+};
+
+/* 约会模式主流程：一次请求拿到 行程 + 简报，渲染路径与普通模式共用 */
+async function planDate(payload){
+  LAST = payload;
+  $('go').disabled = true;
+  $('summary').innerHTML = '<div class="card"><p class="muted">约会规划中…（锚点时刻正在钉死）</p></div>';
+  const body = {
+    query: payload.query,
+    strategy: payload.strategy,
+    realtime: payload.realtime,
+    no_llm: payload.no_llm,
+    model: payload.model,
+    city: $('dateCity').value || 'dalian',
+    zone: $('dateZone').value || '',
+    start_time: $('dateStart').value || '',
+    origin: ($('dateOrigin').value || '').trim(),
+  };
+  if ($('dateCinema').value && showTimePicked()) {
+    body.movie = { poi: $('dateCinema').value, time: showTimePicked() };
+  }
+  if ($('dateDinner').value && $('dateDinnerTime').value) {
+    body.dinner = { poi: $('dateDinner').value, time: $('dateDinnerTime').value };
+  }
+  const customAnchors = collectDateAnchors();
+  if (customAnchors.length) body.anchors = customAnchors;
+  let res;
+  try {
+    res = await api('/api/date/brief', body);
+  } catch (e) {
+    $('summary').innerHTML = '<div class="card"><div class="warn">请求失败：' + esc(e.message || e) + '</div></div>';
+    $('go').disabled = false;
+    return;
+  }
+  $('go').disabled = false;
+  if (!res.ok) {
+    $('summary').innerHTML = '<div class="card"><div class="warn">' + esc(res.error) + '</div></div>';
+    return;
+  }
+  PLAN = res.plan;
+  PTS = res.map || [];
+  LAST_BRIEF = res.brief || null;
+  ADJ = [];
+  noteModel(PLAN);
+  renderPlan();
+  showTab('list');
+}
+
+/* 简报卡片：headline / before / timeline / per_stop / tips / verify。
+ * 键结构与访客简报一致，将来 visit 侧接入时渲染逻辑可直接复用。 */
+function briefCard(b){
+  if (!b) return '';
+  let h = '<div class="card brief-card"><h2>约会简报</h2>';
+  if (b.headline) h += '<p class="brief-line"><b>' + esc(b.headline) + '</b></p>';
+  if (b.before && b.before.length)
+    h += '<p class="brief-line"><b>出发前</b><br>' + b.before.map(x => '· ' + esc(x)).join('<br>') + '</p>';
+  if (b.timeline && b.timeline.length)
+    h += '<p class="brief-line"><b>时间轴</b><ul class="brief-tl">'
+       + b.timeline.map(t => '<li><b>' + esc(t.time) + '</b>　' + esc(t.what) + '</li>').join('')
+       + '</ul></p>';
+  if (b.per_stop && b.per_stop.length)
+    h += '<p class="brief-line"><b>每站安排</b><br>'
+       + b.per_stop.map(s => '· <b>' + esc(s.name) + '</b>　' + esc(s.say)).join('<br>') + '</p>';
+  if (b.tips && b.tips.length)
+    h += '<p class="brief-line"><b>小提醒</b><br>' + b.tips.map(x => '· ' + esc(x)).join('<br>') + '</p>';
+  if (b.verify && b.verify.length)
+    h += '<p class="muted brief-line">待确认：' + b.verify.map(x => esc(x)).join('；') + '</p>';
+  return h + '</div>';
+}
+
 bindScenarioStrategy();
 boot();
+
+
+/* ==================================================================
+   提瓦特 Trip Planner · v6
+   只在 html[data-theme="yuanshen"] 下生效：
+     · renderMapPane 分流到提瓦特大陆 SVG（传送锚点 / 七天神像 / 秘境 / 路线）
+     · 每日委托由真实行程站点生成，可勾选并给奖励
+     · HUD 的冒险等阶 / 树脂 / 当前锚点与行程数据联动
+   其余 6 套主题调用的仍是原来的地图与渲染逻辑。
+   ================================================================== */
+const TV_SLOTS = [
+  {x:214, y:196, region:'蒙德', elem:'风'},
+  {x:318, y:250, region:'蒙德', elem:'风'},
+  {x:462, y:268, region:'璃月', elem:'岩'},
+  {x:548, y:330, region:'璃月', elem:'岩'},
+  {x:748, y:436, region:'稻妻', elem:'雷'},
+  {x:806, y:492, region:'稻妻', elem:'雷'},
+  {x:296, y:418, region:'须弥', elem:'草'},
+  {x:640, y:118, region:'枫丹', elem:'水'}
+];
+let TEYVAT_PINS = [];
+let TV_COM_TOTAL = 0;
+
+function teyvatIsOn() {
+  try { return document.documentElement.dataset.theme === 'yuanshen'; }
+  catch (e) { return false; }
+}
+
+function teyvatPinData(pts) {
+  const items = (PLAN && PLAN.days && PLAN.days[0] && PLAN.days[0].items) || [];
+  const list = (pts && pts.length ? pts : items).slice(0, TV_SLOTS.length);
+  return list.map((p, i) => ({
+    seq: i + 1,
+    name: p.name || ('站点 ' + (i + 1)),
+    arrive: p.arrive || '',
+    region: TV_SLOTS[i].region,
+    elem: TV_SLOTS[i].elem,
+    x: TV_SLOTS[i].x, y: TV_SLOTS[i].y
+  }));
+}
+
+function teyvatLandSvg() {
+  return '<svg class="tv-map" viewBox="0 0 1000 620" role="img" aria-label="提瓦特大陆传送图">'
+  + '<defs>'
+  + '<linearGradient id="tvSea" x1="0" y1="0" x2="1" y2="1">'
+  + '<stop offset="0%" stop-color="#dcecee"/><stop offset="55%" stop-color="#cfe3e6"/>'
+  + '<stop offset="100%" stop-color="#bcd6da"/></linearGradient>'
+  + '<pattern id="tvWaves" width="64" height="42" patternUnits="userSpaceOnUse">'
+  + '<path d="M0,22 Q16,14 32,22 T64,22" fill="none" stroke="#ffffff" stroke-width="1.4" opacity=".34"/>'
+  + '</pattern>'
+  + '</defs>'
+  + '<rect width="1000" height="620" fill="url(#tvSea)"/>'
+  + '<rect width="1000" height="620" fill="url(#tvWaves)"/>'
+  /* 主体大陆：蒙德 / 璃月 / 须弥 / 纳塔 */
+  + '<path class="tv-land" d="M84,252 Q112,158 214,138 Q308,112 392,164 Q456,142 536,196 '
+  + 'Q612,214 610,300 Q638,376 542,416 Q474,466 382,446 Q316,498 220,470 '
+  + 'Q128,448 104,356 Z"/>'
+  /* 须弥南麓 */
+  + '<path class="tv-land-2" d="M242,458 Q322,446 386,492 Q366,558 282,552 Q224,522 242,458 Z"/>'
+  /* 枫丹（北） */
+  + '<path class="tv-land-2" d="M556,58 Q638,26 716,66 Q758,116 698,158 Q616,170 566,128 Z"/>'
+  /* 至冬（东北） */
+  + '<path class="tv-land-2" d="M798,66 Q888,44 948,104 Q962,166 882,188 Q808,178 790,126 Z"/>'
+  /* 稻妻群岛 */
+  + '<path class="tv-land" d="M694,392 Q756,362 812,402 Q834,452 780,486 Q716,478 694,432 Z"/>'
+  + '<path class="tv-land-2" d="M826,470 Q872,452 906,484 Q912,522 866,532 Q826,520 826,470 Z"/>'
+  + '<path class="tv-land-2" d="M660,486 Q696,470 722,496 Q716,528 678,530 Q654,514 660,486 Z"/>'
+  /* 海域与区域名 */
+  + '<text class="tv-sea-label" x="90" y="566">无 相 之 海</text>'
+  + '<text class="tv-sea-label" x="828" y="300">雷 鸣 群 岛 海 域</text>'
+  + '<text class="tv-region" x="268" y="168">蒙 德</text>'
+  + '<text class="tv-region" x="520" y="228">璃 月</text>'
+  + '<text class="tv-region" x="300" y="504">须 弥</text>'
+  + '<text class="tv-region" x="640" y="112">枫 丹</text>'
+  + '<text class="tv-region" x="872" y="130">至 冬</text>'
+  + '<text class="tv-region" x="812" y="404">稻 妻</text>'
+  + '<text class="tv-region" x="140" y="330">纳 塔</text>'
+  + '<text class="tv-title" x="26" y="36">提瓦特大陆 · 传送图</text>'
+  /* 装饰：七天神像 / 秘境（默认隐藏，点 HUD 按钮显示） */
+  + '<g class="tv-domain"><path class="tv-st" d="M368,206 l7,-17 l7,17 l17,7 l-17,7 l-7,17 l-7,-17 l-17,-7 Z"/>'
+  + '<text x="392" y="250">神像 · 风</text></g>'
+  + '<g class="tv-domain"><path class="tv-st" d="M520,356 l7,-17 l7,17 l17,7 l-17,7 l-7,17 l-7,-17 l-17,-7 Z"/>'
+  + '<text x="470" y="424">神像 · 岩</text></g>'
+  + '<g class="tv-domain"><path class="tv-dm" d="M420,372 l14,-14 l14,14 l-14,14 Z"/>'
+  + '<text x="434" y="406">秘境 · 忘却之峡</text></g>'
+  + '<g class="tv-domain"><path class="tv-dm" d="M852,414 l14,-14 l14,14 l-14,14 Z"/>'
+  + '<text x="866" y="448">秘境 · 砂流之庭</text></g>'
+  /* 指北针 + 比例尺 */
+  + '<g transform="translate(944,66)"><circle class="tv-compass" cx="0" cy="0" r="22"/>'
+  + '<path d="M0,-16 L6,4 L0,0 L-6,4 Z" fill="#6b8b91"/>'
+  + '<text class="tv-compass-t" x="0" y="-28">N</text></g>'
+  + '<line class="tv-scale" x1="26" y1="590" x2="126" y2="590"/>'
+  + '<line class="tv-scale" x1="26" y1="585" x2="26" y2="595"/>'
+  + '<line class="tv-scale" x1="126" y1="585" x2="126" y2="595"/>'
+  + '<text class="tv-scale-t" x="34" y="582">提瓦特尺度 · 100 步</text>'
+  + '</svg>';
+}
+
+function teyvatMapHtml(pts) {
+  TEYVAT_PINS = teyvatPinData(pts);
+  let pins = '', route = [];
+  TEYVAT_PINS.forEach(p => {
+    const x = p.x, y = p.y;
+    route.push(x + ',' + y);
+    pins += '<g class="tv-pin" data-seq="' + p.seq + '" onclick="teyvatSelectPin(' + p.seq + ')">'
+      + '<circle class="tv-glow" cx="' + x + '" cy="' + y + '" r="26"/>'
+      + '<line class="tv-beam" x1="' + x + '" y1="' + (y - 56) + '" x2="' + x + '" y2="' + (y - 12) + '"/>'
+      + '<path class="tv-diamond" d="M' + x + ',' + (y - 14) + ' L' + (x + 12) + ',' + y
+      + ' L' + x + ',' + (y + 14) + ' L' + (x - 12) + ',' + y + ' Z"/>'
+      + '<path class="tv-star" d="M' + x + ',' + (y - 7) + ' l2,5 l5,2 l-5,2 l-2,5 l-2,-5 l-5,-2 l5,-2 Z"/>'
+      + '<text class="tv-label" x="' + x + '" y="' + (y + 34) + '">' + esc(p.name) + '</text>'
+      + '<title>' + esc(p.name) + ' · ' + esc(p.region) + ' · 到达 ' + esc(p.arrive || '--:--') + '</title>'
+      + '</g>';
+  });
+  const line = route.length > 1
+    ? '<polyline class="tv-route" points="' + route.join(' ') + '"/>' : '';
+  const svg = teyvatLandSvg().replace('</svg>', line + pins + '</svg>');
+  const count = TEYVAT_PINS.length;
+  return '<div class="tv-map-card">'
+    + '<div class="tv-map-head"><h3>提瓦特大陆 · 传送锚点</h3>'
+    + '<span>已解锁 ' + count + ' 个锚点 · 点击锚点可设为当前传送点</span>'
+    + '<b class="tv-head-cur" id="tvMapHeadCur">未选择锚点</b></div>'
+    + svg
+    + '<div class="tv-info" id="tvPinInfo"><b>传送锚点</b>'
+    + '<span>点击地图上的菱形锚点查看站点详情</span>'
+    + '<span>虚线为今日冒险路线</span></div>'
+    + '<div class="tv-legend">'
+    + '<span><i style="background:#fff7dc;border:2px solid #b8892f"></i>传送锚点</span>'
+    + '<span><i style="background:#c08f2f"></i>冒险路线</span>'
+    + '<span><i style="background:#fffdf0;border:2px solid #c8a45c"></i>七天神像</span>'
+    + '<span><i style="background:#e9dcff;border:2px solid #8d6bb5"></i>秘境</span>'
+    + '</div></div>';
+}
+
+function teyvatSelectPin(seq, silent) {
+  const p = TEYVAT_PINS[seq - 1];
+  if (!p) return;
+  window.__TV_SEL__ = seq;
+  const info = $('tvPinInfo');
+  if (info) info.innerHTML = '<b>传送锚点 · ' + esc(p.name) + '</b>'
+    + '<span>' + esc(p.region) + ' · ' + esc(p.elem) + '元素</span>'
+    + '<span>到达 ' + esc(p.arrive || '--:--') + '</span>'
+    + '<span>第 ' + p.seq + ' 站 / 共 ' + TEYVAT_PINS.length + ' 站</span>';
+  const hud = $('tvCurPin');
+  if (hud) hud.textContent = p.name + ' · ' + p.region;
+  document.querySelectorAll('.tv-pin').forEach(g => {
+    if (g.classList) g.classList.remove('on');
+  });
+  const el = document.querySelector('.tv-pin[data-seq="' + seq + '"]');
+  if (el && el.classList) el.classList.add('on');
+  const head = $('tvMapHeadCur');
+  if (head) head.textContent = '当前 · ' + p.name;
+  if (!silent && typeof toast === 'function')
+    toast('已传送至 ' + p.name + ' · ' + p.region + ' · 到达 ' + (p.arrive || '--:--'));
+}
+
+function teyvatToggleDomains() {
+  const box = $('pane-map');
+  if (!box || !box.classList) return;
+  box.classList.toggle('show-domains');
+  const on = box.classList.contains('show-domains');
+  const b = $('tvToggle');
+  if (b) b.textContent = on ? '隐藏秘境与神像' : '显示秘境与神像';
+}
+
+function teyvatCommissionTick() {
+  let done = 0;
+  document.querySelectorAll('#tvComList input[type=checkbox]').forEach(b => {
+    if (b.checked) done++;
+  });
+  const total = TV_COM_TOTAL || 4;
+  const n = $('tvComCount'); if (n) n.textContent = done + ' / ' + total;
+  const hud = $('tvHudCom'); if (hud) hud.textContent = done + ' / ' + total;
+  const bar = $('tvComBar'); if (bar) bar.style.width = Math.round(done / total * 100) + '%';
+  const reward = $('tvComReward'); if (reward) reward.hidden = done < total;
+  document.querySelectorAll('.tv-com').forEach(row => {
+    const ck = row.querySelector && row.querySelector('input');
+    if (ck && row.classList) row.classList.toggle('done', !!ck.checked);
+  });
+}
+
+function teyvatCommissions() {
+  const list = $('tvComList');
+  if (!list) return;
+  const items = (PLAN && PLAN.days && PLAN.days[0] && PLAN.days[0].items) || [];
+  if (!items.length) {
+    TV_COM_TOTAL = 0;
+    list.innerHTML = '<p class="tv-empty">生成行程后，今日委托会自动出现在这里（每站一条）。</p>';
+    teyvatCommissionTick();
+    return;
+  }
+  const use = items.slice(0, 4);
+  TV_COM_TOTAL = use.length;
+  const tags = ['自习 / 探索', '用餐 / 补给', '取件 / 交付', '运动 / 挑战'];
+  list.innerHTML = use.map((it, i) =>
+    '<label class="tv-com"><input type="checkbox" onchange="teyvatCommissionTick()">'
+    + '<span class="tv-time">' + esc(it.arrive || '--:--') + '</span>'
+    + '<span class="tv-name">' + esc(it.name) + '</span>'
+    + '<span class="tv-tag">' + tags[i % tags.length] + '</span></label>').join('');
+  teyvatCommissionTick();
+}
+
+function teyvatSync(opts) {
+  const items = (PLAN && PLAN.days && PLAN.days[0] && PLAN.days[0].items) || [];
+  const overall = (PLAN && PLAN.metrics && PLAN.metrics.overall) || 0;
+  const lv = $('tvLevel'); if (lv) lv.textContent = String(40 + Math.round(overall * 10));
+  const exp = $('tvExpBar'); if (exp) exp.style.width = Math.round(overall * 100) + '%';
+  const resin = $('tvResin'); if (resin) resin.textContent = '120 / 160';
+  const team = $('tvTeamName');
+  const line = $('tvTeamLine');
+  const hero = (typeof YS_HEROES !== 'undefined')
+    ? (YS_HEROES[window.__YS_CURRENT__ || 'klee'] || YS_HEROES.klee) : null;
+  if (team && hero) team.textContent = hero.name;
+  if (line && hero) line.textContent = '「' + hero.line + '」';
+  if ($('tvHudCom')) $('tvHudCom').textContent = '0 / ' + (items.length ? Math.min(items.length, 4) : 4);
+  teyvatCommissions();
+  /* 切主题时无论切进还是切出都要重绘：切出后必须回到普通地图 */
+  if (opts && opts.map && typeof renderMapPane === 'function') {
+    renderMapPane(PTS);
+  }
+}
+
+/* 元素伙伴切换时同步队伍卡（v5 的 ysPick 里挂的钩子） */
+function teyvatOnHero(key, hero) {
+  window.__YS_CURRENT__ = key;
+  const team = $('tvTeamName'); if (team) team.textContent = hero.name;
+  const line = $('tvTeamLine'); if (line) line.textContent = '「' + hero.line + '」';
+}
+
+/* 主题切换后重绘提瓦特地图；首次加载也同步一次 HUD / 委托 */
+if ($('themeSel')) {
+  const __tvPrevTheme = $('themeSel').onchange;
+  $('themeSel').onchange = function () {
+    if (__tvPrevTheme) __tvPrevTheme();
+    teyvatSync({ map: true });
+  };
+}
+teyvatSync();
+
+
+
+/* ================ 提瓦特 Trip Planner · v7：交互反馈修复 ================
+   v6 的地图与锚点逻辑本身是对的，但四件事让人误以为「点了没反应」：
+   1) 首次打开的全屏引导遮罩盖住整页，所有点击都被吃掉；
+   2) 地图页签在折叠下方约 1300px，切页签后视口内没有任何变化；
+   3) 原型默认浅色主题，那里是普通地图，不是提瓦特传送图；
+   4) 锚点/HUD 按钮的反馈也在折叠下方，看不见。
+   v7 统一给出：关闭引导 → 切页签 → 重绘 → 滚动定位 → 高亮 → toast 提示。
+   ==================================================================== */
+window.__TV_SEL__ = 0;
+
+function toastHide(){ const b = $('toast'); if (b) b.hidden = true; }
+function toast(msg, actionLabel, actionFn){
+  const box = $('toast'); if (!box) return;
+  box.innerHTML = '';
+  const s = document.createElement('span'); s.textContent = msg; box.appendChild(s);
+  if (actionLabel && actionFn){
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = actionLabel;
+    b.onclick = () => { toastHide(); actionFn(); };
+    box.appendChild(b);
+  }
+  const x = document.createElement('button');
+  x.type = 'button'; x.className = 'ts-x'; x.textContent = '×';
+  x.setAttribute('aria-label', '关闭提示'); x.onclick = toastHide;
+  box.appendChild(x);
+  box.hidden = false;
+  clearTimeout(window.__TOAST_TIMER__);
+  window.__TOAST_TIMER__ = setTimeout(toastHide, 7000);
+}
+
+/* 把地图真正推到用户眼前：v6 里它藏在第 1300px */
+function revealMap(){
+  const tabs = $('tabs'); if (tabs) tabs.hidden = false;
+  if (typeof closeGuide === 'function') closeGuide();
+  showTab('map');
+  const pane = $('pane-map'); if (!pane) return;
+  const isTv = document.documentElement.dataset.theme === 'yuanshen'
+               && typeof teyvatMapHtml === 'function';
+  if (typeof renderMapPane === 'function') renderMapPane(PTS);
+  pane.dataset.tv = isTv ? '1' : '0';
+  if (!PLAN || !PTS || !PTS.length){
+    pane.innerHTML = '<div class="card empty-state"><div class="es-icon">✦</div>'
+      + '<h3>还没有冒险路线</h3><p class="muted">先在左边写一句话，点主按钮生成行程，'
+      + '地图上就会出现传送锚点与今日冒险路线。</p>'
+      + '<button class="link" id="mapGoPlan" type="button">去生成行程 →</button></div>';
+    const b = $('mapGoPlan');
+    if (b) b.onclick = () => { const g = $('go'); if (g && g.scrollIntoView) g.scrollIntoView({block:'center'}); };
+  } else if (isTv && window.__TV_SEL__ && typeof teyvatSelectPin === 'function'){
+    teyvatSelectPin(window.__TV_SEL__, true);   /* 重绘后恢复已选中的锚点 */
+  }
+  pane.classList.remove('map-focus');
+  try { void pane.offsetWidth; } catch (e) {}
+  pane.classList.add('map-focus');
+  /* 用即时定位而不是 smooth：无头/虚拟时间下 smooth 不执行，真实浏览器也更「立刻有反应」 */
+  const target = tabs || pane;
+  if (target && target.scrollIntoView) setTimeout(() => {
+    try { target.scrollIntoView({behavior:'instant', block:'start'}); }
+    catch (e) { try { target.scrollIntoView({block:'start'}); } catch (e2) { target.scrollIntoView(); } }
+  }, 40);
+}
+
+function openMapTab(){
+  revealMap();
+  if (document.documentElement.dataset.theme !== 'yuanshen'){
+    toast('现在是普通地图 · 提瓦特传送图在「原神 · 提瓦特」主题里',
+          '一键切换 →', gotoTeyvat);
+  } else {
+    toast('提瓦特传送图已打开 · 点击菱形锚点可设为当前传送点');
+  }
+}
+
+/* 一键把主题切到原神并直接展示传送图（原型默认浅色，这以前要自己找下拉框） */
+function gotoTeyvat(){
+  const sel = $('themeSel');
+  if (sel){ sel.value = 'yuanshen'; if (sel.onchange) sel.onchange(); }
+  else { document.documentElement.dataset.theme = 'yuanshen'; }
+  if (typeof teyvatSync === 'function') teyvatSync({ map:true });
+  revealMap();
+  toast('已抵达提瓦特 · 点菱形锚点看站点，点 HUD「显示秘境与神像」解锁更多');
+}
+
+/* HUD 按钮：点了就跳到地图，并把神像/秘境真正显示出来 */
+function teyvatToggleDomainsV7(){
+  revealMap();
+  if (typeof teyvatToggleDomains === 'function') teyvatToggleDomains();
+  const b = $('tvToggle');
+  toast(b && b.textContent.indexOf('隐藏') >= 0
+        ? '七天神像 / 秘境已显示在地图上'
+        : '已隐藏七天神像 / 秘境');
+}
+
+/* 顶部按钮 / 页签 / HUD / 引导条：全部接到有反馈的入口上 */
+if ($('mbMap')) $('mbMap').onclick = openMapTab;
+if ($('mbTeyvat')) $('mbTeyvat').onclick = gotoTeyvat;
+if ($('tvGoMap')) $('tvGoMap').onclick = openMapTab;
+document.querySelectorAll('.tab[data-tab="map"]').forEach(b => {
+  if (b.addEventListener) b.addEventListener('click', () => setTimeout(openMapTab, 0));
+});
+if ($('ghOpen')) $('ghOpen').onclick = () => openGuide('start');
+if ($('ghTeyvat')) $('ghTeyvat').onclick = () => gotoTeyvat();
+if ($('ghClose')) $('ghClose').onclick = () => { const h = $('guideHint'); if (h) h.hidden = true; };
+if ($('guideStart')) $('guideStart').addEventListener('click', () => {
+  const c = $('guideNoAuto'); if (c && c.checked) lsSet('hint_never', '1');
+  const h = $('guideHint'); if (h) h.hidden = true;
+});
+/* 打开完整引导时收起引导条，避免两层提示叠着 */
+if ($('mbHelp')) $('mbHelp').addEventListener('click', () => { const h = $('guideHint'); if (h) h.hidden = true; });
+
+
+
+function campusBaseSvg(){
+  return '<g class="cm-base">'
+  /* ---- 底纹：格网 + 陆地 ---- */
+  + '<defs>'
+  + '<pattern id="cmGrid" width="60" height="60" patternUnits="userSpaceOnUse">'
+  + '<path d="M60 0 L0 0 0 60" fill="none" style="stroke:var(--line,#e2e9e2)" stroke-width="1" opacity=".7"/>'
+  + '</pattern>'
+  + '<linearGradient id="cmWater" x1="0" y1="0" x2="0" y2="1">'
+  + '<stop offset="0%" stop-color="#cfe6f2"/><stop offset="100%" stop-color="#a9d2e8"/>'
+  + '</linearGradient>'
+  + '</defs>'
+  + '<rect x="0" y="0" width="900" height="420" style="fill:var(--bg,#f4f7f4)"/>'
+  + '<rect x="0" y="0" width="900" height="420" fill="url(#cmGrid)"/>'
+  /* ---- 绿地 / 湖 ---- */
+  + '<path d="M22,26 Q150,10 206,40 Q232,92 176,140 Q86,152 30,116 Z" '
+  + 'style="fill:var(--ok-bg,#e4f0d8)" opacity=".95"/>'
+  + '<path d="M736,296 Q822,272 878,310 Q884,380 806,398 Q730,384 736,296 Z" '
+  + 'style="fill:var(--ok-bg,#e4f0d8)" opacity=".95"/>'
+  /* 湖放在两条主干道之间，避免被白色路面切开 */
+  + '<path d="M566,40 Q626,26 674,50 Q684,86 636,100 Q572,92 566,40 Z" '
+  + 'fill="url(#cmWater)" opacity=".9"/>'
+  + '<path d="M578,62 Q610,54 642,62 T668,64 M576,80 Q610,72 644,80 T668,82" '
+  + 'fill="none" stroke="#ffffff" stroke-width="1.4" opacity=".55"/>'
+  /* ---- 道路：先铺白底，再画中心虚线 ---- */
+  + '<g fill="none" stroke-linecap="round">'
+  + '<path d="M-10,210 H910" style="stroke:var(--card,#ffffff)" stroke-width="24"/>'
+  + '<path d="M-10,210 H910" style="stroke:var(--line,#dfe6df)" stroke-width="1.6" stroke-dasharray="12 10"/>'
+  + '<path d="M450,-10 V430" style="stroke:var(--card,#ffffff)" stroke-width="24"/>'
+  + '<path d="M450,-10 V430" style="stroke:var(--line,#dfe6df)" stroke-width="1.6" stroke-dasharray="12 10"/>'
+  + '<path d="M-10,112 H910 M-10,326 H910 M226,-10 V430 M700,-10 V430" '
+  + 'style="stroke:var(--card,#ffffff)" stroke-width="11" opacity=".95"/>'
+  + '<path d="M-10,112 H910 M-10,326 H910 M226,-10 V430 M700,-10 V430" '
+  + 'style="stroke:var(--line,#dfe6df)" stroke-width="1" opacity=".7"/>'
+  + '</g>'
+  /* ---- 建筑块（用主题变量，深色主题也读得清） ---- */
+  + '<g style="stroke:var(--line,#dde5da)" stroke-width="1">'
+  + '<rect x="58" y="42" width="132" height="48" rx="8" style="fill:var(--accent-soft,#eef2e6)"/>'
+  + '<rect x="268" y="42" width="126" height="48" rx="8" style="fill:var(--accent-soft,#eef2e6)"/>'
+  + '<rect x="58" y="248" width="132" height="48" rx="8" style="fill:var(--accent-soft,#eef2e6)"/>'
+  + '<rect x="268" y="248" width="126" height="48" rx="8" style="fill:var(--accent-soft,#eef2e6)"/>'
+  + '<rect x="512" y="248" width="126" height="48" rx="8" style="fill:var(--accent-soft,#eef2e6)"/>'
+  + '<rect x="740" y="140" width="126" height="42" rx="8" style="fill:var(--accent-soft,#eef2e6)"/>'
+  + '<rect x="268" y="346" width="126" height="42" rx="8" style="fill:var(--accent-soft,#eef2e6)"/>'
+  + '</g>'
+  + '<text class="cm-lbl" x="68" y="58">教学区</text>'
+  + '<text class="cm-lbl" x="278" y="58">图书馆区</text>'
+  + '<text class="cm-lbl" x="68" y="264">生活区</text>'
+  + '<text class="cm-lbl" x="278" y="264">宿舍区</text>'
+  + '<text class="cm-lbl" x="522" y="264">餐饮区</text>'
+  + '<text class="cm-lbl" x="750" y="156">运动场</text>'
+  + '<text class="cm-lbl" x="278" y="362">服务区</text>'
+  + '<text class="cm-tiny" x="620" y="74" text-anchor="middle">未 名 湖</text>'
+  /* ---- 指北针 ---- */
+  + '<g transform="translate(852,56)">'
+  + '<circle r="21" style="fill:var(--card,#ffffff)" opacity=".9" '
+  + 'stroke="var(--line,#dfe6df)" stroke-width="1"/>'
+  + '<path class="cm-north" d="M0,-13 L5,7 L0,2 L-5,7 Z"/>'
+  + '<text class="cm-badge" x="0" y="-26">N</text></g>'
+  /* ---- 比例尺 + 说明 ---- */
+  + '<g transform="translate(40,392)">'
+  + '<line x1="0" y1="0" x2="110" y2="0" style="stroke:var(--sub,#7b8a7e)" stroke-width="2"/>'
+  + '<line x1="0" y1="-5" x2="0" y2="5" style="stroke:var(--sub,#7b8a7e)" stroke-width="2"/>'
+  + '<line x1="110" y1="-5" x2="110" y2="5" style="stroke:var(--sub,#7b8a7e)" stroke-width="2"/>'
+  + '<text class="cm-tiny" x="0" y="-10" text-anchor="start">0</text>'
+  + '<text class="cm-tiny" x="110" y="-10" text-anchor="end">200 m</text></g>'
+  + '<text class="cm-tiny" x="862" y="400" text-anchor="end">离线示意底图 · 非真实比例</text>'
+  + '</g>';
+}
+
+
+/* ================ v8：普通地图补离线示意底图 ================
+   mapHtml() 本身不改一行：只在脚本尾部重新绑定它，
+   在它生成的 <svg> 开头插一层校园示意底图，站点 / 虚线仍然画在上层。 */
+(function(){
+  if (typeof mapHtml !== 'function' || typeof campusBaseSvg !== 'function') return;
+  const __origMapHtml = mapHtml;
+  mapHtml = function(pts){
+    const raw = __origMapHtml(pts);
+    if (!raw || raw.indexOf('<svg ') < 0) return raw;   // 无坐标时保留原来的提示文案
+    return raw.replace(/<svg([^>]*)>/, (tag) => tag + campusBaseSvg());
+  };
+})();
+
+
+
+/* ================ v9：提瓦特入口按钮的状态同步 ================
+   切到原神主题后按钮高亮 + 换 tooltip；切回普通主题则恢复。
+   用 MutationObserver 监听 <html data-theme>，不侵入 apply() 的既有逻辑。 */
+function syncTeyvatEntry(){
+  const b = $('mbTeyvat');
+  if (!b) return;
+  const on = document.documentElement.dataset.theme === 'yuanshen';
+  if (b.classList) b.classList.toggle('on', on);
+  b.title = on
+    ? '当前就是提瓦特主题 · 点此打开传送图'
+    : '一键切到「原神 · 提瓦特」主题并打开传送图';
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+if (typeof MutationObserver === 'function') {
+  new MutationObserver(syncTeyvatEntry).observe(document.documentElement,
+    { attributes: true, attributeFilter: ['data-theme'] });
+}
+syncTeyvatEntry();
+/* 主题下拉直接改值时也同步一次（MutationObserver 之外的兜底） */
+if ($('themeSel')) {
+  const __mbPrev = $('themeSel').onchange;
+  $('themeSel').onchange = function () {
+    if (__mbPrev) __mbPrev();
+    syncTeyvatEntry();
+  };
+}
+
 </script>
 </body>
 </html>

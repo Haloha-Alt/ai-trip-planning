@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "itinerary.schema.json",
-  "title": "AI 出行与规划 · 接口契约 v1（修订 v1.2）",
+  "title": "AI 出行与规划 · 接口契约 v1（修订 v1.5）",
   "description": "PlanResponse 的文档版。给人看，不参与运行时校验 —— 运行时的事实来源是 engine/models.py。",
   "type": "object",
   "required": ["request"],
@@ -30,7 +30,22 @@
         "seed": { "type": ["integer", "null"], "default": null, "description": "v1.2 随机种子，null = 用策略内置种子" },
         "deadline": { "type": "string", "default": "", "description": "v1.3 HH:MM，该时刻前必须抵达最后一个途经点（无途经点则末站）" },
         "waypoints": { "type": "array", "items": { "type": "string" }, "default": [], "description": "v1.3 途经点（名称或 poi_id），按给出顺序强制先后" },
-        "profile": { "type": "string", "enum": ["", "save", "fast", "comfort"], "default": "", "description": "v1.3 权重档位，空 = 用场景 [weights]" }
+        "profile": { "type": "string", "enum": ["", "save", "fast", "comfort"], "default": "", "description": "v1.3 权重档位，空 = 用场景 [weights]" },
+        "zone": { "type": "string", "default": "", "description": "v1.5 商圈/分区（如\"西安路\"）：候选池按此过滤，空 = 不过滤" },
+        "anchors": {
+          "type": "array",
+          "default": [],
+          "description": "v1.5 锚点/预订约束（电影开场、订座等硬时刻），按时刻升序切段排程",
+          "items": {
+            "type": "object",
+            "properties": {
+              "poi": { "type": "string", "description": "名称或 poi_id" },
+              "time": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+              "duration_min": { "type": "integer", "minimum": 1, "default": 120 },
+              "label": { "type": "string", "default": "" }
+            }
+          }
+        }
       }
     },
     "days": {

@@ -109,19 +109,22 @@ def sidebar_inputs(cfg):
 
 
 def city_picker(cities: list[dict], default_key: str) -> str:
-    """城市下拉框。返回的是 registry 里的 key（不是中文名）。"""
+    """高校下拉框。返回的是 registry 里的 key（不是中文名）。
+
+    v1.3 起选择维度是「高校」（city_options 已只返回 campus 数据包）。
+    """
     keys = [c["key"] for c in cities]
     label = {c["key"]: c["name"] for c in cities}
     idx = keys.index(default_key) if default_key in keys else 0
     key = st.selectbox(
-        "城市",
+        "高校",
         keys,
         index=idx,
         format_func=lambda k: "%s（%s）" % (label.get(k, k), k),
         key="in_city",
         on_change=_mark_touched,
         args=("city",),
-        help="城市只是数据路由：换城市就读那份城市的 POI 表，引擎代码一行都不用改。",
+        help="高校只是数据路由：换一所高校就读那份校区数据包，引擎代码一行都不用改。",
     )
     return key
 

@@ -40,6 +40,13 @@ def plan(req: PlanRequest,
 
     cfg: ScenarioConfig = load_scenario(scenario)
     name = strategy or cfg.default_strategy
+    # v1.6.1 锚点中枢分发：任何场景只要给了锚点（课表/固定安排/电影场次），
+    # 切段逻辑就优于其它算法 —— 上课 08:00 开讲与电影 14:30 开场对排程是
+    # 同一件事：到点必须已经开始。stub/random/贪心/2-opt 都不认锚点，
+    # 统一委托给 date 的切段策略；没有锚点时行为逐字不变。
+    # resp.strategy 如实写 "date"，不冒充用户没选的算法。
+    if getattr(req, "anchors", None) and name != "date":
+        name = "date"
     fn = strategies.get(name)                    # 换算法只影响这一行
 
     resp = fn(req, cfg)
@@ -64,6 +71,11 @@ def plan(req: PlanRequest,
         if missing:
             resp.warnings.append(str(Violation(
                 "MUST_VISIT_MISS", "必去点未排入行程：%s" % "、".join(missing))))
+
+    # 锚点（约会模式）：**跨天**核对格式/排入/迟到风险，与 must_visit 同理放在 day 级之外。
+    if req.anchors:
+        for v in constraints.validate_anchors(req, resp, cfg):
+            resp.warnings.append(str(v))
 
     resp.metrics = constraints.score(resp, cfg)
 
@@ -100,12 +112,124 @@ def plan(req: PlanRequest,
         for d in resp.days:
             for it in d.items:
                 p = get_poi(it.poi_id, cfg, req.city)
-                if p is not None and not (p.source_date or "").strip():
+                if (p is not None and not (p.source_date or "").strip()
+                        and not (p.cost or 0) <= 0):   # 免费站（人均0）没有花费风险，不进待核实
                     pending.append("%s（%s，%s）" % (p.name, p.category or "未分类", p.cost_unit))
     except Exception:                       # 数据层异常不能连累主结果
         pending = []
     if pending:
         resp.meta["pending"] = sorted(set(pending))
+
+    # Plan B 备选（v1.6.4）：户外/海景站碰上坏天气改去哪 —— 从同一候选池里找
+    # 同商圈的室内站（带"室内"标签，且没被排进行程）。纯规则推导，不编事实：
+    # 每条备选都是真实入库的 POI，写明分类和人均。查不到就不写，不硬凑。
+    try:
+        from data.loader import load_pois
+
+        placed = {it.poi_id for d in resp.days for it in d.items}
+        pool = load_pois(cfg, req.city)
+        zone_of = {p.poi_id: (p.zone or "") for p in pool}
+        indoor = [p for p in pool
+                  if p.poi_id not in placed and "室内" in (p.tags or [])]
+        # 同商圈的户外站往往共用同一批室内备选 —— 按备份集合分组，避免 Plan B 里
+        # 出现两行一模一样的建议（星海广场/跨海大桥都指向圣亚+海边咖啡）。
+        grouped: dict[tuple, dict] = {}
+        for d in resp.days:
+            for it in d.items:
+                if it.category != "户外" and "户外" not in (it.name or ""):
+                    continue
+                alts = sorted(
+                    (p for p in indoor if zone_of.get(p.poi_id) == zone_of.get(it.poi_id)),
+                    key=lambda p: -p.score)[:2]
+                if alts:
+                    key = tuple(p.poi_id for p in alts)
+                    entry = grouped.setdefault(key, {
+                        "instead_of": [],
+                        "reason": "下雨/大风时改室内",
+                        "backups": ["%s（%s，人均%.0f元）" % (p.name, p.category, p.cost)
+                                    for p in alts],
+                    })
+                    entry["instead_of"].append(it.name)
+        plan_b = list(grouped.values())
+        if plan_b:
+            resp.meta["plan_b"] = plan_b
+    except Exception:                       # 数据层异常不能连累主结果
+        pass
+
+    # v1.6.5 出发/返程腿 + 末班时刻：全部来自 data/cities/<key>/ 的 landmarks.csv、
+    # last_trains.csv 与场景 [taxi] 计价 —— 数据说话，缺哪样就少哪样，不编。
+    try:
+        from data.loader import load_landmarks, load_last_trains
+        from engine.geo import estimate_cost, estimate_minutes, haversine_km
+
+        items = [it for d in resp.days for it in d.items]
+        if items:
+            info = None
+            try:
+                from data.cities import city_info
+                info = city_info(req.city)
+            except Exception:
+                info = None
+            ckey = info.key if info is not None else str(req.city or "").strip()
+
+            lms = load_landmarks(cfg, ckey)
+            lm = None
+            want = (req.origin or "").strip()
+            if want:
+                for cand in lms:
+                    nm = cand.get("name") or ""
+                    if nm == want or nm in want or want in nm:
+                        lm = cand
+                        break
+
+            taxi = getattr(cfg, "taxi", None) or {}
+
+            def _leg(frm_lat: float, frm_lon: float, frm_name: str, to_it) -> dict:
+                km = haversine_km(frm_lat, frm_lon, to_it.lat, to_it.lon)
+                mins = round(estimate_minutes(km, "car", cfg))
+                if taxi.get("start_price") and taxi.get("per_km"):
+                    extra_km = max(0.0, km - float(taxi.get("start_km", 0.0)))
+                    fare = float(taxi["start_price"]) + extra_km * float(taxi["per_km"])
+                    basis = "出租车起步价+里程（场景 [taxi] 口径，白天）"
+                else:
+                    fare = estimate_cost(km, "car", cfg)
+                    basis = "场景每公里单价"
+                return {"from": frm_name, "to": to_it.name, "km": round(km, 2),
+                        "minutes": mins, "fare": round(fare, 1), "basis": basis}
+
+            if lm is not None:
+                try:
+                    resp.meta["origin_leg"] = _leg(
+                        float(lm["lat"]), float(lm["lon"]), lm.get("name", ""), items[0])
+                    resp.meta["return_leg"] = _leg(
+                        float(lm["lat"]), float(lm["lon"]), lm.get("name", ""), items[-1])
+                except Exception:
+                    pass
+
+            trains = load_last_trains(cfg, ckey)
+            if trains:
+                # 只挑和本次行程真有关系的：站点名（去掉"站"字）命中站点名/地址
+                texts = []
+                for it in items:
+                    texts.append(it.name or "")
+                    if it.address:
+                        texts.append(it.address)
+
+                def _hit(t: dict) -> bool:
+                    st = (t.get("station") or "").rstrip("站")
+                    if not st:
+                        return False
+                    if any(st in x for x in texts):
+                        return True
+                    # 兜底：站名前两字（如「星海广场」→「星海」）命中，覆盖
+                    # 「星海广场站 vs 星海湾大桥」这类同片区不同后缀的情况
+                    return len(st) >= 2 and any(st[:2] in x for x in texts)
+
+                matched = [t for t in trains if _hit(t)]
+                if matched:
+                    resp.meta["last_trains"] = matched
+    except Exception:                       # 数据层异常不能连累主结果
+        pass
 
     # 实时数据：只在这里统一生效一次，策略内部一律不碰它
     if ctx is not None and getattr(ctx, "snapshot", None) is not None:
@@ -116,6 +240,72 @@ def plan(req: PlanRequest,
                                   scenario=cfg.name, strategy=name)
         except Exception as e:                  # noqa: BLE001 - 重排失败不能连累主结果
             resp.warnings.append("[实时] 处理失败，已保留原方案：%s" % e)
+
+    # v1.6.6 雨天换站：坏天气时，最后一天的户外末站自动换成 Plan B 的首选室内站。
+    # 放在 plan_b 计算之后、返回之前；全程 try/except，数据异常不连累主结果。
+    try:
+        snap = getattr(ctx, "snapshot", None) if ctx is not None else None
+        if snap is not None and snap.weather:
+            _bad = {"rain", "snow", "storm"}
+            bad_weather = any(
+                (getattr(w, "condition", "") in _bad) or getattr(w, "is_bad", False)
+                for w in snap.weather)
+            if bad_weather and resp.days:
+                from data.loader import get_poi as _get_poi, load_pois as _load_pois
+
+                day = resp.days[-1]
+                if day.items:
+                    last = day.items[-1]
+                    anchor_names = set()
+                    for a in (getattr(req, "anchors", None) or []):
+                        v = str((a or {}).get("poi", "") or "").strip()
+                        if v:
+                            anchor_names.add(v)
+                    is_anchor = (last.name in anchor_names
+                                 or last.poi_id in anchor_names
+                                 or any(n in last.name or last.name in n
+                                        for n in anchor_names))
+                    outdoor = (last.category == "户外"
+                               or "户外" in (last.name or ""))
+                    if outdoor and not is_anchor:
+                        # 从 plan_b 里找覆盖这个末站的备份组，取首选室内站
+                        cand_name = ""
+                        for entry in (resp.meta.get("plan_b") or []):
+                            if last.name in (entry.get("instead_of") or []):
+                                bks = entry.get("backups") or []
+                                if bks:
+                                    cand_name = (bks[0] or "").split("（")[0].strip()
+                                break
+                        new_p = None
+                        if cand_name:
+                            for p in _load_pois(cfg, req.city):
+                                if p.name == cand_name:
+                                    new_p = p
+                                    break
+                            if new_p is None:
+                                new_p = _get_poi(cand_name, cfg, req.city)
+                        if new_p is not None:
+                            old_name = last.name
+                            last.poi_id = new_p.poi_id
+                            last.name = new_p.name
+                            last.lat, last.lon = new_p.lat, new_p.lon
+                            last.category = new_p.category
+                            last.address = new_p.address or ""
+                            last.tips = new_p.tips or ""
+                            last.url = new_p.url or ""
+                            last.cost = float(new_p.cost or 0)
+                            last.flags = []
+                            # 交通重算复杂，沿用原交通并在告警里如实说明
+                            day.refresh_stats()
+                            resp.meta["rain_swap"] = {
+                                "from": old_name, "to": new_p.name,
+                                "reason": "当天有雨，户外末站自动换室内",
+                            }
+                            note = ("[实时] 当天有雨，户外末站「%s」已自动换成室内「%s」"
+                                    "（在途时间沿用原交通估算）" % (old_name, new_p.name))
+                            resp.warnings.append(note)
+    except Exception:                       # 数据层异常不能连累主结果
+        pass
 
     return resp
 

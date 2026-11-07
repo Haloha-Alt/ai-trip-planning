@@ -1,0 +1,22 @@
+{
+  "key": "hit",
+  "name": "哈尔滨工业大学（一校区）",
+  "city": "harbin",
+  "level": "L1",
+  "poi_file": "pois.csv",
+  "poi_count": 36,
+  "poi_source": "amap place/text，2026-11-04 抓取，tools/trim_campus_pois 半径2km+黑名单裁剪",
+  "matrix_file": "",
+  "gates": ["西大直街校门（正门）", "科学园和兴路校门（和兴路95号）"],
+  "alt_campuses": ["二校区（黄河路校门）", "深圳校区（深圳大学城）"],
+  "visitor_difficulty": 1,
+  "guide_doc": "docs/23-C9高校访客参观指南/08-哈尔滨工业大学.md",
+  "sources": [
+    {"kind": "research", "what": "免预约政策+航天馆/博物馆调研", "via": "哈工大官方通知2024-12-26、2025-07-06暑期通知、极光新闻", "date": "2026-11-04"},
+    {"kind": "amap", "what": "校内 POI 36 个（含科学园航天馆一带）", "via": "高德 place/text", "date": "2026-11-04"}
+  ],
+  "next_steps": [
+    "L2: tools.amap_matrix --city hit --mode walk（≥80 边；一校区与科学园之间约1.9km，矩阵务必覆盖）",
+    "事实层已建：visitor_guide.json（多数时间免预约不限名额，是 demo 里'最好进'的样例校）"
+  ]
+}

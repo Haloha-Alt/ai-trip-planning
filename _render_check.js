@@ -16,7 +16,8 @@ const { execFileSync } = require('child_process');
 
 const ROOT = __dirname;
 const PREVIEW_DIR = path.join(ROOT, '_preview');
-const PY = path.join(ROOT, '.venv', 'Scripts', 'python.exe');
+/* 优先 .venv；没有则允许 PYTHON_BIN 指定解释器（隔离运行时的托管 Python 等）。 */
+const PY = process.env.PYTHON_BIN || path.join(ROOT, '.venv', 'Scripts', 'python.exe');
 
 /* ---------------- 夹具：三份真实行程 JSON ---------------- */
 const GEN_PY = String.raw`
@@ -38,12 +39,21 @@ save("plan_default.json", base)
 save("plan_early.json", dict(base, overrides={"start_time": "06:20", "top_n": 3}))
 save("plan_2day.json", dict(base, query="两天：第一天自习加吃饭，第二天取快递和超市",
                             overrides={"days": 2, "top_n": 3}))
+
+# v1.5 约会模式：电影锚点 14:30 必须钉死，简报必须随行程一起回来
+st2, p2 = dispatch("POST", "/api/date/brief", {}, {
+    "query": "看电影，吃晚饭", "start_time": "13:00", "zone": "西安路",
+    "origin": "黑石礁公园", "movie": {"poi": "DL205", "time": "14:30"},
+    "no_llm": True})
+assert p2.get("ok"), (st2, p2)
+with open(os.path.join(out, "plan_date.json"), "w", encoding="utf-8") as f:
+    json.dump(p2, f, ensure_ascii=False)
 print("fixtures ok")
 `;
 
 function ensureFixtures() {
   fs.mkdirSync(PREVIEW_DIR, { recursive: true });
-  const need = ['plan_default.json', 'plan_early.json', 'plan_2day.json'];
+  const need = ['plan_default.json', 'plan_early.json', 'plan_2day.json', 'plan_date.json'];
   if (need.every(n => fs.existsSync(path.join(PREVIEW_DIR, n)))) return;
   if (!fs.existsSync(PY)) {
     console.log('找不到 .venv 里的 python：' + PY);
@@ -51,7 +61,7 @@ function ensureFixtures() {
   }
   execFileSync(PY, ['-c', GEN_PY], {
     cwd: ROOT,
-    env: { ...process.env, PYTHONPATH: ROOT },
+    env: { ...process.env, PYTHONPATH: ROOT, LLM_API_KEY: '' },
     stdio: 'inherit',
   });
 }
@@ -61,6 +71,7 @@ const read = n => JSON.parse(fs.readFileSync(path.join(PREVIEW_DIR, n), 'utf8'))
 const PLAN_RESP = read('plan_default.json');
 const EARLY_RESP = read('plan_early.json');
 const TWO_DAY_RESP = read('plan_2day.json');
+const DATE_RESP = read('plan_date.json');
 
 const html = fs.readFileSync(path.join(ROOT, 'web', 'index.html'), 'utf8');
 const code = html.match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -71,8 +82,13 @@ function node(id) {
   if (!nodes[id]) {
     nodes[id] = {
       id, innerHTML: '', textContent: '', value: '', checked: true,
-      hidden: false, disabled: false, classList: { toggle(){}, add(){}, remove(){} },
-      children: [],
+      hidden: false, disabled: false, style: {},
+      classList: { toggle(){}, add(){}, remove(){} },
+      children: [], options: [],
+      setAttribute(){}, getAttribute(){ return null; },
+      removeAttribute(){}, hasAttribute(){ return false; },
+      remove(){},
+      insertBefore(){}, contains(){ return false; },
       addEventListener(){}, appendChild(c){ this.children.push(c); }, removeChild(){},
       querySelectorAll: () => [],
     };
@@ -80,9 +96,10 @@ function node(id) {
   return nodes[id];
 }
 global.document = {
+  documentElement: { dataset: {} },   // 主题切换会写 html[data-theme]，桩必须给上
   getElementById: node,
   querySelectorAll: () => [],
-  createElement: () => ({ value: '', textContent: '', selected: false, appendChild(){} }),
+  createElement: () => ({ value: '', textContent: '', selected: false, appendChild(){}, remove(){}, style: {} }),
 };
 global.window = {};
 
@@ -165,6 +182,25 @@ function check(name, cond, extra) {
   }
   check('站名标签不重叠', labs.length > 0 && dup === 0,
         labs.length + ' 个标签，' + dup + ' 对重叠：' + labs.map(l => l.name).join('/'));
+
+  /* v1.5 约会模式：走真实的 planDate() 路径（锚点来自 date 面板控件）。
+   * 桩环境下 dateCinema/dateShow 的 value 为空 → body 不带 movie，
+   * 所以这里直接把锚点写进面板控件，模拟用户在页面上选好了场次。 */
+  CURRENT = DATE_RESP;
+  node('dateCinema').value = 'DL205';
+  node('dateShow').value = '14:30';
+  node('dateZone').value = '西安路';
+  await planDate(collect());
+  const sumD = node('summary').innerHTML;
+  const listD = node('pane-list').innerHTML;
+  console.log('[4] 约会模式（date + 电影锚点 14:30）');
+  check('渲染出约会简报卡片', sumD.includes('约会简报'), 'briefCard 没进 summary');
+  check('简报带 headline', sumD.includes('headline') || /brief-line/.test(sumD), sumD.slice(0, 120));
+  check('电影锚点钉死在 14:30', listD.includes('14:30'), '锚点时刻没出现在行程表');
+  check('普通模式不清掉简报标记位', LAST_BRIEF !== null);
+  /* v1.6 详细行程：预算明细块 + 每站玩法 tips 都要上屏 */
+  check('渲染出预算明细块', sumD.includes('预算明细'), 'budgetHtml 没进 summary');
+  check('每站玩法 tips 上屏', listD.includes('class="tip"'), 'item.tips 没渲染出行程表');
 
   console.log(failed ? ('\n' + failed + ' 项未通过') : '\n全部通过');
 

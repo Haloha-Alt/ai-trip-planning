@@ -1,0 +1,25 @@
+# 一条命令起服务：docker compose up -d
+#
+# 设计取舍：
+#   · 端口只绑 127.0.0.1，对外统一由宿主机 Nginx 接（见 deploy/nginx.conf）。
+#     直接把 8000 暴露到 0.0.0.0，等于绕过 Nginx 的 HTTPS 与限流，不划算。
+#   · .env 用 env_file 注入，**密钥不进镜像**（.dockerignore 已排除 .env）。
+#   · WEB_HOST 在容器里必须是 0.0.0.0，否则宿主机连不进来。
+services:
+  trip:
+    build: .
+    image: ai-trip-planner:v1.0
+    container_name: ai-trip-planner
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    environment:
+      WEB_HOST: "0.0.0.0"
+      PYTHONIOENCODING: "utf-8"
+    volumes:
+      # 数据与缓存挂出来：改了 CSV 不用重建镜像
+      - ./data:/app/data:ro
+      - ./.cache:/app/.cache
+      - ./outputs:/app/outputs
+    restart: unless-stopped

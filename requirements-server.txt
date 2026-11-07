@@ -1,0 +1,5 @@
+# 只给"跑网页服务"用的最小依赖（部署/容器用）。
+# 引擎与数据层零第三方依赖，所以这里不需要 streamlit / numpy / pyarrow 那一套。
+# 本机开发仍然用 requirements.txt（带 Streamlit 界面）。
+uvicorn>=0.30
+starlette>=0.37

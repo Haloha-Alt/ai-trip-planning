@@ -34,6 +34,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -198,6 +199,43 @@ def clear_cache() -> int:
     return n
 
 
+# ------------------------------------------------------------------ 调用记录（给页面面板用）
+
+#: 最近若干次真实调用。**只放内存、不落盘**：它是"刚才发生了什么"，
+#: 不是审计日志；进程重启就清空，避免把历史当成现状展示。
+_RECENT: list[dict[str, Any]] = []
+MAX_RECENT = 20
+
+
+def record(task: str, decision: Decision, ms: float, ok: bool = True,
+           error: str = "") -> None:
+    """记一次调用。字段刻意保持扁平，前端直接拼字符串即可。"""
+    _RECENT.append({
+        "time": time.strftime("%H:%M:%S"),
+        "task": task or "(未标注)",
+        "role": decision.role,
+        "model": decision.model,
+        "source": decision.source,
+        "why": decision.why,
+        "ms": int(ms),
+        "ok": bool(ok),
+        "error": error[:80],
+    })
+    del _RECENT[:-MAX_RECENT]
+
+
+def recent(limit: int = 8) -> list[dict[str, Any]]:
+    """最近的调用记录，**新的在前**。"""
+    n = max(0, int(limit))
+    return list(reversed(_RECENT[-n:])) if n else []
+
+
+def clear_recent() -> int:
+    n = len(_RECENT)
+    _RECENT.clear()
+    return n
+
+
 # ------------------------------------------------------------------ 包装成 client
 
 class RoutedClient:
@@ -233,8 +271,15 @@ class RoutedClient:
     def chat(self, system: str, user: str, **kwargs) -> str:
         task = str(kwargs.pop("task", "") or "")
         d = self._pick(task, system, user)
+        t0 = time.time()
         kwargs["model"] = d.model
-        return self._base.chat(system, user, **kwargs)
+        try:
+            text = self._base.chat(system, user, **kwargs)
+        except Exception as e:  # noqa: BLE001 - 记一笔再原样抛出，行为不变
+            record(task, d, (time.time() - t0) * 1000.0, ok=False, error="%s: %s" % (type(e).__name__, e))
+            raise
+        record(task, d, (time.time() - t0) * 1000.0, ok=True)
+        return text
 
     def json_chat(self, system: str, user: str, **kwargs) -> dict[str, Any]:
         text = self.chat(system, user, **kwargs)

@@ -1,0 +1,131 @@
+# 场景：date —— 城市约会模式（选定约会中心，辐射周边吃喝玩乐）
+#
+# 与 daily / visit 的根本区别：
+#   daily  = 校内学生的一天，目标是"优化"
+#   visit  = 外来者的半天，目标是"可执行"
+#   date   = 两个有硬时刻的人（电影开场、餐厅订座），目标是"锚点不误事"：
+#            以锚点（电影场次 / 预订时间）为骨架切段，段内贪心填充周边好玩的点。
+# 所以这个场景时间窗拉到晚上（要看夜场电影）、默认交通是公交/地铁（跨商圈）、
+# 站点更密（吃喝玩乐穿插），并配 showtimes.json 的演示场次数据。
+
+name = "date"
+
+# 默认策略：date（锚点切段 + 段内贪心，见 engine/strategies.py 的 date_plan）
+# ⚠️ 必须写在任何 [table] 之前，否则会被 TOML 归进上面的表
+default_strategy = "date"
+
+# ---- 时间窗：约会从午后到夜里，夜场电影散场也不能超 ----
+day_start = "09:00"
+day_end = "23:00"
+
+# ---- 预算：两个人吃玩一天的大致口径（per_person）----
+daily_budget = 200.0
+
+# ---- 行程规模 ----
+days = 1
+max_poi_per_day = 8
+# 约会一天 5~6 个点比较从容：商圈 + 咖啡 + 电影 + 晚餐 + 散步
+default_top_n = 6
+default_pace = "normal"
+
+# ---- 节奏 -> 每天站数系数 ----
+[pace_factor]
+relaxed = 0.6
+normal = 1.0
+packed = 1.3
+
+# ---- 交通方式：速度（km/h）。跨商圈基本靠公交/地铁/打车 ----
+[transport_speed_kmh]
+walk = 4.5
+bike = 12.0
+bus = 18.0
+metro = 30.0
+car = 35.0
+
+# ---- 交通方式：每公里费用 ----
+[transport_cost_per_km]
+walk = 0.0
+bike = 0.0
+bus = 2.0
+metro = 3.0
+car = 0.8
+
+# ---- 距离矩阵缺项时的估算方式：约会默认按公交估算 ----
+default_mode = "bus"
+
+# ---- 出租车计价（起步价制）：出发/返程打车的费用估算口径 ----
+# 大连白天口径：起步价 10 元（含 3 公里），之后每公里 2.0 元；
+# 夜间/高峰加价未计入，导出层会注明"以实际为准"。
+[taxi]
+start_price = 10.0
+start_km = 3.0
+per_km = 2.0
+
+# ---- 默认权重：约会更在意"去的地方对味"，路远一点可以接受 ----
+# anchor_fit（v1.6.6）：原话锚点贴合度，按此权重并入满意度 ——
+# 行程完全命中用户写的场次/订座时刻时，满意度应显著抬升。
+[weights]
+satisfaction = 0.40
+cost = 0.15
+time = 0.15
+distance = 0.10
+anchor_fit = 0.30
+
+# ---- 三档权重：由 PlanRequest.profile 选 ----
+[weight_presets.save]
+satisfaction = 0.35
+cost = 0.40
+time = 0.15
+distance = 0.10
+
+[weight_presets.fast]
+satisfaction = 0.30
+cost = 0.10
+time = 0.45
+distance = 0.15
+
+[weight_presets.comfort]
+satisfaction = 0.55
+cost = 0.10
+time = 0.20
+distance = 0.15
+
+# ---- 兴趣词 -> POI 标签（右边必须是 pois_date.csv 的 tags 列里真实出现的词）----
+[interest_alias]
+"吃饭" = ["正餐", "餐饮"]
+"晚餐" = ["正餐", "约会"]
+"午饭" = ["正餐", "餐饮"]
+"咖啡" = ["咖啡"]
+"喝咖啡" = ["咖啡"]
+"甜品" = ["甜品"]
+"奶茶" = ["甜品"]
+"电影" = ["电影"]
+"看电影" = ["电影"]
+"逛街" = ["购物", "商圈"]
+"购物" = ["购物"]
+"商场" = ["购物", "商圈"]
+"散步" = ["散步", "户外"]
+"逛逛" = ["散步", "商圈"]
+"海边" = ["海景", "户外"]
+"看海" = ["海景", "户外"]
+"夜景" = ["夜景"]
+"看展" = ["展馆"]
+"博物馆" = ["展馆"]
+"游乐" = ["娱乐"]
+"玩" = ["娱乐"]
+"密室" = ["娱乐"]
+"室内" = ["室内"]
+"户外" = ["户外"]
+"约会" = ["约会"]
+
+# ---- 数据文件（相对 data/ 目录）----
+[data_files]
+# 约会模式用自己的点位表：西安路 / 星海 两个商圈，列里多一个 zone（约会中心）
+pois = "cities/dalian/pois_date.csv"
+matrix = "cities/dalian/travel_matrix.csv"
+
+# ---- 点位路由：城市约会模式以「城市」为准（v1.6.3）----
+# city_date = 每个城市自己的 data/cities/<key>/pois_date.csv 说了算；
+# 该城市没建约会数据包时不借别人的（与矩阵同一口径），如实返回空候选。
+# 这里那条路径退居"未注册城市 / 老调用（不传 city）"的兜底。
+poi_routing = "city_date"

@@ -3,6 +3,7 @@
 > 大连理工大学《AI 大模型及其运用》课程项目 · 2 人小组
 > 当前状态：**功能完成**（M0–M4 收尾，M5 交付物在 `docs/submission/`）
 > 场景已锁定：**日常出行**（校园生活圈 46 个点，不是游客一日游）
+> v1.5 新增：**城市约会模式**（商圈辐射 + 电影开场/订座锚点钉死，网页三模式切换）—— 见 `docs/24-约会模式设计.md`
 
 ---
 
@@ -29,7 +30,7 @@
 # 3) 另一个界面（Streamlit，答辩时可作为对照）
 .venv\Scripts\python.exe -m streamlit run ui/app.py
 
-# 4) 跑测试，确认项目健康（当前 262 个，全程不联网，2 秒）
+# 4) 跑测试，确认项目健康（当前 320 个，全程不联网，5 秒）
 .venv\Scripts\python.exe -m unittest discover -s tests -t .
 
 # 5) 跑基线对比（4 个算法 × 6 个用例，结果写入 eval/results.md）
@@ -47,6 +48,17 @@
 # 9) 生成"发给别人"的链接（自动从 bat 读口令；--check 会真打一次接口）
 .venv\Scripts\python.exe -m tools.share_link
 .venv\Scripts\python.exe -m tools.share_link https://你的穿透域名 --check
+
+# 10) 加一座新城市（脚手架 → 抓 POI → 拉矩阵 → 体检，详见 docs/08）
+.venv\Scripts\python.exe -m tools.new_city --scaffold suzhou --name 苏州 --lat 31.2989 --lon 120.5853
+.venv\Scripts\python.exe -m tools.new_city --fetch-pois suzhou --keyword 图书馆 --keyword 食堂 --dry-run
+.venv\Scripts\python.exe -m tools.new_city --check
+
+# 11) 上线前自检（部署 / 开穿透之前跑，逐项告诉你卡在哪一层）
+.venv\Scripts\python.exe -m tools.preflight --with-tests
+
+# 12) 开隧道并直接打印"能发人"的链接（认得出 cpolar / cloudflared）
+.venv\Scripts\python.exe -m tools.tunnel
 
 # 开发期可选：不开浏览器验证前端画得对不对（13 项断言 + 生成静态预览页）
 node _render_check.js
@@ -188,24 +200,24 @@ $env:ACCESS_CODE="你自己定的口令"
 ```
 .
 ├── main.py                 命令行入口：读场景 → 解析 → 规划 → 打印 + 落盘 JSON
-├── config\scenarios\       ★ 业务参数全在这里（daily / commute / errand / rainy / tight-budget）
+├── config\scenarios\       ★ 业务参数全在这里（daily / visit / date / commute / errand / rainy / tight-budget）
 ├── data\                   ★ POI 与交通矩阵；data\cities\<key>\ 按城市分目录
 ├── engine\
-│   ├── models.py           ★★ 接口契约（唯一的类定义，冻结文件，v1.4）
+│   ├── models.py           ★★ 接口契约（唯一的类定义，冻结文件，v1.5：新增 zone / anchors）
 │   ├── config.py           场景配置加载
 │   ├── geo.py              距离 / 时间 / 费用估算
-│   ├── constraints.py      硬约束校验 + 评分
-│   ├── strategies.py       所有规划算法（stub / random / greedy / two_opt）
+│   ├── constraints.py      硬约束校验 + 评分（v1.5 新增 ANCHOR_MISS）
+│   ├── strategies.py       所有规划算法（stub / random / greedy / two_opt / date）
 │   ├── adjust.py           局部调整（打补丁 → 重铺时间轴 → 重算分）
 │   └── planner.py          ★ 唯一对外入口 plan()
-├── service\                用例层：三种入口共用（usecases / dto / exporters / compare）
-├── api\                    HTTP 接口与服务启动（routes / server / asgi_min）
-├── web\index.html          ★ 四页签前端（无构建、离线渲染）
-├── llm\                    自然语言解析 / 解说 / 局部调整听懂
+├── service\                用例层：三种入口共用（usecases / dto / exporters / compare / date_mode）
+├── api\                    HTTP 接口与服务启动（routes / server / asgi_min；v1.5 新增 /api/date/* 三端点）
+├── web\index.html          ★ 页签前端（无构建、离线渲染；三模式：校内游览 / 访客参观 / 城市约会）
+├── llm\                    自然语言解析 / 解说 / 局部调整听懂 / 访客与约会简报（date_brief）
 ├── ui\                     Streamlit 页面（app.py 管交互，render.py 管展示）
 ├── mock\                   请求样例（6 个用例，评测与演示用）
 ├── eval\                   基线对比脚本与结果
-├── tests\                  单元测试（210 个）
+├── tests\                  单元测试（320 个，含约会模式 test_date_mode.py）
 ├── schemas\                接口契约的 JSON 文档版（给人看）
 ├── tools\                  高德步行耗时抓取（生成 travel_matrix.csv）
 └── docs\                   接口契约 / 验收清单 / 需求说明书 / submission 交付物
@@ -244,6 +256,8 @@ $env:ACCESS_CODE="你自己定的口令"
 | `docs/场景定义.md` | 日常出行场景的边界、六种情形、已知缺口 |
 | `docs/06-内网穿透与分享.md` | 要把网页给别人看（cpolar 实操 / 故障对照 / 安全底线） |
 | `docs/07-v2.0路线图.md` | **下一步做什么**：四条主线 + 编号任务 + 里程碑 |
+| `docs/08-部署上线.md` | 买域名、备案、ECS、Nginx、HTTPS（**上线前必读第零节**） |
+| `docs/09-上线操作清单.md` | **要你亲自做的事**：勾选式清单，每步带预期结果 |
 | `docs/数据来源.md` | 46 个点的来源与核实纪律 |
 | `docs/submission/课程报告.md` | **交付物**：课程报告 |
 | `docs/submission/答辩讲稿.md` | **交付物**：15 分钟讲稿 + 演示步骤 + 翻车预案 |

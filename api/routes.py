@@ -21,6 +21,8 @@ from service.dto import to_api_dict, to_map_points
 from service.usecases import (
     adjust_plan,
     build_request,
+    detailed_itinerary_plan,
+    enhance_plan,
     narrate_plan,
     options,
     plan_context_for,
@@ -67,6 +69,29 @@ def get_options(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
     return _ok(options())
 
 
+def get_llm(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """大模型调用面板的数据源。
+
+    回答三个问题：**通没通**（enabled）、**怎么选的模型**（router_mode + 路由表）、
+    **刚才发生了什么**（recent：任务 / 模型 / 来源 / 耗时 / 是否失败）。
+
+    刻意不做成"日志接口"：`recent` 只在内存里留最近 20 条，进程重启即清空 ——
+    面板要的是"现在"，不是审计。
+    """
+    from llm import router
+    from llm.client import get_client
+
+    c = get_client()
+    return _ok({
+        "enabled": bool(getattr(c, "enabled", False)),
+        "model": str(getattr(c, "model", "") or ""),
+        "router_mode": router.router_mode(),
+        "roles": router.ROLE_MODELS,
+        "judge": router.JUDGE_MODEL,
+        "recent": router.recent(8),
+    })
+
+
 def post_plan(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     """生成行程。
 
@@ -84,19 +109,48 @@ def post_plan(req: HttpRequest) -> tuple[int, dict[str, Any]]:
 
     `narrate` 默认 **false**：解说写进 `theme/tips/meta.narrative`；
     没配 LLM Key 时用规则模板（同样确定），配了才多一次模型调用。
+
+    `no_llm` 默认 **false**：置 true 时**强制规则解析 + 规则解说**，一个模型都不调 ——
+    网页上的「模型开/关」对照就是靠它；同一句话开与关的差别（比如"别太赶"能不能被听懂）
+    可以直接摆在一起看，也顺手证明了没有模型系统照样跑得动。
+
+    `model` 可选：指定模型名则**绕过自动路由**、整次请求都用它；不传就自动挑。
+
+    `detailed` 默认 **false**（老调用方 / 测试行为逐字不变）。前端默认勾选，
+    置 true 时把「规则骨架 + 校区事实层 + 大模型」三层编排写进
+    `plan.meta["detailed_itinerary"]`，并把入校须知写进 `meta["visitor_briefing"]`。
+    只增 meta 键，不动 `days/items`，因此与 `no_llm` 组合正好构成
+    「模型开 / 关」对照：站点与时刻不变，措辞层有 / 无增量。
     """
     body = req.get("body") or {}
+    no_llm = bool(body.get("no_llm"))
+    model = (body.get("model") or "").strip() or None
+    if no_llm:
+        model = None
+    must_leave = (body.get("must_leave") or "").strip() or None
     try:
         r = _run_plan(body, body.get("scenario"), body.get("strategy"),
-                      body.get("realtime", False))
-        if body.get("narrate"):
-            r = narrate_plan(r)
+                      body.get("realtime", False), use_llm=not no_llm, model=model)
+        if body.get("narrate") and body.get("detailed"):
+            # v1.6.2 提速：两个增强都开时并行跑（各一次模型调用，串行要等两倍时间）
+            r = enhance_plan(r, query=str(body.get("query") or ""),
+                             enabled=not no_llm, model=model)
+        elif body.get("narrate"):
+            r = narrate_plan(r, enabled=not no_llm, model=model)
+        elif body.get("detailed"):
+            r = detailed_itinerary_plan(r, query=str(body.get("query") or ""),
+                                        enabled=not no_llm, model=model)
     except KeyError as e:                       # 未知算法名
         return _err(str(e).strip('"'), 400)
     except Exception as e:                      # noqa: BLE001 - 接口层兜底，不能让 500 裸奔
         return _err("规划失败：%s" % e, 500)
 
-    return _ok({"plan": to_api_dict(r), "map": to_map_points(r)})
+    payload = {"plan": to_api_dict(r), "map": to_map_points(r)}
+    if must_leave:                              # 反向规划：告诉用户"最晚几点到校"
+        from service.extras import reverse_hint
+
+        payload["reverse"] = reverse_hint(payload["plan"], must_leave)
+    return _ok(payload)
 
 
 def post_adjust(req: HttpRequest) -> tuple[int, dict[str, Any]]:
@@ -152,7 +206,8 @@ def post_adjust(req: HttpRequest) -> tuple[int, dict[str, Any]]:
     })
 
 
-def _prepare(body: dict[str, Any], scenario: str | None, use_realtime: bool):
+def _prepare(body: dict[str, Any], scenario: str | None, use_realtime: bool,
+             use_llm: bool = True, model: str | None = None):
     """「造请求 → 造上下文」。顺序很重要：**先有请求（知道去哪个城市、几天），才抓天气**。
 
     反过来的话就成了"排完行程再问天气预报"，重排也就无从谈起。
@@ -161,17 +216,80 @@ def _prepare(body: dict[str, Any], scenario: str | None, use_realtime: bool):
         req = PlanRequest.from_dict(body["request"])
     else:
         req = build_request(text=body.get("query", ""), scenario=scenario,
-                            overrides=body.get("overrides") or {})
+                            overrides=body.get("overrides") or {},
+                            use_llm=use_llm, model=model)
 
     ctx = plan_context_for(req, enabled=bool(use_realtime))
     return req, ctx
 
 
 def _run_plan(body: dict[str, Any], scenario: str | None, strategy: str | None,
-              use_realtime: bool):
+              use_realtime: bool, use_llm: bool = True, model: str | None = None):
     """统一的「造请求 → 造上下文 → 规划」。三个接口都要用，抽出来避免口径漂移。"""
-    req, ctx = _prepare(body, scenario, use_realtime)
+    req, ctx = _prepare(body, scenario, use_realtime, use_llm=use_llm, model=model)
     return plan_from_request(req, scenario=scenario, strategy=strategy, ctx=ctx)
+
+
+def post_checkup(req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """行程体检：把已经排好的行程交给模型挑毛病（不重新规划、不改数字）。
+
+    body: {"plan": {...to_api_dict 的返回...}, "model": "可选，锁定模型"}
+
+    设计上宁可少报也不许瞎报：每条问题必须带 evidence，否则在 `llm/checkup.py` 里被丢掉。
+    """
+    body = req.get("body") or {}
+    plan = body.get("plan")
+    if not isinstance(plan, dict):
+        return _err("缺少 plan（把 /api/plan 返回的 plan 原样传进来）", 400)
+    try:
+        from llm.checkup import checkup
+        from service.usecases import llm_client
+
+        model = (body.get("model") or "").strip() or None
+        out = checkup(plan, client=llm_client(model), enabled=True)
+    except Exception as e:                      # noqa: BLE001
+        return _err("体检失败：%s" % e, 500)
+    return _ok(out)
+
+
+def post_extras(req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """四个附加能力共用一个端点，按 `action` 分派。
+
+    body: {"action": "negotiate|audience|spiel|reverse", "plan": {...}, ...}
+      · negotiate  → 超支时给三个可执行方案（每个带 overrides，前端拿去重排）
+      · audience   → {"audience": "peer|parent"}，同一份行程两种说法
+      · spiel      → 每站 60–100 字讲解词
+      · reverse    → {"must_leave": "16:00"}，算最晚到校时间
+
+    全部"数字本地算、模型只写话"，模型挂了一律回模板，前端不用判断有没有 Key。
+    """
+    from service import extras
+    from service.usecases import llm_client
+
+    body = req.get("body") or {}
+    action = (body.get("action") or "").strip()
+    plan = body.get("plan")
+    if not isinstance(plan, dict):
+        return _err("缺少 plan（把 /api/plan 返回的 plan 原样传进来）", 400)
+
+    model = (body.get("model") or "").strip() or None
+    client = llm_client(model)
+    enabled = not bool(body.get("no_llm"))
+    try:
+        if action == "negotiate":
+            out = extras.negotiate(plan, client=client, enabled=enabled)
+        elif action == "audience":
+            out = extras.audience(plan, which=(body.get("audience") or "peer"),
+                                  client=client, enabled=enabled)
+        elif action == "spiel":
+            out = extras.spiel(plan, client=client, enabled=enabled)
+        elif action == "reverse":
+            out = extras.reverse_hint(plan, (body.get("must_leave") or "").strip())
+        else:
+            return _err("未知 action：%s" % action, 400)
+    except Exception as e:                      # noqa: BLE001
+        return _err("处理失败：%s" % e, 500)
+    return _ok(out)
 
 
 def post_export(req: HttpRequest) -> tuple[int, dict[str, Any]]:
@@ -224,16 +342,170 @@ def post_reload(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
     return _ok({"reloaded": True})
 
 
+# ---------------------------------------------------------------- 约会模式（v1.5）
+
+def get_date_info(req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """约会模式面板初始数据：商圈、影院、场次（演示数据口径原样透传）。
+
+    query 可带 ?city=dalian。
+    """
+    from service.date_mode import date_info
+
+    city = str((req.get("query") or {}).get("city") or "dalian").strip() or "dalian"
+    try:
+        return _ok(date_info(city=city))
+    except Exception as e:                      # noqa: BLE001
+        return _err("约会信息读取失败：%s" % e, 500)
+
+
+def post_date_locate(req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """按坐标找最近的商圈（网页「我在这里」按钮）。
+
+    body: {"lat": 38.87, "lon": 121.56, "city": "dalian"}
+    距离按各商圈 POI 质心的直线距离估算，离线可复现，不调外部定位 API。
+    """
+    from service.date_mode import locate
+
+    body = req.get("body") or {}
+    try:
+        lat = float(body.get("lat"))
+        lon = float(body.get("lon"))
+    except (TypeError, ValueError):
+        return _err("缺少或非法的 lat/lon", 400)
+    city = str(body.get("city") or "dalian").strip() or "dalian"
+    try:
+        return _ok(locate(lat, lon, city=city))
+    except Exception as e:                      # noqa: BLE001
+        return _err("定位失败：%s" % e, 500)
+
+
+def post_date_brief(req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """约会模式一站式入口：排程 + 简报。
+
+    body 形如::
+
+        {"query": "想约会", "start_time": "13:00", "zone": "西安路",
+         "city": "dalian", "origin": "黑石礁公园", "strategy": "date",
+         "movie":  {"poi": "DL205", "time": "14:30"},
+         "dinner": {"poi": "星海渔港", "time": "18:00"},
+         "anchors": [ ...自定义固定安排（v1.6.3，原样透传）... ],
+         "no_llm": false, "model": ""}
+
+    - movie / dinner 是面板勾选结果，服务端转成引擎锚点（硬时刻）
+    - 一句话行程（query）里**写明了**的时刻/地点优先于面板勾选（v1.6.3）：
+      冲突时以文本为准，冲突过程写进 plan.meta["date_query_overrides"]，
+      前端如实展示"哪里被一句话改掉了"
+    - 简报与行程同一次返回：模型只措辞，时刻全部来自行程事实
+    """
+    from llm.date_brief import briefing as date_briefing
+    from service.date_mode import anchors_from_body, query_overrides
+    from service.usecases import llm_client
+
+    body = req.get("body") or {}
+    no_llm = bool(body.get("no_llm"))
+    model = (body.get("model") or "").strip() or None
+    zone = str(body.get("zone") or "").strip()
+    city = str(body.get("city") or "").strip()
+
+    overrides: dict[str, Any] = dict(body.get("overrides") or {})
+    if city:
+        overrides["city"] = city
+    if zone:
+        overrides["zone"] = zone
+    if (body.get("start_time") or "").strip():
+        overrides["start_time"] = body["start_time"].strip()
+    if (body.get("origin") or "").strip():
+        overrides["origin"] = body["origin"].strip()
+    if (body.get("date") or "").strip():
+        overrides["date"] = body["date"].strip()
+
+    # ---- 一句话优先（v1.6.3）----
+    # 文本里写明的商圈 / 场次时间 / 地点覆盖面板勾选；没写的维度照旧走面板。
+    city_for_parse = city or "dalian"
+    qov = query_overrides(str(body.get("query") or ""), city=city_for_parse)
+    conflicts: list[str] = []
+    if qov.get("zone") and qov["zone"] != zone:
+        if zone:
+            conflicts.append("商圈以一句话为准：「%s」（面板选的是「%s」）"
+                             % (qov["zone"], zone))
+        overrides["zone"] = qov["zone"]
+        zone = qov["zone"]
+
+    def _merge(kind: str, label: str) -> dict | None:
+        """面板勾选 ∪ 一句话：文本写了的维度覆盖面板，其余照旧。"""
+        sel = body.get(kind) if isinstance(body.get(kind), dict) else {}
+        poi = qov.get(kind + "_poi") or str(sel.get("poi") or "").strip()
+        time = qov.get(kind + "_time") or str(sel.get("time") or "").strip()
+        if not poi or not time:
+            return None
+        sel_time = str(sel.get("time") or "").strip()
+        if qov.get(kind + "_time") and sel_time and sel_time != qov[kind + "_time"]:
+            conflicts.append("%s时间以一句话为准：%s（面板选的是 %s）"
+                             % (label, qov[kind + "_time"], sel_time))
+        return {"poi": poi, "time": time}
+
+    merged_movie = _merge("movie", "电影开场")
+    merged_dinner = _merge("dinner", "晚餐订座")
+    if merged_movie:
+        body = dict(body)
+        body["movie"] = merged_movie
+    if merged_dinner:
+        body = dict(body)
+        body["dinner"] = merged_dinner
+
+    anchors = anchors_from_body(body)
+    if anchors:
+        overrides["anchors"] = anchors
+    if qov.get("must_visit"):
+        extra = list(overrides.get("must_visit") or [])
+        extra += [m for m in qov["must_visit"] if m not in extra]
+        overrides["must_visit"] = extra
+    # 关键：_run_plan -> _prepare 只认 body["overrides"]，
+    # 这里必须把面板拼出的约束合并回去，否则全部被静默丢弃。
+    body = dict(body)
+    body["overrides"] = overrides
+
+    try:
+        r = _run_plan(body, body.get("scenario") or "date",
+                      body.get("strategy"), body.get("realtime", False),
+                      use_llm=not no_llm, model=model)
+    except KeyError as e:                       # 未知算法名
+        return _err(str(e).strip('"'), 400)
+    except Exception as e:                      # noqa: BLE001
+        return _err("约会规划失败：%s" % e, 500)
+
+    # 冲突留痕：改了什么、为什么改，全写进 meta —— 界面与导出都能如实回放
+    if conflicts or qov.get("picked"):
+        r.meta["date_query_overrides"] = {
+            "conflicts": conflicts,
+            "picked": qov.get("picked", []),
+        }
+
+    try:
+        brief = date_briefing(r, zone=zone,
+                              client=llm_client(model), enabled=not no_llm)
+    except Exception as e:                      # noqa: BLE001 - 简报失败不拖垮行程
+        brief = {"headline": "简报生成失败（行程本身有效）：%s" % e}
+
+    return _ok({"plan": to_api_dict(r), "map": to_map_points(r), "brief": brief})
+
+
 # ---------------------------------------------------------------- 路由表
 
 ROUTES: list[tuple[str, str, Handler]] = [
     ("GET", "/api/health", health),
     ("GET", "/api/options", get_options),
+    ("GET", "/api/llm", get_llm),
     ("POST", "/api/plan", post_plan),
     ("POST", "/api/adjust", post_adjust),
     ("POST", "/api/compare", post_compare),
+    ("POST", "/api/checkup", post_checkup),
+    ("POST", "/api/extras", post_extras),
     ("POST", "/api/export", post_export),
     ("POST", "/api/reload", post_reload),
+    ("GET", "/api/date/info", get_date_info),
+    ("POST", "/api/date/locate", post_date_locate),
+    ("POST", "/api/date/brief", post_date_brief),
 ]
 
 

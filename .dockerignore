@@ -1,0 +1,34 @@
+# 构建镜像时**排除**的东西。
+# .venv 尤其重要：几百 MB 且平台相关的二进制，拷进 Linux 镜像会直接坏掉。
+
+.venv/
+venv/
+env/
+.git/
+.github/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 本地数据与产出
+outputs/
+.cache/
+_preview/
+docs/demo_outputs/
+eval/
+*.log
+
+# 密钥绝不能进镜像
+.env
+*.env
+!.env.example
+
+# 开发期杂项
+.idea/
+.vscode/
+.learnbuddy/
+*.md
+!README.md
+_preview*
+node_modules/

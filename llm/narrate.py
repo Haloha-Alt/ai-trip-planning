@@ -106,7 +106,8 @@ def narrate(resp: PlanResponse, client=None, use_llm: bool = True) -> PlanRespon
             got = guarded_json(
                 client, NARRATE_SYSTEM,
                 NARRATE_USER.format(city=resp.request.city or "", items=_items_text(resp)),
-                fallback=base, on_warn=resp.warnings.append, tag="narrate")
+                fallback=base, on_warn=resp.warnings.append, tag="narrate",
+                retries=0, client_kwargs={"timeout": 10.0})
         except Exception:                       # noqa: BLE001 - 解说永远不能拖垮主流程
             got = base
         if isinstance(got, dict) and isinstance(got.get("items"), dict):

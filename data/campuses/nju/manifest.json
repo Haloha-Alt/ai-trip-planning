@@ -1,0 +1,18 @@
+{
+  "key": "nju",
+  "name": "南京大学（鼓楼校区）",
+  "city": "nanjing",
+  "level": "L0",
+  "gates": ["汉口路正门（鼓楼北园）"],
+  "alt_campuses": ["仙林（仙林大道正门）", "浦口", "苏州"],
+  "visitor_difficulty": 3,
+  "guide_doc": "docs/23-C9高校访客参观指南/06-南京大学.md",
+  "sources": [
+    {"kind": "research", "what": "开放日预约+民国建筑群动线调研", "via": "南大官微访客入校指引、校史博物馆官网、现代快报2025-12-13", "date": "2026-11-04"}
+  ],
+  "next_steps": [
+    "L1: tools/new_city.py --scaffold nju，按指南 2.2/2.3 点位表抓高德 POI（鼓楼+仙林两个点位集）",
+    "L2: tools.amap_matrix 实测步行矩阵（≥80 边）",
+    "事实层: visitor_guide.json（每天9:00放号、半年每校区1次；拉贝纪念馆在校外可独立参观）"
+  ]
+}

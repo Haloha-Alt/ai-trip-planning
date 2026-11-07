@@ -37,12 +37,38 @@ def _mask(v: str) -> str:
     return v[:6] + "…" + v[-4:] if len(v) > 12 else "已设置(过短)"
 
 
+def _key_source(v: str) -> str:
+    """对比 shell 环境变量与 .env 里的值：不一致说明进程拿到的是旧 Key。
+
+    `load_dotenv()` **不覆盖已存在的环境变量** —— 如果启动 server 的终端里
+    早就 export 过一个失效的 LLM_API_KEY，改 .env 也不会生效，必须重启
+    （或先清掉 shell 变量）。这是「改了 .env 还是 401」最常见的原因。
+    """
+    from service.bootstrap import ROOT
+
+    env_path = Path(ROOT) / ".env"
+    dot_key = ""
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("LLM_API_KEY="):
+                dot_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                break
+    if not v:
+        return "未设置"
+    if dot_key and dot_key != v:
+        return "⚠ shell 环境变量与 .env 不一致（.env=%s）—— 改 .env 不会生效，请重启服务" % _mask(dot_key)
+    return "与 .env 一致"
+
+
 def main(argv: list[str]) -> int:
     print("== 环境变量 ==")
     for name in ("LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LLM_TIMEOUT"):
         raw = (os.environ.get(name) or "").strip()
         shown = _mask(raw) if name == "LLM_API_KEY" else (raw or "(用默认值)")
         print("  %-13s %s" % (name, shown))
+    key = (os.environ.get("LLM_API_KEY") or "").strip()
+    if key:
+        print("  %-13s 来源：%s" % ("", _key_source(key)))
 
     from llm.client import LLMError, get_client
 
@@ -63,7 +89,9 @@ def main(argv: list[str]) -> int:
         reply = client.chat("你是一个连通性测试端点。", "只回复两个字：可用", max_tokens=8)
     except LLMError as e:
         print("  [失败] %s" % e)
-        print("\n常见原因：Key 无效/过期（401）、模型名写错（404）、余额不足（402）、网络或代理不通。")
+        print("常见原因：Key 无效/过期（401）、模型名写错（404）、余额不足（402）、网络或代理不通。")
+        if getattr(e, "fatal", False):
+            print("该错误是**确定性失败**（HTTP 4xx），重试也不会好 —— 修配置后重跑本探针。")
         return 1
     cost = time.time() - t0
     print("  [ok] 用时 %.2fs，回复：%s" % (cost, (reply or "").strip()[:40]))

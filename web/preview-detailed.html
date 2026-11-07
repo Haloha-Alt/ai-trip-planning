@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>详细行程预览 · 清华大学 · 模型开/关对照</title>
+<style>
+
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --line:#e3e6ea; --ink:#1f2328;
+    --sub:#6b7280; --accent:#2563eb; --accent-soft:#eaf1ff;
+    --warn:#b45309; --warn-bg:#fff7ed; --ok:#15803d; --ok-bg:#f0fdf4;
+    --stay:#2563eb; --move:#9aa4b2; --wait:#f59e0b; --best:#15803d; --best-bg:#f0fdf4;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{padding:18px 24px;background:var(--card);border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:19px}
+  header p{margin:4px 0 0;color:var(--sub);font-size:13px}
+  .wrap{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px 24px 40px}
+  @media (max-width:900px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:15px}
+  label{display:block;margin:10px 0 4px;color:var(--sub);font-size:12px}
+  input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);
+       border-radius:7px;background:#fff;color:var(--ink);font-size:13px}
+  textarea{resize:vertical;min-height:76px}
+  button{width:100%;padding:10px;margin-top:14px;border:0;border-radius:7px;
+       background:var(--accent);color:#fff;font-size:14px;cursor:pointer}
+  button:hover{filter:brightness(1.06)}
+  button.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  button:disabled{opacity:.55;cursor:progress}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}
+  @media (max-width:900px){.metrics{grid-template-columns:repeat(3,1fr)}}
+  .metric{background:var(--accent-soft);border-radius:8px;padding:10px;text-align:center}
+  .metric b{display:block;font-size:17px}
+  .metric span{font-size:11px;color:var(--sub)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--sub);font-weight:600;font-size:12px}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .day{margin-bottom:18px}
+  .warn{background:var(--warn-bg);border:1px solid #fed7aa;color:var(--warn);
+        border-radius:8px;padding:10px;margin-top:12px;font-size:13px}
+  .ok{background:var(--ok-bg);border:1px solid #bbf7d0;color:var(--ok);
+      border-radius:8px;padding:10px;margin-top:12px;font-size:13px}
+  .muted{color:var(--sub);font-size:12px}
+  .exp{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .exp button{width:auto;padding:7px 12px;margin:0;font-size:13px}
+  svg{width:100%;height:auto;background:#fbfcfe;border:1px solid var(--line);border-radius:8px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:99px;background:var(--accent-soft);
+        color:var(--accent);font-size:12px;margin-right:6px}
+  .narr{background:#f8fafc;border-left:3px solid var(--accent);border-radius:6px;
+        padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.7}
+  .tip{color:var(--sub);font-size:12px;line-height:1.5;margin-top:2px}
+
+  /* ---- 详细行程 v1.6：规则骨架 + 校区事实层 + 大模型，三层分开展示 ---- */
+  .di-hero{background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;
+           padding:14px 16px;margin-bottom:14px}
+  .di-hero h2{margin:0 0 8px;font-size:17px}
+  .di-hero p{margin:5px 0 0;font-size:13px;line-height:1.7}
+  .di-model-note{margin-top:9px;padding:8px 11px;border-radius:8px;background:var(--card);
+                 border:1px dashed var(--line);font-size:12.5px;line-height:1.7}
+  .di-model-note.ok{border-style:solid;border-color:var(--accent)}
+  .di-model-note .muted{display:block;margin-top:3px}
+  .di-badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;
+            font-weight:600;margin:0 6px 4px 0;background:var(--card);
+            border:1px solid var(--line);color:var(--sub)}
+  .di-badge.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .di-sec{margin:18px 0 8px;font-size:14px;font-weight:700;
+          border-left:3px solid var(--accent);padding-left:9px}
+  .di-arch{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .di-arch-col{background:var(--card);border:1px solid var(--line);border-radius:8px;
+               padding:11px 12px;font-size:12px;line-height:1.65;min-width:0}
+  .di-arch-col b{display:block;font-size:13px;margin-bottom:6px;color:var(--accent)}
+  .di-arch-col ul{margin:0;padding-left:16px}
+  .di-arch-col .muted{display:block;margin-top:6px}
+  .di-box{background:var(--card);border:1px solid var(--line);border-radius:8px;
+          padding:12px 14px;font-size:13px;line-height:1.75}
+  .di-box p{margin:0 0 7px}
+  .di-box ul{margin:4px 0 0;padding-left:18px}
+  .di-box li{margin:2px 0}
+  .di-step{border:1px solid var(--line);border-radius:10px;background:var(--card);
+           margin-bottom:12px;overflow:hidden}
+  .di-step-head{display:flex;align-items:center;gap:10px;padding:10px 14px;
+                background:var(--accent-soft);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .di-seq{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+          display:inline-flex;align-items:center;justify-content:center;font-size:13px;
+          font-weight:700;flex:none}
+  .di-step-head h3{margin:0;font-size:15px;flex:1;min-width:130px}
+  .di-meta{font-size:12px;color:var(--sub)}
+  .di-body{padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .di-blk{min-width:0}
+  .di-blk h4{margin:0 0 5px;font-size:11.5px;font-weight:700;color:var(--sub);letter-spacing:.4px}
+  .di-blk p{margin:0 0 7px;font-size:12.5px;line-height:1.75}
+  .di-blk ul{margin:0;padding-left:16px;font-size:12.5px;line-height:1.75}
+  .di-llm{grid-column:1/-1;background:var(--accent-soft);border-left:3px solid var(--accent);
+          border-radius:6px;padding:10px 12px;font-size:12.5px;line-height:1.75}
+  .di-llm h4{color:var(--accent);margin-bottom:7px}
+  .di-llm p{margin:0 0 6px}
+  .di-access{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;
+             border:1px solid var(--line);color:var(--sub);margin-right:6px}
+  .di-access.warn{border-color:var(--accent);color:var(--accent)}
+  .di-tags{margin:8px 0 2px}
+  .di-facts{border-top:1px dashed var(--line);padding-top:8px;font-size:11.5px;
+            color:var(--sub);line-height:1.8}
+  .di-facts b{color:var(--ink);font-weight:600}
+  .di-src{margin-top:6px;font-size:11px;color:var(--sub)}
+  .di-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media (max-width:900px){.di-arch,.di-body,.di-compare{grid-template-columns:1fr}}
+
+  /* ---- 页签 ---- */
+  .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  .tab{width:auto;margin:0;padding:8px 16px;background:#fff;color:var(--sub);
+       border:1px solid var(--line);font-size:13px}
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .pane{min-height:80px}
+
+  /* ---- 时间轴 ---- */
+  .legend{display:flex;gap:16px;align-items:center;font-size:12px;color:var(--sub);margin-bottom:8px}
+  .legend i{display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:5px}
+  .tl-day{margin-bottom:14px}
+  .tl-day h3{margin:0 0 6px;font-size:13px;font-weight:600}
+  .tl-day h3 span{color:var(--sub);font-weight:400;font-size:12px;margin-left:8px}
+
+  /* ---- 算法对比 ---- */
+  .cmp-summary{background:var(--best-bg);border:1px solid #bbf7d0;color:#14532d;
+       border-radius:8px;padding:10px 12px;font-size:13px;margin:0 0 12px}
+  tr.best td{background:var(--best-bg);font-weight:600}
+  tr.best td:first-child{color:var(--best)}
+  .bars{margin-top:14px}
+  .bar-row{display:grid;grid-template-columns:96px 1fr 62px;gap:10px;align-items:center;
+       margin-bottom:7px;font-size:12px}
+  .bar-track{background:#eef1f5;border-radius:99px;height:14px;overflow:hidden}
+  .bar-fill{height:14px;border-radius:99px;background:var(--accent)}
+  .bar-fill.dim{background:#9aa4b2}
+  .bar-val{text-align:right;font-variant-numeric:tabular-nums;color:var(--sub)}
+
+  details{margin-top:12px}
+  summary{cursor:pointer;color:var(--sub);font-size:13px}
+  pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;
+      font-size:12px;line-height:1.5;max-height:340px}
+
+
+  /* ---------- 顶部菜单栏（三主题共用一套结构） ---------- */
+  #menubar{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:8px;
+    padding:8px 18px;background:var(--card);border-bottom:1px solid var(--line);
+    font-size:12.5px;box-shadow:0 1px 0 rgba(0,0,0,.02)}
+  #menubar .brand{font-weight:700;font-size:14px;letter-spacing:.5px;margin-right:4px}
+  #menubar .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+  #menubar .sp{flex:1}
+  #menubar .lab{color:var(--sub)}
+  #menubar select{width:auto;min-width:230px;padding:5px 8px;font-size:12.5px;
+    border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  #menubar .hint{color:var(--sub);font-size:11.5px;max-width:260px;overflow:hidden;
+    white-space:nowrap;text-overflow:ellipsis}
+  #menubar button{width:auto;margin:0;padding:5px 10px;border-radius:6px;font-size:12.5px;
+    background:transparent;color:var(--ink);border:1px solid var(--line)}
+  #menubar button:hover{background:var(--accent-soft);filter:none}
+  #menubar .tb.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  #menubar .mb{background:var(--accent-soft);border-color:transparent;color:var(--ink)}
+
+  /* ---------- 三套主题：只换变量，不碰结构 ---------- */
+  html[data-theme="dark"]{
+    --bg:#0f1216; --card:#171b21; --line:#262c34; --ink:#e6ebf2;
+    --sub:#93a1b1; --accent:#4f8cff; --accent-soft:#16233a;
+    --warn:#f0b429; --warn-bg:#2a2114; --ok:#3ecf8e; --ok-bg:#12251c;
+    --stay:#4f8cff; --move:#5b6675; --wait:#f0b429; --best:#3ecf8e; --best-bg:#12251c;
+  }
+  html[data-theme="paper"]{
+    --bg:#f7f4ec; --card:#fffdf7; --line:#e0d8c6; --ink:#2a2620;
+    --sub:#7a7264; --accent:#b23a2f; --accent-soft:#f7ece9;
+    --warn:#8a5a2f; --warn-bg:#fdf6ec; --ok:#3f6b4a; --ok-bg:#eef3ea;
+    --stay:#b23a2f; --move:#a99f8c; --wait:#c0872a; --best:#3f6b4a; --best-bg:#eef3ea;
+  }
+  html[data-theme="dark"] input, html[data-theme="dark"] select,
+  html[data-theme="dark"] textarea{background:#12161c;color:var(--ink)}
+  html[data-theme="dark"] button.ghost{background:#12161c}
+
+  /* ================= 结构级主题：不只换颜色，排版也跟着换 =================
+     三套主题改的是**版式语言**：字体族、圆角、间距、边框样式、指标网格列数、按钮形状。
+     只换色 = 换皮；换版式才算"另一个界面"。 */
+
+  /* ---- 纸媒：衬线标题 / 无双线不收边 / 三列指标 / 方角描边按钮 ---- */
+  html[data-theme="paper"] body{
+    background-image:repeating-linear-gradient(to bottom,transparent 0 29px,rgba(42,38,32,.045) 29px 30px)}
+  html[data-theme="paper"] .wrap{grid-template-columns:300px 1fr;gap:28px;padding:20px 36px 64px}
+  html[data-theme="paper"] header{padding:26px 36px 16px;border-bottom:3px double var(--line);background:transparent}
+  html[data-theme="paper"] header h1{font:600 25px/1.35 "Songti SC",Georgia,serif;letter-spacing:1.5px}
+  html[data-theme="paper"] header p{font-size:12.5px;letter-spacing:.3px}
+  html[data-theme="paper"] .card{border:0;border-bottom:1px solid var(--line);
+    border-radius:0;background:transparent;padding:14px 0 16px}
+  html[data-theme="paper"] .card h2{font:600 15px/1.4 "Songti SC",Georgia,serif;letter-spacing:.8px}
+  html[data-theme="paper"] .card h2::before{content:"§ ";color:var(--accent)}
+  html[data-theme="paper"] .metrics{grid-template-columns:repeat(3,1fr);gap:12px 22px}
+  html[data-theme="paper"] .metric{background:transparent;border-radius:0;text-align:left;
+    padding:2px 0 2px 10px;border-left:2px solid var(--accent)}
+  html[data-theme="paper"] .metric b{font:600 21px/1.25 Georgia,"Songti SC",serif}
+  html[data-theme="paper"] button{border-radius:0;background:transparent;color:var(--accent);
+    border:1px solid var(--accent);font-weight:600;letter-spacing:.6px}
+  html[data-theme="paper"] button:hover{background:var(--accent);color:#fff;filter:none}
+  html[data-theme="paper"] button.ghost{border-color:var(--line);color:var(--ink)}
+  html[data-theme="paper"] .tabs{border-bottom:1px solid var(--line);gap:0}
+  html[data-theme="paper"] .tab{border-radius:0;background:transparent;border-bottom:2px solid transparent;color:var(--sub)}
+  html[data-theme="paper"] .tab.active{background:transparent;color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+  html[data-theme="paper"] table td{border-bottom:1px dotted var(--line)}
+
+  /* ---- 仪表盘：等宽标题 / 紧凑卡片 / 三列指标带亮条 / 小方角 ---- */
+  html[data-theme="dark"] body{
+    background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+    background-size:32px 32px}
+  html[data-theme="dark"] .wrap{grid-template-columns:320px 1fr;gap:12px;padding:12px 18px 44px}
+  html[data-theme="dark"] header{padding:14px 18px;background:transparent;border-bottom:1px solid #232b35}
+  html[data-theme="dark"] header h1{font:600 15px/1.3 "SF Mono",Consolas,monospace;
+    letter-spacing:1px}
+  html[data-theme="dark"] header p{font:11.5px/1.6 "SF Mono",Consolas,monospace;color:#7b8a9c}
+  html[data-theme="dark"] .card{border-radius:4px;border-color:#2a323c;
+    background:linear-gradient(180deg,#1a1f26,#151a20)}
+  html[data-theme="dark"] .card h2{font:600 13px/1.4 "SF Mono",Consolas,monospace;letter-spacing:1.2px}
+  html[data-theme="dark"] .metrics{grid-template-columns:repeat(3,1fr);gap:6px}
+  html[data-theme="dark"] .metric{background:#12171d;border:1px solid #232b35;border-left:2px solid var(--accent);
+    border-radius:3px;text-align:left;padding:7px 9px}
+  html[data-theme="dark"] .metric b{font-family:"SF Mono",Consolas,monospace;letter-spacing:.5px}
+  html[data-theme="dark"] button{border-radius:3px;background:#1b2430;color:#cfe0f5;
+    border:1px solid #2b3a4d;letter-spacing:.4px}
+  html[data-theme="dark"] button:hover{background:#22303f;filter:none}
+  html[data-theme="dark"] .tabs{gap:4px}
+  html[data-theme="dark"] .tab{border-radius:3px;background:#12171d;border:1px solid #232b35}
+  html[data-theme="dark"] .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  html[data-theme="dark"] #menubar{background:#12171d;border-bottom:1px solid #232b35}
+
+  /* ---- 奶蛙：奶黄 + 超大圆角 + 立体按钮 + 三趾脚印底 ---- */
+  html[data-theme="naiwa"]{
+    --bg:#fbf4df; --card:#fffdf6; --line:#eee0b4; --ink:#4a3c1c;
+    --sub:#9c8a58; --accent:#d3941c; --accent-soft:#fdf1cf;
+    --warn:#a86f14; --warn-bg:#fdf3dd; --ok:#5c8a3c; --ok-bg:#eef4e0;
+    --stay:#d3941c; --move:#c4b489; --wait:#d99a20; --best:#5c8a3c; --best-bg:#eef4e0;
+  }
+  html[data-theme="naiwa"] body{
+    background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Cg fill='%23c89a2c' fill-opacity='0.08'%3E%3Cellipse cx='27' cy='53' rx='10' ry='7'/%3E%3Cellipse cx='48' cy='55' rx='8' ry='6'/%3E%3Cellipse cx='35' cy='33' rx='13' ry='9'/%3E%3C/g%3E%3C/svg%3E");
+    background-size:84px 84px}
+  html[data-theme="naiwa"] .wrap{grid-template-columns:360px 1fr;gap:18px;padding:16px 22px 48px}
+  html[data-theme="naiwa"] header{padding:20px 22px;background:transparent;border:0}
+  html[data-theme="naiwa"] header h1{font:800 22px/1.4 "PingFang SC";letter-spacing:.5px;color:#8a6410}
+  html[data-theme="naiwa"] header p{color:#a08a4e}
+  html[data-theme="naiwa"] .card{border-radius:20px;border:0;padding:18px;
+    box-shadow:0 6px 0 #f1e4bd,0 10px 24px rgba(207,164,60,.14)}
+  html[data-theme="naiwa"] .card h2{font-size:15px;color:#8a6410}
+  html[data-theme="naiwa"] .metrics{grid-template-columns:repeat(3,1fr);gap:10px}
+  html[data-theme="naiwa"] .metric{background:#fdf6e0;border-radius:16px;border:2px dashed #ecdcab;
+    text-align:center;padding:10px 6px}
+  html[data-theme="naiwa"] .metric b{font:800 20px/1.2 "PingFang SC";color:#8a6410}
+  html[data-theme="naiwa"] .metric span{color:#a08a4e}
+  html[data-theme="naiwa"] button{border-radius:999px;color:#4a3710;border:0;font-weight:700;
+    background:linear-gradient(180deg,#f9d768,#e5ad2c);box-shadow:0 4px 0 #c08a18}
+  html[data-theme="naiwa"] button:hover{filter:brightness(1.04)}
+  html[data-theme="naiwa"] button:active{transform:translateY(2px);box-shadow:0 2px 0 #c08a18}
+  html[data-theme="naiwa"] button.ghost{background:#fff;color:#8a6410;border:2px solid #eeddab;
+    box-shadow:0 3px 0 #f2e6c2}
+  html[data-theme="naiwa"] input,html[data-theme="naiwa"] select,html[data-theme="naiwa"] textarea{
+    border-radius:14px;border:2px solid #eddfb2;background:#fffdf6}
+  html[data-theme="naiwa"] .tabs{gap:8px}
+  html[data-theme="naiwa"] .tab{border-radius:999px;background:#f8efd2;border:2px solid transparent;color:#8a7434}
+  html[data-theme="naiwa"] .tab.active{background:#e9b62f;color:#4a3710;border-color:#c8931c}
+  html[data-theme="naiwa"] #menubar{background:#fdf8e9;border-bottom:2px solid #f0e2ba}
+  html[data-theme="naiwa"] .pill{background:#fdf1cf;color:#8a6410}
+  html[data-theme="naiwa"] .narr{background:#fdf8e8;border-left:3px solid var(--accent)}
+
+  /* ---- 像素复古：硬边框 + 硬阴影 + 等宽 + 扫描线 ---- */
+  html[data-theme="pixel"]{
+    --bg:#0f1210; --card:#191d18; --line:#3a4a32; --ink:#d9e6c8;
+    --sub:#8fa27e; --accent:#8ad34f; --accent-soft:#232b1e;
+    --warn:#e0c04a; --warn-bg:#2a2718; --ok:#8ad34f; --ok-bg:#1e2a18;
+    --stay:#8ad34f; --move:#5b6b4e; --wait:#e0c04a; --best:#8ad34f; --best-bg:#1e2a18;
+  }
+  html[data-theme="pixel"] body{font-family:"SF Mono",Consolas,"Courier New",monospace;
+    background-image:repeating-linear-gradient(to bottom,rgba(255,255,255,.03) 0 1px,transparent 1px 4px)}
+  html[data-theme="pixel"] .wrap{grid-template-columns:340px 1fr;gap:14px;padding:14px 16px 40px}
+  html[data-theme="pixel"] header{padding:14px 16px;background:transparent;border-bottom:3px solid var(--line)}
+  html[data-theme="pixel"] header h1{font:700 15px/1.4 monospace;letter-spacing:2px}
+  html[data-theme="pixel"] header h1::before{content:"> ";color:var(--accent)}
+  html[data-theme="pixel"] .card{border-radius:0;border:2px solid var(--line);
+    box-shadow:6px 6px 0 rgba(138,211,79,.16);padding:14px}
+  html[data-theme="pixel"] .card h2{font:700 12.5px/1.4 monospace;letter-spacing:2px;text-transform:uppercase}
+  html[data-theme="pixel"] .metrics{grid-template-columns:repeat(3,1fr);gap:8px}
+  html[data-theme="pixel"] .metric{border-radius:0;border:2px solid var(--line);background:#12160f;
+    text-align:left;padding:8px}
+  html[data-theme="pixel"] .metric b{font:700 18px/1.2 monospace;color:var(--accent)}
+  html[data-theme="pixel"] button{border-radius:0;border:2px solid var(--accent);background:var(--accent);
+    color:#0f1210;font:700 13px/1 monospace;letter-spacing:1px;
+    box-shadow:4px 4px 0 rgba(138,211,79,.35)}
+  html[data-theme="pixel"] button:hover{filter:none;transform:translate(-1px,-1px);
+    box-shadow:5px 5px 0 rgba(138,211,79,.45)}
+  html[data-theme="pixel"] button:active{transform:translate(2px,2px);box-shadow:2px 2px 0 rgba(138,211,79,.35)}
+  html[data-theme="pixel"] button.ghost{background:#12160f;color:var(--accent);
+    border-color:var(--line);box-shadow:none}
+  html[data-theme="pixel"] input,html[data-theme="pixel"] select,html[data-theme="pixel"] textarea{
+    border-radius:0;border:2px solid var(--line);background:#0f120e;color:var(--ink);font-family:monospace}
+  html[data-theme="pixel"] .tab{border-radius:0;background:#12160f;border:2px solid var(--line);font-family:monospace}
+  html[data-theme="pixel"] .tab.active{background:var(--accent);color:#0f1210;border-color:var(--accent)}
+  html[data-theme="pixel"] #menubar{background:#12160f;border-bottom:3px solid var(--line);
+    font-family:monospace;gap:6px;font-size:12px}
+  /* 等宽字体 + 字距会把菜单挤到换行，这里统一不换行并让提示文字先让位 */
+  html[data-theme="pixel"] #menubar .brand,
+  html[data-theme="pixel"] #menubar .lab,
+  html[data-theme="pixel"] #menubar button{white-space:nowrap;letter-spacing:.4px}
+  html[data-theme="pixel"] #menubar .hint{max-width:130px}
+  html[data-theme="pixel"] #menubar select{min-width:180px}
+
+  /* ---- 赛博霓虹：切角 + 荧光边 + 渐变标题 ---- */
+  html[data-theme="cyber"]{
+    --bg:#060911; --card:rgba(12,18,32,.86); --line:#1d2c47; --ink:#d7e7ff;
+    --sub:#7f93b5; --accent:#00e5ff; --accent-soft:rgba(0,229,255,.10);
+    --warn:#ffb020; --warn-bg:#241a06; --ok:#31ffa8; --ok-bg:#062218;
+    --stay:#00e5ff; --move:#3d5375; --wait:#ffb020; --best:#ff2d95; --best-bg:#24061a;
+  }
+  html[data-theme="cyber"] body{
+    background-image:radial-gradient(1200px 500px at 20% -10%,rgba(0,229,255,.10),transparent 60%),
+      radial-gradient(900px 400px at 90% 10%,rgba(255,45,149,.10),transparent 60%),
+      linear-gradient(rgba(0,229,255,.05) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(0,229,255,.05) 1px,transparent 1px);
+    background-size:auto,auto,48px 48px,48px 48px;background-attachment:fixed}
+  html[data-theme="cyber"] .wrap{grid-template-columns:330px 1fr;gap:16px;padding:16px 22px 50px}
+  html[data-theme="cyber"] header{padding:18px 22px;background:transparent;border:0}
+  html[data-theme="cyber"] header h1{font:700 20px/1.4 "PingFang SC";letter-spacing:5px;
+    background:linear-gradient(90deg,#00e5ff,#ff2d95);-webkit-background-clip:text;
+    background-clip:text;color:transparent}
+  html[data-theme="cyber"] .card{border:1px solid rgba(0,229,255,.28);border-radius:2px;padding:16px;
+    box-shadow:0 0 26px rgba(0,229,255,.10);clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,
+      100% 100%,14px 100%,0 calc(100% - 14px))}
+  html[data-theme="cyber"] .card h2{font-size:13px;letter-spacing:2px;color:#9fe9ff;text-transform:uppercase}
+  html[data-theme="cyber"] .card h2::before{content:"// "}
+  html[data-theme="cyber"] .metrics{grid-template-columns:repeat(3,1fr);gap:8px}
+  html[data-theme="cyber"] .metric{background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.22);
+    border-radius:2px;padding:8px 10px;text-align:left}
+  html[data-theme="cyber"] .metric b{font-family:monospace;color:#7ff3ff;
+    text-shadow:0 0 10px rgba(0,229,255,.55)}
+  html[data-theme="cyber"] button{border-radius:2px;color:#b8f4ff;letter-spacing:1px;
+    border:1px solid rgba(0,229,255,.45);
+    background:linear-gradient(180deg,rgba(0,229,255,.16),rgba(0,229,255,.06));
+    clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))}
+  html[data-theme="cyber"] button:hover{filter:none;
+    box-shadow:0 0 18px rgba(0,229,255,.35),0 0 2px rgba(0,229,255,.6) inset}
+  html[data-theme="cyber"] button.ghost{background:rgba(255,45,149,.06);
+    border-color:rgba(255,45,149,.35);color:#ffb3d9}
+  html[data-theme="cyber"] input,html[data-theme="cyber"] select,html[data-theme="cyber"] textarea{
+    border-radius:2px;border:1px solid rgba(0,229,255,.25);background:rgba(6,10,18,.9);color:var(--ink)}
+  html[data-theme="cyber"] input:focus,html[data-theme="cyber"] textarea:focus{
+    outline:1px solid rgba(0,229,255,.6)}
+  html[data-theme="cyber"] .tab{border-radius:2px;background:rgba(0,229,255,.05);
+    border:1px solid rgba(0,229,255,.18);color:#8fb9cf}
+  html[data-theme="cyber"] .tab.active{background:rgba(0,229,255,.16);color:#dffaff;
+    border-color:rgba(0,229,255,.6)}
+  html[data-theme="cyber"] #menubar{background:rgba(6,10,18,.92);
+    border-bottom:1px solid rgba(0,229,255,.22)}
+
+/* ==================================================================
+   结构级差异化 v4 —— 四套主题各有各的「按钮语言」
+   本段没有任何一条规则作用于 light / dark：那两套是浅色/深色基准。
+   ================================================================== */
+.actions{display:block}
+.input-col,.result-col{min-width:0}
+/* 奶蛙相关元素在 light / dark 下完全不出现（连盒子都不占） */
+#buddy,#buddyMini,#naiwaTip{display:none}
+
+/* ---- 纸质杂志 ---- */
+html[data-theme="paper"] .wrap{grid-template-columns:1fr 300px}
+html[data-theme="paper"] .input-col{order:2;display:flex;flex-direction:column}
+html[data-theme="paper"] .result-col{order:1}
+html[data-theme="paper"] .input-col > h2{order:-2}
+html[data-theme="paper"] .input-col > .actions{
+  order:-1;display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;
+  padding:0 0 10px;border-bottom:1px solid var(--line)}
+html[data-theme="paper"] .input-col .actions button{
+  width:auto;margin:0;padding:4px 9px;font-size:11.5px;letter-spacing:0}
+html[data-theme="paper"] .input-col .actions #go{
+  padding:4px 20px;font-size:12.5px;font-weight:700}
+html[data-theme="paper"] .input-col .actions #go::before{content:"§ "}
+
+/* ---- 奶蛙：超大胶囊主按钮 + 小圆饼副按钮 + 满屏奶蛙 ---- */
+html[data-theme="naiwa"] .wrap{grid-template-columns:380px 1fr}
+html[data-theme="naiwa"] .input-col .actions{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:9px;margin-top:18px}
+html[data-theme="naiwa"] .input-col .actions #go{
+  flex:0 0 82%;width:82%;height:64px;margin:0;font-size:19px;border-radius:999px;color:#4a3710;
+  background:linear-gradient(180deg,#fadd74,#e8b02e);
+  box-shadow:0 6px 0 #c08a18,0 12px 20px rgba(214,167,52,.32)}
+html[data-theme="naiwa"] .input-col .actions #go::after{content:" 🐸"}
+html[data-theme="naiwa"] .input-col .actions button.ghost{
+  flex:0 0 auto;width:auto;margin:0;padding:7px 14px;font-size:12px;border-radius:999px}
+
+html[data-theme="naiwa"] #buddy{
+  display:block;position:fixed;right:10px;bottom:6px;z-index:70;width:190px;
+  pointer-events:none;animation:buddyFloat 3.6s ease-in-out infinite}
+html[data-theme="naiwa"] #buddy .frog{
+  width:178px;height:auto;display:block;margin:0 auto;
+  filter:drop-shadow(0 10px 14px rgba(150,118,40,.22))}
+html[data-theme="naiwa"] #buddy .bubble{
+  background:#fff;border:2px solid #eeddab;border-radius:16px;padding:6px 10px;
+  font:700 12px/1.4 "PingFang SC";color:#8a6410;text-align:center;
+  margin-bottom:4px;box-shadow:0 3px 0 #f2e6c2}
+@keyframes buddyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+html[data-theme="naiwa"] header{position:relative}
+html[data-theme="naiwa"] #buddyMini{display:block;position:absolute;right:20px;top:4px;width:54px;pointer-events:none;opacity:.95}
+html[data-theme="naiwa"] #buddyMini img{width:54px;height:auto;display:block}
+
+html[data-theme="naiwa"] #naiwaTip{
+  display:flex;align-items:center;gap:8px;position:fixed;left:14px;bottom:12px;z-index:69;
+  max-width:330px;padding:6px 14px 6px 6px;background:#fff;border:2px solid #eeddab;
+  border-radius:999px;box-shadow:0 4px 0 #f2e6c2;
+  font:600 12px/1.5 "PingFang SC";color:#8a6410;pointer-events:none}
+html[data-theme="naiwa"] #naiwaTip img{width:26px;height:auto;flex:0 0 26px}
+
+html[data-theme="naiwa"] .card h2::before{content:"🐸 "}
+html[data-theme="naiwa"] .metric{position:relative;overflow:hidden}
+html[data-theme="naiwa"] .metric::after{
+  content:"🐸";position:absolute;right:2px;bottom:-8px;font-size:30px;line-height:1;opacity:.12}
+html[data-theme="naiwa"] .tab.active::before{content:"🐸 "}
+
+/* ---- 像素复古 ---- */
+html[data-theme="pixel"] .wrap{padding-right:216px}
+html[data-theme="pixel"] .input-col .actions{
+  position:fixed;top:70px;right:16px;z-index:58;
+  display:grid;grid-template-columns:repeat(2,88px);gap:6px;
+  width:auto;margin:0;padding:8px;background:#12160f;
+  border:2px solid var(--line);box-shadow:6px 6px 0 rgba(138,211,79,.16)}
+html[data-theme="pixel"] .input-col .actions button{
+  display:flex;align-items:center;justify-content:center;
+  width:88px;height:34px;margin:0;padding:0;font-size:0;line-height:0;overflow:hidden}
+html[data-theme="pixel"] .input-col .actions button::after{font:700 12px/1 monospace;letter-spacing:1px}
+html[data-theme="pixel"] .input-col .actions #go{grid-column:1 / -1;height:46px}
+html[data-theme="pixel"] .input-col .actions #go::after{content:"> START";font-size:14px}
+html[data-theme="pixel"] .input-col .actions #ab::after{content:"A/B"}
+html[data-theme="pixel"] .input-col .actions #cmp::after{content:"VS"}
+html[data-theme="pixel"] .input-col .actions #reload{grid-column:1 / -1}
+html[data-theme="pixel"] .input-col .actions #reload::after{content:"RESET"}
+
+/* ---- 赛博霓虹 ---- */
+html[data-theme="cyber"] .wrap{padding-right:198px}
+/* 赛博卡片用了 clip-path：它会成为 fixed 后代的包含块并裁剪它们 */
+html[data-theme="cyber"] .input-col{clip-path:none}
+html[data-theme="cyber"] .input-col .actions{
+  position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:58;
+  display:flex;flex-direction:column;gap:8px;width:170px;margin:0;padding:12px 10px;
+  background:rgba(6,10,18,.92);border-left:1px solid rgba(0,229,255,.35);
+  box-shadow:-8px 0 24px rgba(0,229,255,.08)}
+html[data-theme="cyber"] .input-col .actions button{
+  width:100%;height:36px;margin:0;padding:0 6px;font-size:10.5px;letter-spacing:.5px;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+html[data-theme="cyber"] .input-col .actions #go{
+  height:54px;font-size:13px;letter-spacing:2px;
+  background:linear-gradient(180deg,rgba(0,229,255,.30),rgba(0,229,255,.10));
+  box-shadow:0 0 18px rgba(0,229,255,.28)}
+html[data-theme="cyber"] .input-col .actions #go::before{content:"// ";color:#7ff3ff}
+
+/* ---- 窄屏回退 ---- */
+@media (max-width:1100px){
+  html[data-theme="pixel"] .wrap{padding-right:16px}
+  html[data-theme="pixel"] .input-col .actions{
+    position:static;top:auto;right:auto;width:auto;box-shadow:6px 6px 0 rgba(138,211,79,.16)}
+  html[data-theme="cyber"] .wrap{padding-right:22px}
+  html[data-theme="cyber"] .input-col .actions{
+    position:static;top:auto;right:auto;transform:none;width:auto;
+    flex-direction:row;flex-wrap:wrap;border-left:0;border:1px solid rgba(0,229,255,.25);box-shadow:none}
+  html[data-theme="cyber"] .input-col .actions button{flex:1 1 45%}
+  html[data-theme="paper"] .wrap{grid-template-columns:1fr}
+  html[data-theme="paper"] .input-col{order:1}
+  html[data-theme="paper"] .result-col{order:2}
+}
+@media (max-width:900px){
+  html[data-theme="naiwa"] .wrap{grid-template-columns:1fr}
+  html[data-theme="naiwa"] #buddy{width:118px;right:4px;bottom:4px}
+  html[data-theme="naiwa"] #buddy .frog{width:110px}
+  html[data-theme="naiwa"] #buddyMini{display:none}
+  html[data-theme="naiwa"] #naiwaTip{display:none}
+}
+
+/* ==================================================================
+   清爽化整理层 v5 —— 作用于全部 7 套主题
+   规则全部追加在文件末尾，不修改 light / dark 原有规则一个字符。
+   ================================================================== */
+
+/* ---------- 1. 留白、分组、层级 ---------- */
+.wrap{gap:20px}
+.card{padding:18px}
+.card h2{margin:0 0 6px;font-size:16px;letter-spacing:.2px}
+.hd-more{color:var(--sub);font-size:12px;margin-left:6px}
+.lead{margin:0 0 14px;color:var(--sub);font-size:12.5px;line-height:1.65}
+.lb{font-weight:600}
+.big-input{min-height:96px;font-size:14px;line-height:1.7}
+.core-row{margin-top:14px}
+/* ---------- v1.5 模式切换 + 约会面板 ---------- */
+.mode-tabs{display:flex;gap:8px;margin-top:14px}
+.mode-btn{flex:1;margin:0;padding:9px 6px;font-size:12.5px;font-weight:700;
+  border-radius:10px;border:1px solid var(--line);background:var(--card);
+  color:var(--sub);cursor:pointer;box-shadow:none;filter:none}
+.mode-btn:hover{filter:none;border-color:var(--accent)}
+.mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.date-panel{margin-top:14px;border:1px dashed var(--accent);background:var(--accent-soft)}
+.date-panel .row{margin-top:8px}
+.date-panel h2{margin-bottom:2px !important}
+.brief-card{margin-bottom:14px;border:1px solid var(--accent);background:var(--accent-soft)}
+.brief-card h2::before{content:"💞 "}
+.brief-line{margin:9px 0 0;font-size:13px;line-height:1.75}
+.brief-tl{margin:6px 0 0;padding-left:4px;list-style:none;font-size:12.5px;line-height:1.95}
+.brief-tl b{color:var(--accent)}
+.form-sec{margin:16px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--line);
+  color:var(--sub);font-size:11.5px;font-weight:700;letter-spacing:1.2px}
+.ck{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--ink);font-size:12.5px;cursor:pointer}
+.ck input{width:auto;margin:0}
+.ck span{color:var(--sub);font-size:11.5px;margin-left:auto}
+.adv-note{margin-top:14px !important;line-height:1.7}
+
+/* ---------- 2. 主按钮放大 / 次要按钮收纳 ---------- */
+.actions{margin-top:20px}
+.actions #go{
+  display:block;width:100%;height:58px;margin:0 0 10px;padding:0;
+  font-size:18px;font-weight:800;letter-spacing:.5px;border-radius:12px;
+  box-shadow:0 6px 18px rgba(0,0,0,.16)}
+.actions #go::before{content:"➤ "}
+.more{display:flex;gap:8px;flex-wrap:wrap}
+.more button{width:auto;flex:1 1 auto;margin:0;padding:8px 10px;
+  font-size:12px;border-radius:8px}
+.mini-hint{margin:12px 0 0;color:var(--sub);font-size:12px;line-height:1.8}
+.mini-sep{margin:0 6px;color:var(--line)}
+.link,button.link{width:auto;margin:0;padding:0;border:0;background:transparent;
+  color:var(--accent);font-size:12px;font-weight:600;text-decoration:underline;cursor:pointer;
+  box-shadow:none;filter:none}
+.link:hover,button.link:hover{text-decoration:none;filter:none}
+/* 纸质杂志的主按钮原本是横排小字，这里单独放大，保证「主要按钮更明显」 */
+html[data-theme="paper"] .input-col .actions #go{
+  height:46px;font-size:15px;letter-spacing:1px;
+  background:var(--accent);color:#fff;border:1px solid var(--accent);
+  padding:0 22px;width:auto;min-width:180px;margin:0 0 10px}
+html[data-theme="paper"] .input-col .actions #go::before{content:"§ "}
+
+/* ---------- 3. 高级设置折叠 ---------- */
+details.adv{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}
+details.adv summary{list-style:none;cursor:pointer;font-size:12.5px;font-weight:600;
+  color:var(--sub);padding:9px 12px;border:1px dashed var(--line);
+  border-radius:9px;background:var(--accent-soft)}
+details.adv summary::-webkit-details-marker{display:none}
+details.adv summary::before{content:"⚙  ";color:var(--accent)}
+details.adv[open] summary{margin-bottom:14px;border-style:solid}
+details.adv[open] summary::before{content:"▾  "}
+.adv-body .row{margin-top:8px}
+
+/* ---------- 4. 空状态 ---------- */
+.empty-state{text-align:center;padding:44px 22px}
+.empty-state .es-icon{font-size:30px;color:var(--accent);opacity:.6;margin-bottom:8px}
+.empty-state h3{margin:0 0 8px;font-size:16px}
+.empty-state p{margin:0 0 14px}
+
+/* ---------- 5. 说明 / 引导界面（用变量，自动适配 7 套主题） ---------- */
+#guide{position:fixed;inset:0;z-index:200;display:flex;align-items:center;
+  justify-content:center;padding:24px}
+.gd-mask{position:absolute;inset:0;background:rgba(12,18,26,.58);backdrop-filter:blur(3px)}
+.gd-panel{position:relative;width:min(880px,96vw);max-height:88vh;overflow:auto;
+  background:var(--card);color:var(--ink);border:1px solid var(--line);
+  border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.32)}
+.gd-head{display:flex;align-items:flex-start;justify-content:space-between;
+  padding:22px 26px 14px;border-bottom:1px solid var(--line)}
+.gd-kicker{color:var(--accent);font-size:11px;font-weight:800;letter-spacing:2px}
+.gd-head h2{margin:4px 0 0;font-size:23px;letter-spacing:.5px}
+.gd-close{width:34px;height:34px;margin:0;padding:0;border-radius:50%;
+  background:transparent;border:1px solid var(--line);color:var(--ink);
+  font-size:20px;line-height:1;box-shadow:none}
+.gd-tabs{display:flex;gap:4px;flex-wrap:wrap;padding:0 20px;border-bottom:1px solid var(--line)}
+.gd-tab{width:auto;margin:0;padding:11px 14px;background:transparent;border:0;
+  border-bottom:2px solid transparent;border-radius:0;color:var(--sub);
+  font-size:13px;box-shadow:none;filter:none}
+.gd-tab.active{color:var(--accent);border-bottom-color:var(--accent);
+  background:transparent;font-weight:700;filter:none}
+.gd-body{padding:24px 26px}
+.gd-intro{margin:0 0 18px;color:var(--sub);font-size:13px;line-height:1.75}
+.gd-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.gd-grid-2{grid-template-columns:repeat(2,1fr)}
+.gd-step,.gd-card{position:relative;background:var(--accent-soft);
+  border:1px solid var(--line);border-radius:12px;padding:16px}
+.gd-num{display:block;color:var(--accent);font:800 22px/1 Georgia,serif;margin-bottom:10px}
+.gd-step h3,.gd-card h3{margin:0 0 8px;font-size:14.5px}
+.gd-step p,.gd-card p{margin:0 0 8px;color:var(--sub);font-size:12.5px;line-height:1.75}
+.gd-card p:last-child{margin-bottom:0}
+.gd-callout{margin-top:16px;padding:12px 14px;border-left:3px solid var(--accent);
+  background:var(--accent-soft);border-radius:6px;font-size:12.5px;line-height:1.8}
+.gd-table{width:100%;border-collapse:collapse;font-size:13px}
+.gd-table th{width:130px;text-align:left;color:var(--accent);
+  font-weight:700;white-space:nowrap;vertical-align:top;padding:10px 12px}
+.gd-table td{color:var(--sub);line-height:1.7;padding:10px 12px}
+.gd-table tr{border-bottom:1px solid var(--line)}
+.gd-themes{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.gd-theme{display:flex;align-items:center;gap:12px;padding:12px 14px;
+  border:1px solid var(--line);border-radius:11px}
+.gd-theme i{width:34px;height:34px;flex:0 0 34px;border:3px solid;border-radius:9px}
+.gd-theme b{font-size:13.5px;white-space:nowrap}
+.gd-theme span{color:var(--sub);font-size:12px;margin-left:auto;text-align:right}
+.gd-stat{padding:12px 0;border-bottom:1px solid var(--line)}
+.gd-stat b{display:block;font-size:12.5px;color:var(--accent);margin-bottom:6px}
+.gd-stat > div,.gd-stat > p{color:var(--sub);font-size:12.5px;line-height:1.8}
+.gd-llm{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.gd-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:16px 26px 22px;border-top:1px solid var(--line)}
+.gd-noauto{display:flex;align-items:center;gap:8px;margin:0;color:var(--sub);font-size:12px}
+.gd-noauto input{width:auto;margin:0}
+.gd-primary{width:auto;margin:0;padding:11px 22px;font-size:13.5px;font-weight:700;
+  border:0;border-radius:10px;background:var(--accent);color:#fff;box-shadow:none}
+.gd-entry{background:var(--accent-soft) !important;border-color:transparent !important;
+  color:var(--accent) !important;font-weight:700}
+@media (max-width:760px){
+  .gd-grid,.gd-grid-2,.gd-themes{grid-template-columns:1fr}
+  .gd-head,.gd-body,.gd-foot{padding-left:18px;padding-right:18px}
+}
+
+/* ---------- 6. 第 7 套主题：原神 · 提瓦特（质量对齐奶蛙） ---------- */
+#ysBuddy,#ysPaimon,#ysTip{display:none}
+html[data-theme="yuanshen"]{
+  --bg:#eaf0f1; --card:#fffdf6; --line:#ddd6c1; --ink:#2b3a42;
+  --sub:#7a8790; --accent:#2f6f8a; --accent-soft:#e7f1f3;
+  --warn:#a8761c; --warn-bg:#fdf4e2; --ok:#3f7f57; --ok-bg:#eaf5ee;
+  --stay:#2f6f8a; --move:#a9b8bd; --wait:#c89a3c; --best:#3f7f57; --best-bg:#eaf5ee;
+}
+html[data-theme="yuanshen"] body{
+  background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='%23c8a45c' fill-opacity='0.10'%3E%3Cpath d='M48 4 L52 44 L92 48 L52 52 L48 92 L44 52 L4 48 L44 44 Z'/%3E%3Ccircle cx='16' cy='16' r='3'/%3E%3Ccircle cx='80' cy='80' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:96px 96px}
+html[data-theme="yuanshen"] header{position:relative;padding:20px 26px;
+  background:linear-gradient(90deg,#fffdf6,#e9f2f2);border-bottom:2px solid #c8a45c}
+html[data-theme="yuanshen"] header h1{font-weight:800;letter-spacing:1px;color:#243b45}
+html[data-theme="yuanshen"] header p{color:#6d818a}
+html[data-theme="yuanshen"] .wrap{grid-template-columns:380px 1fr;gap:20px;padding:18px 236px 48px 26px}
+html[data-theme="yuanshen"] .card{border:1px solid #e4dcc4;border-radius:14px;
+  box-shadow:0 2px 0 rgba(200,164,92,.28),0 10px 26px rgba(43,58,66,.07)}
+html[data-theme="yuanshen"] .card h2{color:#2b3a42}
+html[data-theme="yuanshen"] .card h2::before{content:"✦ ";color:#c8a45c}
+html[data-theme="yuanshen"] .metrics{grid-template-columns:repeat(3,1fr);gap:10px}
+html[data-theme="yuanshen"] .metric{position:relative;overflow:hidden;
+  background:#f4f8f6;border:1px solid #e2ddc7;border-radius:12px}
+html[data-theme="yuanshen"] .metric b{font:800 20px/1.2 "PingFang SC";color:#2b3a42}
+html[data-theme="yuanshen"] .metric::after{content:"✦";position:absolute;right:4px;bottom:-8px;
+  font-size:30px;line-height:1;color:#c8a45c;opacity:.2}
+html[data-theme="yuanshen"] button{border-radius:10px;font-weight:700;
+  background:linear-gradient(180deg,#3a7f9c,#245d78);color:#fff7e2;border:1px solid #1e4c63}
+html[data-theme="yuanshen"] button.ghost{background:#fffdf6;color:#2b3a42;border:1px solid #d8cfb4}
+html[data-theme="yuanshen"] input,html[data-theme="yuanshen"] select,
+html[data-theme="yuanshen"] textarea{border:1px solid #ddd6c1;border-radius:10px;background:#fffefa}
+html[data-theme="yuanshen"] .tabs{gap:8px}
+html[data-theme="yuanshen"] .tab{border-radius:10px;background:#fffdf6;border:1px solid #ddd6c1;color:#6d818a}
+html[data-theme="yuanshen"] .tab.active{background:linear-gradient(180deg,#3a7f9c,#245d78);
+  color:#fff7e2;border-color:#1e4c63}
+html[data-theme="yuanshen"] .tab.active::before{content:"✦ "}
+html[data-theme="yuanshen"] #menubar{background:#fffdf6;border-bottom:2px solid #c8a45c}
+html[data-theme="yuanshen"] .pill{background:#e7f1f3;color:#2f6f8a}
+html[data-theme="yuanshen"] .narr{background:#f4f8f6;border-left:3px solid #c8a45c}
+/* 原神主按钮：金色切角大按钮，明显强于三个次要按钮 */
+html[data-theme="yuanshen"] .input-col .actions #go{
+  height:64px;margin:0 0 12px;font-size:19px;letter-spacing:1px;
+  background:linear-gradient(180deg,#e6c983,#c99f45);color:#2b2410;
+  border:2px solid #a87f2c;box-shadow:0 6px 0 #a87f2c,0 14px 26px rgba(200,164,92,.35);
+  clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),
+                    calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px)}
+html[data-theme="yuanshen"] .input-col .actions #go::before{content:"✦ "}
+html[data-theme="yuanshen"] .input-col .actions .more button{
+  padding:7px 10px;font-size:12px;border-radius:9px}
+
+/* 右下角：元素伙伴立绘 + 对话气泡 + 头像切换 */
+html[data-theme="yuanshen"] #ysBuddy{
+  display:block;position:fixed;right:12px;bottom:6px;z-index:70;width:214px;
+  pointer-events:none;animation:ysFloat 4s ease-in-out infinite}
+@keyframes ysFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+html[data-theme="yuanshen"] #ysBuddy .ys-bubble{
+  background:#fffdf6;border:2px solid #c8a45c;border-radius:14px;padding:7px 10px;
+  font:700 12px/1.5 "PingFang SC";color:#2b3a42;text-align:center;
+  margin-bottom:4px;box-shadow:0 3px 0 #eadfc0;min-height:34px}
+html[data-theme="yuanshen"] #ysBuddy .ys-frame{
+  height:244px;display:flex;align-items:flex-end;justify-content:center}
+html[data-theme="yuanshen"] #ysBuddy .ys-hero{display:none;height:244px;width:auto;
+  filter:drop-shadow(0 8px 12px rgba(30,60,70,.25))}
+html[data-theme="yuanshen"] #ysBuddy .ys-hero.on{display:block}
+html[data-theme="yuanshen"] #ysBuddy .ys-name{
+  text-align:center;font:700 12px/1.6 "PingFang SC";color:#7a5c18;margin:2px 0 6px}
+html[data-theme="yuanshen"] #ysBuddy .ys-picks{
+  display:flex;gap:6px;justify-content:center;pointer-events:auto}
+html[data-theme="yuanshen"] #ysBuddy .ys-pick{
+  width:34px;height:34px;min-width:34px;margin:0;padding:0;border-radius:50%;
+  overflow:hidden;background:#fffdf6;border:2px solid #e1d6b8;box-shadow:none}
+html[data-theme="yuanshen"] #ysBuddy .ys-pick.on{border-color:#c8a45c;
+  box-shadow:0 0 0 2px rgba(200,164,92,.4)}
+html[data-theme="yuanshen"] #ysBuddy .ys-pick img{width:100%;height:100%;object-fit:cover;display:block}
+/* 页头派蒙 + 左下贴士 */
+html[data-theme="yuanshen"] #ysPaimon{
+  display:flex;align-items:center;gap:8px;position:absolute;right:26px;top:12px;
+  font:700 12px/1.4 "PingFang SC";color:#8a6a20;pointer-events:none}
+html[data-theme="yuanshen"] #ysPaimon img{width:54px;height:54px;display:block;
+  border-radius:14px;background:#fffdf6;border:2px solid #c8a45c;
+  box-shadow:0 2px 8px rgba(120,90,30,.18)}
+html[data-theme="yuanshen"] #ysTip{
+  display:flex;align-items:center;gap:8px;position:fixed;left:14px;bottom:12px;z-index:69;
+  max-width:340px;padding:6px 14px 6px 6px;background:#fffdf6;border:2px solid #c8a45c;
+  border-radius:999px;box-shadow:0 4px 0 #eadfc0;
+  font:600 12px/1.5 "PingFang SC";color:#2b3a42;pointer-events:none}
+html[data-theme="yuanshen"] #ysTip img{width:28px;height:28px;flex:0 0 28px}
+@media (max-width:1100px){
+  html[data-theme="yuanshen"] .wrap{grid-template-columns:1fr;padding-right:22px}
+  html[data-theme="yuanshen"] #ysBuddy{width:132px;right:4px;bottom:4px}
+  html[data-theme="yuanshen"] #ysBuddy .ys-frame,
+  html[data-theme="yuanshen"] #ysBuddy .ys-hero{height:160px}
+  html[data-theme="yuanshen"] #ysPaimon{display:none}
+  html[data-theme="yuanshen"] #ysTip{display:none}
+}
+
+/* ==================================================================
+   提瓦特 Trip Planner · v6
+   所有新元素先全局 display:none，再在 yuanshen 主题内放开；
+   其余 6 套主题的渲染完全不受影响。
+   ================================================================== */
+#teyvatHud,#teyvatBoard{display:none}
+
+/* ---- 品牌：原神主题下换一套标题文案 ---- */
+html[data-theme="yuanshen"] header h1{font-size:0}
+html[data-theme="yuanshen"] header h1::after{
+  content:"提瓦特 · Trip Planner";font-size:23px;font-weight:800;
+  letter-spacing:1px;color:#243b45}
+html[data-theme="yuanshen"] header p{font-size:0}
+html[data-theme="yuanshen"] header p::after{
+  content:"今日委托 · 传送锚点 · 元素伙伴，陪你把一天安排妥当";
+  font-size:12.5px;color:#6d818a}
+
+/* ---- 冒险终端 HUD ---- */
+html[data-theme="yuanshen"] #teyvatHud{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  margin:14px 26px 0;padding:10px 16px;
+  background:linear-gradient(90deg,#fffdf6,#edf4f3);
+  border:1px solid #ddd6c1;border-left:4px solid #c8a45c;border-radius:12px;
+  box-shadow:0 3px 12px rgba(43,58,66,.06)}
+.tv-hud-item{display:flex;flex-direction:column;min-width:96px}
+.tv-hud-item.tv-hud-wide{flex:1;min-width:170px}
+.tv-hud-k{font-size:10.5px;letter-spacing:1px;color:#7a8790}
+.tv-hud-item b{font:800 15px/1.5 "PingFang SC";color:#2b3a42}
+.tv-exp{width:88px;height:4px;background:#dfe7e6;border-radius:99px;overflow:hidden;margin-top:2px}
+.tv-exp i{display:block;height:100%;width:0;background:linear-gradient(90deg,#e6c983,#c89a3c);border-radius:99px}
+html[data-theme="yuanshen"] .tv-hud-btn{width:auto;margin:0;padding:7px 12px;font-size:11.5px;
+  border-radius:8px;background:#fffdf6;color:#2b3a42;border:1px solid #d8cfb4;
+  box-shadow:none;white-space:nowrap}
+
+/* ---- 每日委托 + 元素队伍 ---- */
+html[data-theme="yuanshen"] #teyvatBoard{
+  display:grid;grid-template-columns:1.35fr 1fr;gap:14px;margin-bottom:14px}
+.tv-card{background:var(--card);border:1px solid #e4dcc4;border-radius:14px;padding:16px;
+  box-shadow:0 2px 0 rgba(200,164,92,.22),0 8px 20px rgba(43,58,66,.05)}
+.tv-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tv-card-head h3{margin:0;font-size:14.5px;color:#2b3a42}
+.tv-card-head h3::before{content:"✦ ";color:#c8a45c}
+.tv-badge{padding:2px 10px;border-radius:99px;background:#e7f1f3;color:#2f6f8a;
+  font-size:11.5px;font-weight:700;white-space:nowrap}
+.tv-card-sub{margin:6px 0 12px;color:var(--sub);font-size:11.5px;line-height:1.6}
+.tv-com-list{display:flex;flex-direction:column;gap:6px}
+.tv-com{display:flex;align-items:center;gap:9px;padding:7px 10px;border:1px solid #eae2cc;
+  border-radius:9px;background:#fffdf6;font-size:12.5px;cursor:pointer}
+.tv-com input{width:auto;margin:0;accent-color:#c89a3c}
+.tv-com .tv-time{color:#a8842c;font-weight:700;font-variant-numeric:tabular-nums}
+.tv-com .tv-name{flex:1;color:#2b3a42}
+.tv-com .tv-tag{color:#7a8790;font-size:11px}
+.tv-com.done .tv-name{text-decoration:line-through;color:#9aa6ab}
+.tv-empty{margin:0;color:var(--sub);font-size:12px;line-height:1.7}
+.tv-progress{height:7px;margin-top:12px;background:#e9eee9;border-radius:99px;overflow:hidden}
+.tv-progress i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,#e6c983,#c89a3c);transition:width .25s}
+.tv-reward{margin-top:10px;padding:8px 10px;border-radius:8px;background:#fdf4dd;
+  border:1px solid #ecd9a6;color:#8a6a20;font-size:11.5px;font-weight:700}
+.tv-team-hero{display:flex;align-items:center;gap:10px;margin:4px 0 8px}
+.tv-elem{display:flex;align-items:center;justify-content:center;width:36px;height:36px;
+  border-radius:10px;background:#f4ead0;border:1px solid #d9bd7b;color:#a8842c;font-size:19px}
+.tv-team-hero b{font-size:14px;color:#2b3a42}
+.tv-team-line{margin:0 0 10px;color:#6d818a;font-size:12px;line-height:1.65;font-style:italic}
+.tv-team-tip{padding:9px 10px;border-radius:9px;background:#f4f8f6;
+  border:1px dashed #d8cfb4;color:#6d818a;font-size:11.5px;line-height:1.7}
+.tv-team-tip b{color:#2f6f8a}
+
+/* ---- 提瓦特大陆地图 ---- */
+.tv-map-card{background:var(--card);border:1px solid #e4dcc4;border-radius:14px;
+  padding:16px;box-shadow:0 2px 0 rgba(200,164,92,.22)}
+.tv-map-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+.tv-map-head h3{margin:0;font-size:15px;color:#2b3a42}
+.tv-map-head h3::before{content:"✦ ";color:#c8a45c}
+.tv-map-head span{color:var(--sub);font-size:11.5px}
+.tv-map{width:100%;height:auto;display:block;border:1px solid #d9cfb0;
+  border-radius:12px;background:#e8f1f1;overflow:hidden}
+.tv-land{fill:#eee7ce;stroke:#bda671;stroke-width:2;stroke-linejoin:round}
+.tv-land-2{fill:#e6e2c6;stroke:#bda671;stroke-width:2;stroke-linejoin:round}
+.tv-region{fill:#8a8063;font:600 15px "PingFang SC",sans-serif;letter-spacing:3px;
+  text-anchor:middle;opacity:.85}
+.tv-sea-label{fill:#8fb0b5;font:600 12px "PingFang SC",sans-serif;letter-spacing:4px}
+.tv-title{fill:#3c5a63;font:800 17px "PingFang SC",sans-serif;letter-spacing:1px}
+.tv-route{fill:none;stroke:#c08f2f;stroke-width:3;stroke-dasharray:9 7;
+  stroke-linecap:round;opacity:.9}
+.tv-pin{cursor:pointer}
+.tv-pin .tv-glow{fill:#f7e2a6;opacity:.35}
+.tv-pin .tv-diamond{fill:#fff7dc;stroke:#b8892f;stroke-width:2.2}
+.tv-pin .tv-star{fill:#c08f2f}
+.tv-pin .tv-seq{fill:#6b4f14;font:800 11px "PingFang SC",sans-serif;text-anchor:middle}
+.tv-pin .tv-label{fill:#3c4a4f;font:700 12px "PingFang SC",sans-serif;text-anchor:middle;
+  paint-order:stroke;stroke:#fffdf6;stroke-width:3.5px;stroke-linejoin:round}
+.tv-pin .tv-beam{stroke:#c8a45c;stroke-width:1.5;stroke-dasharray:4 5;opacity:.55}
+.tv-pin.on .tv-diamond{fill:#ffe9a8;stroke:#8a6410;stroke-width:3}
+.tv-pin.on .tv-glow{opacity:.8;fill:#f4cf6c}
+.tv-pin:hover .tv-diamond{fill:#ffe9a8}
+.tv-domain{display:none}
+.show-domains .tv-domain{display:inline}
+.tv-domain .tv-dm{fill:#e9dcff;stroke:#8d6bb5;stroke-width:2}
+.tv-domain .tv-st{fill:#fffdf0;stroke:#c8a45c;stroke-width:2}
+.tv-domain text{fill:#6b5a86;font:600 10px "PingFang SC",sans-serif;text-anchor:middle}
+.tv-compass{fill:none;stroke:#6b8b91;stroke-width:1.5}
+.tv-compass-t{fill:#3c5a63;font:700 12px Georgia,serif;text-anchor:middle}
+.tv-scale{stroke:#6b8b91;stroke-width:2}
+.tv-scale-t{fill:#6b8b91;font:600 10px "PingFang SC",sans-serif}
+.tv-info{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;
+  padding:10px 14px;border-radius:10px;background:#f4f8f6;border:1px dashed #d8cfb4;
+  color:#6d818a;font-size:12px;min-height:22px}
+.tv-info b{color:#2b3a42;font-size:13px}
+.tv-info span{padding-left:12px;border-left:1px solid #d8cfb4}
+.tv-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;color:var(--sub);font-size:11.5px}
+.tv-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+/* ---- 提瓦特化文案：只换可见文字，不动任何 id / JS 依赖 ---- */
+html[data-theme="yuanshen"] #menubar .brand{font-size:0}
+html[data-theme="yuanshen"] #menubar .brand::after{
+  content:"提瓦特";font-size:14px;font-weight:700;letter-spacing:.5px}
+html[data-theme="yuanshen"] .input-col h2{font-size:0}
+html[data-theme="yuanshen"] .input-col h2::before{font-size:16px}
+html[data-theme="yuanshen"] .input-col h2::after{
+  content:"冒险委托";font-size:16px;letter-spacing:.2px}
+html[data-theme="yuanshen"] .input-col .lead{font-size:0}
+html[data-theme="yuanshen"] .input-col .lead::after{
+  content:"用一句话写下今天想做的事，派蒙帮你排好路线。";font-size:12.5px;color:var(--sub)}
+html[data-theme="yuanshen"] .input-col .actions #go{font-size:0}
+html[data-theme="yuanshen"] .input-col .actions #go::before{
+  content:"✦ 开始冒险";font-size:19px;letter-spacing:1px}
+html[data-theme="yuanshen"] .tab{font-size:0}
+html[data-theme="yuanshen"] .tab::after{font-size:13px;font-weight:600}
+html[data-theme="yuanshen"] .tab::before{font-size:13px}
+html[data-theme="yuanshen"] .tab[data-tab="detail"]::after{content:"冒险手记"}
+html[data-theme="yuanshen"] .tab[data-tab="list"]::after{content:"冒险日志"}
+html[data-theme="yuanshen"] .tab[data-tab="timeline"]::after{content:"时序"}
+html[data-theme="yuanshen"] .tab[data-tab="map"]::after{content:"传送图"}
+html[data-theme="yuanshen"] .tab[data-tab="compare"]::after{content:"路线推演"}
+@media (max-width:900px){
+  html[data-theme="yuanshen"] #teyvatBoard{grid-template-columns:1fr}
+  html[data-theme="yuanshen"] #teyvatHud{margin:12px 16px 0}
+}
+
+/* ================ v7：交互反馈（所有主题共用，仍走 CSS 变量） ================ */
+#guideHint{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;
+  margin:0 auto 14px;padding:10px 16px;border:1px solid var(--line);border-radius:12px;
+  background:var(--accent-soft);color:var(--ink);font-size:13px;line-height:1.5;
+  box-shadow:0 4px 16px rgba(0,0,0,.05)}
+#guideHint .gh-ico{color:var(--accent);font-size:17px}
+#guideHint b{color:var(--accent)}
+.gh-btn{width:auto;margin:0;padding:6px 13px;border-radius:8px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);font-size:12.5px;font-weight:700;box-shadow:none;filter:none}
+.gh-btn.gh-go{background:var(--accent);border-color:var(--accent);color:#fff}
+.gh-x{width:26px;height:26px;margin:0;padding:0;border:0;border-radius:50%;
+  background:transparent;color:var(--sub);font-size:19px;line-height:1;box-shadow:none;filter:none}
+.mb-teyvat{font-weight:700;color:var(--accent)}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:300;
+  display:flex;gap:12px;align-items:center;max-width:min(680px,92vw);
+  padding:11px 14px;border:1px solid var(--line);border-radius:12px;
+  background:var(--card);color:var(--ink);font-size:13px;font-weight:600;
+  box-shadow:0 14px 40px rgba(0,0,0,.24)}
+#toast button{width:auto;margin:0;padding:5px 12px;border:1px solid var(--accent);
+  border-radius:8px;background:var(--accent);color:#fff;font-size:12.5px;
+  font-weight:700;box-shadow:none;filter:none;white-space:nowrap}
+#toast button.ts-x{margin-left:auto;padding:0;width:24px;height:24px;border:0;border-radius:50%;
+  background:transparent;color:var(--sub);font-size:18px}
+#tabs{scroll-margin-top:18px}
+#pane-map.map-focus .tv-map-card,#pane-map.map-focus>.card{
+  animation:mapPulse 1.05s ease-out 1}
+@keyframes mapPulse{
+  0%{box-shadow:0 0 0 0 rgba(200,164,92,.85)}
+  100%{box-shadow:0 0 0 20px rgba(200,164,92,0)}}
+.tv-head-cur{margin-left:auto;padding:4px 11px;border-radius:99px;
+  background:#f4ead0;border:1px solid #d9bd7b;color:#8a6a20;font-size:12px;font-weight:800}
+.tv-map-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#tvGoMap{background:#2f6f8a;border-color:#2f6f8a;color:#fff}
+html[data-theme="yuanshen"] .tv-hud-btn#tvGoMap{background:#2f6f8a;border:1px solid #2f6f8a;color:#fff}
+
+/* ================ v8：普通地图的离线示意底图 ================ */
+#pane-map .cm-base{pointer-events:none}
+/* 建筑名做得比站点名小且淡，避免和真实站点标签抢视觉 */
+#pane-map .cm-lbl{font:600 10px "PingFang SC","Microsoft YaHei",sans-serif;
+  text-anchor:start;fill:var(--sub,#7b8a7e);opacity:.62}
+#pane-map .cm-tiny{font:500 10px "PingFang SC","Microsoft YaHei",sans-serif;
+  fill:var(--sub,#7b8a7e);opacity:.8}
+#pane-map .cm-north{fill:var(--accent)}
+#pane-map .cm-badge{font:700 10px "PingFang SC",sans-serif;
+  text-anchor:middle;fill:var(--accent)}
+
+/* ================ v9：主题细节修复（全量复核后） ================ */
+/* pixel：非激活页签被 button 的深色字压成隐形，按页签自身底色补回可读色 */
+html[data-theme="pixel"] .tab{color:var(--sub)}
+html[data-theme="pixel"] .tab:hover{color:var(--ink);border-color:var(--accent)}
+html[data-theme="pixel"] .tab.active{color:#0f1210}
+/* 站点名在 mapHtml 里写死了 fill="#1f2328" + stroke="#fbfcfe"，
+   深色系主题（dark / pixel / cyber）会变成「白边糊字」。CSS 的 fill/stroke
+   优先级高于 presentation attribute，这里直接按主题变量改回可读配色。 */
+#pane-map svg text[fill="#1f2328"]{fill:var(--ink,#1f2328);stroke:var(--bg,#fbfcfe);
+  stroke-width:3px;font-weight:700}
+/* 「✦ 提瓦特地图」在已是提瓦特主题时高亮，避免误以为没生效 */
+#menubar .mb.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+html[data-theme="naiwa"] #menubar .mb.on{color:#4a3710}
+html[data-theme="pixel"] #menubar .mb.on{color:#0f1210}
+html[data-theme="paper"] #menubar .mb.on{color:#fffdf7}
+
+body{max-width:1000px;margin:0 auto;padding:22px 16px 70px}
+.pv-head{background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;padding:16px 18px;margin-bottom:8px}
+.pv-head h1{margin:0 0 8px;font-size:19px}
+.pv-head p{margin:5px 0 0;font-size:13px;line-height:1.8}
+.pv-sec{margin:30px 0 12px;font-size:15px;font-weight:700;border-left:4px solid var(--accent);padding-left:11px}
+.pv-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:0 0 14px}
+</style>
+</head>
+<body>
+<div class="pv-head">
+  <h1>详细行程预览 · 清华大学 · 访客参观</h1>
+  <p>同一句需求「上午去图书馆自习，中午在食堂吃饭，下午随便逛逛拍照」，同一份 5 站骨架，只有「模型开 / 关」不同。</p>
+  <p>这是从 <code>web/index.html</code> 的 <code>detailHtml()</code> 用真实 <code>/api/plan</code> 响应离线渲染的，样式与线上页面一致。</p>
+  <p><b>对照要点</b>：两版的站点、时刻、停留、在途一个字都不变；变化的是「模型状态条」和「⑧ 规则 vs 模型」区的说明。</p>
+</div>
+
+<h2 class="pv-sec">① 只用规则（关闭模型）· 规则模板本身已是完整逐站说明</h2>
+<p class="pv-note">看每站的「看什么 / 怎么走 / 为什么排在这 / 可达性 / 时间提示 / 备选 / 事实溯源」，共 5 站；顶部还有入校预约动作、三层分工、整体编排、注意事项、来源与查阅日期。</p>
+<div class="card"><div class="di-hero"><h2>清华大学 · 09:00–12:14 · 5 站可执行行程</h2><p><span class="di-badge on">只用规则（手动关闭）</span><span class="di-badge">清华大学</span><span class="di-badge">5 站</span><span class="di-badge">09:00–12:14</span><span class="di-badge">校外访客</span></p><p class="muted">事实与措辞分开展示：时刻、渠道、电话、来源由规则引擎与校区事实卡给出；导览词与编排解释由大模型给出（未启用时为规则模板）。</p><div class="di-model-note"><b>本次模型状态 · 只用规则（手动关闭）</b><br>本次按「只用规则」生成，未调用大模型。<span class="muted">取消左侧「只用规则」勾选后重新生成，即可看到模型导览增量。</span></div></div><div class="di-sec">这套行程是怎么来的 · 三层分工</div><div class="di-arch"><div class="di-arch-col"><b>规则引擎 · engine/</b><ul><li>按语义标签与质量分选点，并按类别做多样化补位</li><li>算时间窗、在途时间、停留、成本与站点顺序</li><li>对硬约束做校验与评分，结果可复现</li></ul><span class="muted">保证：同一输入 → 同一行程；时刻/距离/成本来自计算，不是模型生成；时间窗 09:00–17:00 内闭合</span></div><div class="di-arch-col"><b>校区事实层 · visitor_guide.json</b><ul><li>入校预约渠道与到校动作</li><li>各类点位的访客可达性</li><li>逐点看什么、开放与讲解信息</li><li>每条事实的来源与查阅日期</li></ul><span class="muted">事实卡更新 2026-11-04　点位 11 条 / 来源 5 条</span><span class="muted" style="word-break:break-all">data/campuses/tsinghua/visitor_guide.json（或 cities/tsinghua/）</span></div><div class="di-arch-col"><b>大模型编排层 · llm/</b><ul><li>解释为什么这样排</li><li>把事实写成逐站导览</li><li>按用户措辞调整详略</li><li>给备选与取舍</li></ul><span class="muted">禁止：新增预约渠道/电话/开放时间/地点/公交线路；改时刻、改顺序、改停留时长；替代地点（备选只给流程性建议）</span><span class="muted">入校须知（渠道/电话/时段）坚持走规则模板，不交给模型改写 —— 最敏感的事实不允许被措辞层污染。</span></div></div><div class="di-sec">① 出发前 / 进校动作（校区事实卡 · 规则模板，不经模型改写）</div><div class="di-box"><p><b>是否需要预约：需要</b></p><p><b>1. 参观清华 · 微信小程序（唯一个人渠道）</b><br>微信搜「参观清华」小程序（或从「清华大学」公众号菜单「参观清华」进入）→ 实名认证 → 选即时预约或抽签预约<br><span class="muted">实名认证用本人中国大陆身份证号；港澳台/外籍人士替代方式未核实，建议电话 010-62793001 确认</span></p><p><b>2. 校园参观 · 官网团队渠道</b><br>清华保卫部官网（peace.tsinghua.edu.cn）「校园参观」栏目，仅面向中小学及教育主管部门，可提前 14 天约<br><span class="muted">不接受散客拼团、商业机构</span></p><p><b>要准备的材料</b><ul><li>本人中国大陆身份证号（实名认证）+ 入校当日身份证原件</li><li>未满 8 周岁儿童免约，但须由已预约监护人陪同</li><li>每人每 180 天只能成功预约 1 次（证件占用期内无法再约）</li></ul></p><p><b>审批</b>：抽签 + 即时名额双轨：即时预约每日 8:00–17:00 申请（可提前工作日 1 天、周末节假日 7 天）；抽签预约每日 17:00–21:45 申请（可提前工作日 2 天、周末节假日 8 天，每人每天限参与 1 次）。参观日 8:00 后不可取消，名额不可转让</p><p><b>提前量</b>：热门节假日档：参观日前 8 日的 17:00 首放 3200 个名额（含抽签 1600），此后每日 17:00 再放 400 个——建议即时+抽签双管齐下</p><p><b>到校动作</b>：入校时段 8:00–11:00、13:00–16:00（超时视为放弃）；凭身份证原件从西门南侧「个人参观专用通道」刷证+安检入校，二次刷卡无效；2025 国庆起个人也可选艺术博物馆专用通道入校，团队走东侧门</p><p><b>怎么到校</b><ul><li>西门：地铁 4 号线「圆明园」站方向（步行距离建议地图确认）</li><li>艺博通道：地铁 13 号线「五道口」站 A 口，或 15 号线「清华东路西口」站 C 口</li></ul></p><p><b>车辆</b>：**一切车辆（含网约车、大巴）禁入**（自驾停同方大厦/学研大厦/同方科技广场；大巴停六郎庄北停车场（约 355 泊位））</p><p class="muted">政策提示：清华入校政策一年内多次调整。以下以 2025 暑期/国庆官方通告为准整理，出行前务必以「参观清华」小程序当日信息为准；学期中工作日是否开放个人参观请打 010-62793001 确认。官方明示非旅游景点、不收任何费用，警惕黄牛。</p></div><div class="di-box" style="margin-top:10px"><b>访客速览简报 · 半天 5 站，步行串联，按下面时间走即可</b><ul><li>微信搜「参观清华」小程序（或从「清华大学」公众号菜单「参观清华」进入）→ 实名认证 → 选即时预约或抽签预约</li><li>准备：本人中国大陆身份证号（实名认证）+ 入校当日身份证原件、未满 8 周岁儿童免约，但须由已预约监护人陪同、每人每 180 天只能成功预约 1 次（证件占用期内无法再约）</li><li>热门节假日档：参观日前 8 日的 17:00 首放 3200 个名额（含抽签 1600），此后每日 17:00 再放 400 个——建议即时+抽签双管齐下</li><li>入校时段 8:00–11:00、13:00–16:00（超时视为放弃）；凭身份证原件从**西门南侧「个人参观专用通道」**刷证+安检入校，二次刷卡无效；2025 国庆起个人也可选**艺术博物馆专用通道**入校，团队走东侧门</li></ul></div><div class="di-sec">② 整体编排与为什么这样排</div><div class="di-box"><p class="muted">1 天 / 5 站 · 停留 165 分 · 在途 29.3 分 · 2.05 km · 花费 0 元 · 满意度 0.0222 / 可行性 1 / 总分 0.348</p><p><b>为什么这样排</b><br>规则引擎在 09:00–12:14 的时间窗内，按兴趣标签与质量分选出 5 个点，再按在途距离串成一条不折返的动线：停留合计 165 分钟、在途约 29 分钟，全程 2.05 km、花费 0 元。每一站的时刻、成本与可达性都有数据或事实来源，不依赖模型判断。</p><p class="muted">时间窗说明：场景时间窗 09:00–17:00，规则引擎已排到 12:14，之后还有约 286 分钟：可按下方备选方案给某站延长停留，或自由活动，不必重新生成。</p><p class="muted">本次需求原文：上午去图书馆自习，中午在食堂吃饭，下午随便逛逛拍照</p></div><div class="di-sec">③ 逐站详细安排（看什么 / 怎么走 / 为什么 / 可达性 / 备选 / 事实溯源）</div><div class="di-step"><div class="di-step-head"><span class="di-seq">1</span><h3>清华大学电管科园林食堂</h3><span class="di-meta">09:00–09:40 · 停留 40 分 · 免费 · 中餐厅</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>当天起点</p><p>到校：西门：地铁 4 号线「圆明园」站方向（步行距离建议地图确认）  进校：入校时段 8:00–11:00、13:00–16:00（超时视为放弃）；凭身份证原件从西门南侧「个人参观专用通道」刷证+安检入校，二次刷卡无效；2025 国庆起个人也可选艺术博物馆专用通道入校，团队走东侧门  入校后按指示牌走向「清华大学电管科园林食堂」，本行程 09:00 从这里开始。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 40 分钟（09:00–09:40）；可达性规则建议该类点位压到 0 分钟，现场请以实际开放情况为准</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>先看门口的支付方式与是否接待访客标识</li><li>按行程给出的停留时间安排用餐，避开高峰排队</li></ul><div class="di-tags"><span class="di-access warn">不对访客开放</span><span class="muted">官方通告明确未经允许不得进入不对公众开放的食堂；就餐建议出西门/艺博通道到五道口、清华科技园商圈</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>首站：命中兴趣：公园、户外、散步、食堂、餐饮。安排在 09:00–09:40，落在 09:00–17:00 的可执行时间窗内。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：双清路30号清华大学 <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 双清路30号清华大学</div></div></div></div></div><div class="di-step"><div class="di-step-head"><span class="di-seq">2</span><h3>星巴克(清华大学图书馆店)</h3><span class="di-meta">09:55–10:40 · 停留 45 分 · 免费 · 星巴克咖啡</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>从上一站步行约 15 分钟（1.04 km）</p><p>从上一站步行约 15 分钟（1.04 km）；沿校内主路步行，到点后先看门口当日开放标识。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 45 分钟（09:55–10:40）；可达性规则建议该类点位压到 10 分钟，现场请以实际开放情况为准</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>看建筑外观与楼前广场，按规则只作外观打卡</li><li>在门厅外看当日公告栏，确认是否对访客开放</li></ul><div class="di-tags"><span class="di-access warn">仅外观</span><span class="muted">图书馆老馆红砖经典建筑，访客只看外观；馆内需校内证件</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>第 2 站：命中兴趣：图书馆、自习、食堂、餐饮。安排在 09:55–10:40，落在 09:00–17:00 的可执行时间窗内。上一站到这里的在途已计入，避免来回折返。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：清华园街道清华大学图书馆 <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 清华园街道清华大学图书馆</div></div></div></div></div><div class="di-step"><div class="di-step-head"><span class="di-seq">3</span><h3>清华园</h3><span class="di-meta">10:45–11:15 · 停留 30 分 · 免费 · 风景名胜</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>从上一站步行约 5 分钟（0.32 km）</p><p>从上一站步行约 5 分钟（0.32 km）；沿校内主路步行，到点后先看门口当日开放标识。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 30 分钟（10:45–11:15）</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>沿步道慢走，选开阔处取景</li><li>留意脚下与自行车道，拍照别占用通道</li></ul><div class="di-tags"><span class="di-access">可进入</span><span class="muted">事实卡未对该类点位单列限制，按现场公告为准</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>第 3 站：命中兴趣：公园、户外、散步。安排在 10:45–11:15，落在 09:00–17:00 的可执行时间窗内。上一站到这里的在途已计入，避免来回折返。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：双清路30号 <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 双清路30号</div></div></div></div></div><div class="di-step"><div class="di-step-head"><span class="di-seq">4</span><h3>清华园二校门</h3><span class="di-meta">11:18–11:48 · 停留 30 分 · 免费 · 风景名胜</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>从上一站步行约 3 分钟（0.23 km）</p><p>从上一站步行约 3 分钟（0.23 km）；沿校内主路步行，到点后先看门口当日开放标识。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 30 分钟（11:18–11:48）</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>沿步道慢走，选开阔处取景</li><li>留意脚下与自行车道，拍照别占用通道</li></ul><div class="di-tags"><span class="di-access">可进入</span><span class="muted">事实卡未对该类点位单列限制，按现场公告为准</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>第 4 站：命中兴趣：公园、户外、散步。安排在 11:18–11:48，落在 09:00–17:00 的可执行时间窗内。上一站到这里的在途已计入，避免来回折返。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：双清路30号(清华大学内) <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 双清路30号(清华大学内)</div></div></div></div></div><div class="di-step"><div class="di-step-head"><span class="di-seq">5</span><h3>清华大学图书馆</h3><span class="di-meta">11:54–12:14 · 停留 20 分 · 免费 · 图书馆</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>从上一站步行约 6 分钟（0.46 km）</p><p>从上一站步行约 6 分钟（0.46 km）；沿校内主路步行，到点后先看门口当日开放标识。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 20 分钟（11:54–12:14）；可达性规则建议该类点位压到 10 分钟，现场请以实际开放情况为准</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>看建筑外观与楼前广场，按规则只作外观打卡</li><li>在门厅外看当日公告栏，确认是否对访客开放</li></ul><div class="di-tags"><span class="di-access warn">仅外观</span><span class="muted">图书馆老馆红砖经典建筑，访客只看外观；馆内需校内证件</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>末站：命中兴趣：图书馆、自习。安排在 11:54–12:14，落在 09:00–17:00 的可执行时间窗内。上一站到这里的在途已计入，避免来回折返。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：双清路30号清华大学 <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 双清路30号清华大学</div></div></div></div></div><div class="di-sec">④ 备选方案（不同情况下怎么调）</div><div class="di-box"><ul><li><b>想少走 / 赶时间</b>：保留首站与末站，中间各站改为外观打卡压到 10 分钟；顺序不变</li><li><b>遇到闭馆或排队</b>：该站改外观 5–10 分钟，剩余时间顺延给下一站，仍在时间窗内</li><li><b>想更偏某类点位</b>：在需求文本里点名（如「多看展馆」「多拍照」）重新生成，候选池按语义标签重新加权</li><li><b>入校时段有变</b>：以事实卡里的入校时段为准调整到达时刻，重新生成让规则引擎重算时间轴</li></ul></div><div class="di-sec">⑤ 校内注意事项</div><div class="di-box"><ul><li>教学核心区、宿舍区为非开放区域；不得盈利性拍摄/直播；禁摆摊兜售；12 岁以下禁骑共享单车</li><li>红马甲志愿讲解每天 8:30、13:30 从日晷出发，每场约 1 小时可随时加入（目前证据限于暑期/国庆/寒假档，平时是否常态化待核实）</li><li>半天经典动线（约 3 小时）：西门入 → 近春园荷塘 → 水木清华 → 工字厅外 → 大礼堂草坪（日晷）→ 清华学堂 → 二校门 → 科学馆 → 出西门</li><li>艺博馆周一闭馆，且与校园参观是两套预约体系，别混</li><li>全程免费；官方明示非旅游景点不收任何费用，警惕黄牛代约</li><li>入校时段 8:00–11:00、13:00–16:00，超时视为放弃，别卡点</li></ul></div><div class="di-sec">⑥ 需现场确认 / 以当日公告为准</div><div class="di-box"><ul><li>清华入校政策一年内多次调整。以下以 2025 暑期/国庆官方通告为准整理，出行前务必以「参观清华」小程序当日信息为准；学期中工作日是否开放个人参观请打 010-62793001 确认。官方明示非旅游景点、不收任何费用，警惕黄牛。</li><li>是否有对访客开放的例外窗口未核实，电话 010-62793001</li><li>红马甲志愿讲解每天 8:30、13:30 从日晷出发，每场约 1 小时可随时加入（目前证据限于暑期/国庆/寒假档，平时是否常态化待核实）</li></ul></div><div class="di-sec">⑦ 事实来源与查阅日期</div><div class="di-box"><ul><li>唯一官方个人渠道为「参观清华」小程序、团队渠道仅中小学及教育主管部门、实名认证规则<br><span class="muted">清华保卫部《个人参观预约须知》peace.tsinghua.edu.cn/info/1016/1371.htm　2026-11-04 查阅</span></li><li>即时/抽签双轨申请时段、180 天 1 次、参观日 8:00 后不可取消、节假日放号节奏（首放 3200/日放 400）、入校时段 8:00–11:00 与 13:00–16:00<br><span class="muted">2025 暑期官方通告（新京报 2025-07-09 报道）　2026-11-04 查阅</span></li><li>国庆起艺博专用通道开放、西门南侧个人专用通道刷证+安检、车辆全禁、周边停车点<br><span class="muted">《国庆中秋节假期校园参观管理通告》官方公众号 2025-09-29　2026-11-04 查阅</span></li><li>艺博开放时间（周二至周日 9:00–17:00，16:30 停止入馆，周一闭馆）与另行预约购票规则<br><span class="muted">清华大学艺术博物馆官网参观服务页　2026-11-04 查阅</span></li><li>三条志愿讲解线路、8:30/13:30 日晷出发、免费与警惕黄牛、注意事项<br><span class="muted">北京本地宝 2025 汇编 + 清华官方通告　2026-11-04 查阅</span></li></ul></div><div class="di-sec">⑧ 规则引擎 vs 大模型：优越性对照</div><div class="di-box" style="margin-bottom:10px"><b>本次运行状态 · 只用规则（手动关闭）</b><p>本次按「只用规则」生成，未调用大模型。</p><p class="muted">取消左侧「只用规则」勾选后重新生成，即可看到模型导览增量。</p></div><div class="di-compare"><div class="di-box"><b>只有规则引擎</b><p>规则引擎只能给出一张表：站点顺序、时刻、停留、在途距离、成本、命中了哪些兴趣标签 —— 可执行，但不解释、不导览、不照顾你的措辞。</p></div><div class="di-box"><b>大模型额外带来</b><ul><li>本次未启用大模型：以下逐站说明全部由规则模板 + 事实卡生成</li><li>开启模型后，每站会多出一段结合你需求的导览词</li><li>模型会解释「为什么这样排」并给取舍与备选</li><li>时刻、渠道、电话、来源始终由规则层给出，模型碰不到</li></ul></div></div><div class="di-box" style="margin-top:10px"><p>勾选左侧「只用规则」再生成一次：站点与时刻一个字都不会变，但导览词、编排解释与备选会退回模板 —— 差别就是模型带来的增量。</p><p class="muted">事实（渠道/时间/电话/地点/来源）与措辞（导览/解释/取舍）在界面上分开展示，任何一句都能追溯到出处。</p></div></div>
+
+<h2 class="pv-sec">② 开启模型 · 本机 LLM_API_KEY 已 401 失效 → 自动回退规则版</h2>
+<p class="pv-note">模型链路确实被调用了，但网关鉴权失败。现在页面会明确写出失败原因和修复提示，而不是静默退化成「模板兜底」四个字。换上有效 Key 后，这里会变成「模型导览已生效」，并多出逐站导览词与编排解释。</p>
+<div class="card"><div class="di-hero"><h2>清华大学 · 09:00–12:14 · 5 站可执行行程</h2><p><span class="di-badge on">模型调用失败 · 已回退规则</span><span class="di-badge">清华大学</span><span class="di-badge">5 站</span><span class="di-badge">09:00–12:14</span><span class="di-badge">校外访客</span></p><p class="muted">事实与措辞分开展示：时刻、渠道、电话、来源由规则引擎与校区事实卡给出；导览词与编排解释由大模型给出（未启用时为规则模板）。</p><div class="di-model-note"><b>本次模型状态 · 模型调用失败 · 已回退规则</b><br>模型网关鉴权失败（HTTP 401）：.env 里的 LLM_API_KEY 无效或已过期。<span class="muted">本页规则版已是完整逐站说明，不影响使用；修好 Key 后重新生成即可叠加模型导览。</span></div></div><div class="di-sec">这套行程是怎么来的 · 三层分工</div><div class="di-arch"><div class="di-arch-col"><b>规则引擎 · engine/</b><ul><li>按语义标签与质量分选点，并按类别做多样化补位</li><li>算时间窗、在途时间、停留、成本与站点顺序</li><li>对硬约束做校验与评分，结果可复现</li></ul><span class="muted">保证：同一输入 → 同一行程；时刻/距离/成本来自计算，不是模型生成；时间窗 09:00–17:00 内闭合</span></div><div class="di-arch-col"><b>校区事实层 · visitor_guide.json</b><ul><li>入校预约渠道与到校动作</li><li>各类点位的访客可达性</li><li>逐点看什么、开放与讲解信息</li><li>每条事实的来源与查阅日期</li></ul><span class="muted">事实卡更新 2026-11-04　点位 11 条 / 来源 5 条</span><span class="muted" style="word-break:break-all">data/campuses/tsinghua/visitor_guide.json（或 cities/tsinghua/）</span></div><div class="di-arch-col"><b>大模型编排层 · llm/</b><ul><li>解释为什么这样排</li><li>把事实写成逐站导览</li><li>按用户措辞调整详略</li><li>给备选与取舍</li></ul><span class="muted">禁止：新增预约渠道/电话/开放时间/地点/公交线路；改时刻、改顺序、改停留时长；替代地点（备选只给流程性建议）</span><span class="muted">入校须知（渠道/电话/时段）坚持走规则模板，不交给模型改写 —— 最敏感的事实不允许被措辞层污染。</span></div></div><div class="di-sec">① 出发前 / 进校动作（校区事实卡 · 规则模板，不经模型改写）</div><div class="di-box"><p><b>是否需要预约：需要</b></p><p><b>1. 参观清华 · 微信小程序（唯一个人渠道）</b><br>微信搜「参观清华」小程序（或从「清华大学」公众号菜单「参观清华」进入）→ 实名认证 → 选即时预约或抽签预约<br><span class="muted">实名认证用本人中国大陆身份证号；港澳台/外籍人士替代方式未核实，建议电话 010-62793001 确认</span></p><p><b>2. 校园参观 · 官网团队渠道</b><br>清华保卫部官网（peace.tsinghua.edu.cn）「校园参观」栏目，仅面向中小学及教育主管部门，可提前 14 天约<br><span class="muted">不接受散客拼团、商业机构</span></p><p><b>要准备的材料</b><ul><li>本人中国大陆身份证号（实名认证）+ 入校当日身份证原件</li><li>未满 8 周岁儿童免约，但须由已预约监护人陪同</li><li>每人每 180 天只能成功预约 1 次（证件占用期内无法再约）</li></ul></p><p><b>审批</b>：抽签 + 即时名额双轨：即时预约每日 8:00–17:00 申请（可提前工作日 1 天、周末节假日 7 天）；抽签预约每日 17:00–21:45 申请（可提前工作日 2 天、周末节假日 8 天，每人每天限参与 1 次）。参观日 8:00 后不可取消，名额不可转让</p><p><b>提前量</b>：热门节假日档：参观日前 8 日的 17:00 首放 3200 个名额（含抽签 1600），此后每日 17:00 再放 400 个——建议即时+抽签双管齐下</p><p><b>到校动作</b>：入校时段 8:00–11:00、13:00–16:00（超时视为放弃）；凭身份证原件从西门南侧「个人参观专用通道」刷证+安检入校，二次刷卡无效；2025 国庆起个人也可选艺术博物馆专用通道入校，团队走东侧门</p><p><b>怎么到校</b><ul><li>西门：地铁 4 号线「圆明园」站方向（步行距离建议地图确认）</li><li>艺博通道：地铁 13 号线「五道口」站 A 口，或 15 号线「清华东路西口」站 C 口</li></ul></p><p><b>车辆</b>：**一切车辆（含网约车、大巴）禁入**（自驾停同方大厦/学研大厦/同方科技广场；大巴停六郎庄北停车场（约 355 泊位））</p><p class="muted">政策提示：清华入校政策一年内多次调整。以下以 2025 暑期/国庆官方通告为准整理，出行前务必以「参观清华」小程序当日信息为准；学期中工作日是否开放个人参观请打 010-62793001 确认。官方明示非旅游景点、不收任何费用，警惕黄牛。</p></div><div class="di-box" style="margin-top:10px"><b>访客速览简报 · 半天 5 站，步行串联，按下面时间走即可</b><ul><li>微信搜「参观清华」小程序（或从「清华大学」公众号菜单「参观清华」进入）→ 实名认证 → 选即时预约或抽签预约</li><li>准备：本人中国大陆身份证号（实名认证）+ 入校当日身份证原件、未满 8 周岁儿童免约，但须由已预约监护人陪同、每人每 180 天只能成功预约 1 次（证件占用期内无法再约）</li><li>热门节假日档：参观日前 8 日的 17:00 首放 3200 个名额（含抽签 1600），此后每日 17:00 再放 400 个——建议即时+抽签双管齐下</li><li>入校时段 8:00–11:00、13:00–16:00（超时视为放弃）；凭身份证原件从**西门南侧「个人参观专用通道」**刷证+安检入校，二次刷卡无效；2025 国庆起个人也可选**艺术博物馆专用通道**入校，团队走东侧门</li></ul></div><div class="di-sec">② 整体编排与为什么这样排</div><div class="di-box"><p class="muted">1 天 / 5 站 · 停留 165 分 · 在途 29.3 分 · 2.05 km · 花费 0 元 · 满意度 0.0222 / 可行性 1 / 总分 0.348</p><p><b>为什么这样排</b><br>规则引擎在 09:00–12:14 的时间窗内，按兴趣标签与质量分选出 5 个点，再按在途距离串成一条不折返的动线：停留合计 165 分钟、在途约 29 分钟，全程 2.05 km、花费 0 元。每一站的时刻、成本与可达性都有数据或事实来源，不依赖模型判断。</p><p class="muted">时间窗说明：场景时间窗 09:00–17:00，规则引擎已排到 12:14，之后还有约 286 分钟：可按下方备选方案给某站延长停留，或自由活动，不必重新生成。</p><p class="muted">本次需求原文：上午去图书馆自习，中午在食堂吃饭，下午随便逛逛拍照</p></div><div class="di-sec">③ 逐站详细安排（看什么 / 怎么走 / 为什么 / 可达性 / 备选 / 事实溯源）</div><div class="di-step"><div class="di-step-head"><span class="di-seq">1</span><h3>清华大学电管科园林食堂</h3><span class="di-meta">09:00–09:40 · 停留 40 分 · 免费 · 中餐厅</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>当天起点</p><p>到校：西门：地铁 4 号线「圆明园」站方向（步行距离建议地图确认）  进校：入校时段 8:00–11:00、13:00–16:00（超时视为放弃）；凭身份证原件从西门南侧「个人参观专用通道」刷证+安检入校，二次刷卡无效；2025 国庆起个人也可选艺术博物馆专用通道入校，团队走东侧门  入校后按指示牌走向「清华大学电管科园林食堂」，本行程 09:00 从这里开始。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 40 分钟（09:00–09:40）；可达性规则建议该类点位压到 0 分钟，现场请以实际开放情况为准</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>先看门口的支付方式与是否接待访客标识</li><li>按行程给出的停留时间安排用餐，避开高峰排队</li></ul><div class="di-tags"><span class="di-access warn">不对访客开放</span><span class="muted">官方通告明确未经允许不得进入不对公众开放的食堂；就餐建议出西门/艺博通道到五道口、清华科技园商圈</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>首站：命中兴趣：公园、户外、散步、食堂、餐饮。安排在 09:00–09:40，落在 09:00–17:00 的可执行时间窗内。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：双清路30号清华大学 <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 双清路30号清华大学</div></div></div></div></div><div class="di-step"><div class="di-step-head"><span class="di-seq">2</span><h3>星巴克(清华大学图书馆店)</h3><span class="di-meta">09:55–10:40 · 停留 45 分 · 免费 · 星巴克咖啡</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>从上一站步行约 15 分钟（1.04 km）</p><p>从上一站步行约 15 分钟（1.04 km）；沿校内主路步行，到点后先看门口当日开放标识。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 45 分钟（09:55–10:40）；可达性规则建议该类点位压到 10 分钟，现场请以实际开放情况为准</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>看建筑外观与楼前广场，按规则只作外观打卡</li><li>在门厅外看当日公告栏，确认是否对访客开放</li></ul><div class="di-tags"><span class="di-access warn">仅外观</span><span class="muted">图书馆老馆红砖经典建筑，访客只看外观；馆内需校内证件</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>第 2 站：命中兴趣：图书馆、自习、食堂、餐饮。安排在 09:55–10:40，落在 09:00–17:00 的可执行时间窗内。上一站到这里的在途已计入，避免来回折返。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：清华园街道清华大学图书馆 <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 清华园街道清华大学图书馆</div></div></div></div></div><div class="di-step"><div class="di-step-head"><span class="di-seq">3</span><h3>清华园</h3><span class="di-meta">10:45–11:15 · 停留 30 分 · 免费 · 风景名胜</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>从上一站步行约 5 分钟（0.32 km）</p><p>从上一站步行约 5 分钟（0.32 km）；沿校内主路步行，到点后先看门口当日开放标识。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 30 分钟（10:45–11:15）</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>沿步道慢走，选开阔处取景</li><li>留意脚下与自行车道，拍照别占用通道</li></ul><div class="di-tags"><span class="di-access">可进入</span><span class="muted">事实卡未对该类点位单列限制，按现场公告为准</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>第 3 站：命中兴趣：公园、户外、散步。安排在 10:45–11:15，落在 09:00–17:00 的可执行时间窗内。上一站到这里的在途已计入，避免来回折返。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：双清路30号 <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 双清路30号</div></div></div></div></div><div class="di-step"><div class="di-step-head"><span class="di-seq">4</span><h3>清华园二校门</h3><span class="di-meta">11:18–11:48 · 停留 30 分 · 免费 · 风景名胜</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>从上一站步行约 3 分钟（0.23 km）</p><p>从上一站步行约 3 分钟（0.23 km）；沿校内主路步行，到点后先看门口当日开放标识。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 30 分钟（11:18–11:48）</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>沿步道慢走，选开阔处取景</li><li>留意脚下与自行车道，拍照别占用通道</li></ul><div class="di-tags"><span class="di-access">可进入</span><span class="muted">事实卡未对该类点位单列限制，按现场公告为准</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>第 4 站：命中兴趣：公园、户外、散步。安排在 11:18–11:48，落在 09:00–17:00 的可执行时间窗内。上一站到这里的在途已计入，避免来回折返。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：双清路30号(清华大学内) <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 双清路30号(清华大学内)</div></div></div></div></div><div class="di-step"><div class="di-step-head"><span class="di-seq">5</span><h3>清华大学图书馆</h3><span class="di-meta">11:54–12:14 · 停留 20 分 · 免费 · 图书馆</span><span class="di-badge">规则模板</span></div><div class="di-body"><div class="di-blk"><h4>怎么走</h4><p>从上一站步行约 6 分钟（0.46 km）</p><p>从上一站步行约 6 分钟（0.46 km）；沿校内主路步行，到点后先看门口当日开放标识。</p><h4>时间提示</h4><p>事实卡建议停留 10 分钟；点位表标注 00:00–23:59（数据口径，非校方公告）；本行程安排停留 20 分钟（11:54–12:14）；可达性规则建议该类点位压到 10 分钟，现场请以实际开放情况为准</p></div><div class="di-blk"><h4>看什么 / 做什么（校区事实卡）</h4><ul><li>德国古典风格，建校初期校舍（外观；高德标注不对外开放）</li><li>事实卡建议在这儿停留 10 分钟</li><li>看建筑外观与楼前广场，按规则只作外观打卡</li><li>在门厅外看当日公告栏，确认是否对访客开放</li></ul><div class="di-tags"><span class="di-access warn">仅外观</span><span class="muted">图书馆老馆红砖经典建筑，访客只看外观；馆内需校内证件</span></div><h4 style="margin-top:8px">为什么排在这</h4><p>末站：命中兴趣：图书馆、自习。安排在 11:54–12:14，落在 09:00–17:00 的可执行时间窗内。上一站到这里的在途已计入，避免来回折返。</p><h4>备选 / 兜底</h4><p>备选：若此站临时不开放或排队过长，改为外观打卡约 5–10 分钟，把剩余时间顺延给下一站；站点顺序与整体时间窗不变。</p></div><div class="di-blk" style="grid-column:1/-1"><h4>事实溯源（可核查）</h4><div class="di-facts"><div><b>建议停留</b>：10 分钟 <span class="muted">← 事实卡 spots[清华学堂].duration_min</span></div><div><b>点位数据</b>：来源 amap，核对于 2026-11-04 <span class="muted">← POI 表 pois.csv</span></div><div><b>地址</b>：双清路30号清华大学 <span class="muted">← POI 表 address</span></div><div class="di-src">点位数据：amap · 核对于 2026-11-04 · 地址 双清路30号清华大学</div></div></div></div></div><div class="di-sec">④ 备选方案（不同情况下怎么调）</div><div class="di-box"><ul><li><b>想少走 / 赶时间</b>：保留首站与末站，中间各站改为外观打卡压到 10 分钟；顺序不变</li><li><b>遇到闭馆或排队</b>：该站改外观 5–10 分钟，剩余时间顺延给下一站，仍在时间窗内</li><li><b>想更偏某类点位</b>：在需求文本里点名（如「多看展馆」「多拍照」）重新生成，候选池按语义标签重新加权</li><li><b>入校时段有变</b>：以事实卡里的入校时段为准调整到达时刻，重新生成让规则引擎重算时间轴</li></ul></div><div class="di-sec">⑤ 校内注意事项</div><div class="di-box"><ul><li>教学核心区、宿舍区为非开放区域；不得盈利性拍摄/直播；禁摆摊兜售；12 岁以下禁骑共享单车</li><li>红马甲志愿讲解每天 8:30、13:30 从日晷出发，每场约 1 小时可随时加入（目前证据限于暑期/国庆/寒假档，平时是否常态化待核实）</li><li>半天经典动线（约 3 小时）：西门入 → 近春园荷塘 → 水木清华 → 工字厅外 → 大礼堂草坪（日晷）→ 清华学堂 → 二校门 → 科学馆 → 出西门</li><li>艺博馆周一闭馆，且与校园参观是两套预约体系，别混</li><li>全程免费；官方明示非旅游景点不收任何费用，警惕黄牛代约</li><li>入校时段 8:00–11:00、13:00–16:00，超时视为放弃，别卡点</li></ul></div><div class="di-sec">⑥ 需现场确认 / 以当日公告为准</div><div class="di-box"><ul><li>清华入校政策一年内多次调整。以下以 2025 暑期/国庆官方通告为准整理，出行前务必以「参观清华」小程序当日信息为准；学期中工作日是否开放个人参观请打 010-62793001 确认。官方明示非旅游景点、不收任何费用，警惕黄牛。</li><li>是否有对访客开放的例外窗口未核实，电话 010-62793001</li><li>红马甲志愿讲解每天 8:30、13:30 从日晷出发，每场约 1 小时可随时加入（目前证据限于暑期/国庆/寒假档，平时是否常态化待核实）</li></ul></div><div class="di-sec">⑦ 事实来源与查阅日期</div><div class="di-box"><ul><li>唯一官方个人渠道为「参观清华」小程序、团队渠道仅中小学及教育主管部门、实名认证规则<br><span class="muted">清华保卫部《个人参观预约须知》peace.tsinghua.edu.cn/info/1016/1371.htm　2026-11-04 查阅</span></li><li>即时/抽签双轨申请时段、180 天 1 次、参观日 8:00 后不可取消、节假日放号节奏（首放 3200/日放 400）、入校时段 8:00–11:00 与 13:00–16:00<br><span class="muted">2025 暑期官方通告（新京报 2025-07-09 报道）　2026-11-04 查阅</span></li><li>国庆起艺博专用通道开放、西门南侧个人专用通道刷证+安检、车辆全禁、周边停车点<br><span class="muted">《国庆中秋节假期校园参观管理通告》官方公众号 2025-09-29　2026-11-04 查阅</span></li><li>艺博开放时间（周二至周日 9:00–17:00，16:30 停止入馆，周一闭馆）与另行预约购票规则<br><span class="muted">清华大学艺术博物馆官网参观服务页　2026-11-04 查阅</span></li><li>三条志愿讲解线路、8:30/13:30 日晷出发、免费与警惕黄牛、注意事项<br><span class="muted">北京本地宝 2025 汇编 + 清华官方通告　2026-11-04 查阅</span></li></ul></div><div class="di-sec">⑧ 规则引擎 vs 大模型：优越性对照</div><div class="di-box" style="margin-bottom:10px"><b>本次运行状态 · 模型调用失败 · 已回退规则</b><p>模型网关鉴权失败（HTTP 401）：.env 里的 LLM_API_KEY 无效或已过期。</p><p class="muted">本页规则版已是完整逐站说明，不影响使用；修好 Key 后重新生成即可叠加模型导览。</p></div><div class="di-compare"><div class="di-box"><b>只有规则引擎</b><p>规则引擎只能给出一张表：站点顺序、时刻、停留、在途距离、成本、命中了哪些兴趣标签 —— 可执行，但不解释、不导览、不照顾你的措辞。</p></div><div class="di-box"><b>大模型额外带来</b><ul><li>本次模型未生效：模型网关鉴权失败（HTTP 401）：.env 里的 LLM_API_KEY 无效或已过期。 以下逐站说明全部由规则模板 + 事实卡生成</li><li>开启模型后，每站会多出一段结合你需求的导览词</li><li>模型会解释「为什么这样排」并给取舍与备选</li><li>时刻、渠道、电话、来源始终由规则层给出，模型碰不到</li></ul></div></div><div class="di-box" style="margin-top:10px"><p>勾选左侧「只用规则」再生成一次：站点与时刻一个字都不会变，但导览词、编排解释与备选会退回模板 —— 差别就是模型带来的增量。</p><p class="muted">事实（渠道/时间/电话/地点/来源）与措辞（导览/解释/取舍）在界面上分开展示，任何一句都能追溯到出处。</p></div></div>
+</body>
+</html>

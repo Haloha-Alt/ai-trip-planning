@@ -1,0 +1,18 @@
+{
+  "key": "sjtu",
+  "name": "上海交通大学（闵行校区）",
+  "city": "shanghai",
+  "level": "L0",
+  "gates": ["东大门", "思源门/南门（车辆口）"],
+  "alt_campuses": ["徐汇（华山路1954号一号门）", "七宝"],
+  "visitor_difficulty": 2,
+  "guide_doc": "docs/23-C9高校访客参观指南/04-上海交通大学.md",
+  "sources": [
+    {"kind": "research", "what": "入校登记政策+官方研学线路调研", "via": "《校园访客参观管理暂行办法》沪交校园〔2025〕5号、上海发布2025-03、今日闵行2025-04", "date": "2026-11-04"}
+  ],
+  "next_steps": [
+    "L1: tools/new_city.py --scaffold sjtu，按指南 2.3 点位表抓高德 POI（闵行校区大，优先官方研学线路沿线）",
+    "L2: tools.amap_matrix 实测步行矩阵（≥80 边）",
+    "事实层: visitor_guide.json（唯一可驾车入校的 C9：闵行 6 元/小时）"
+  ]
+}

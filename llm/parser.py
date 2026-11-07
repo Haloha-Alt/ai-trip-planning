@@ -37,6 +37,34 @@ def _to_int(token: str) -> int | None:
     return CN_NUM.get(token)
 
 
+def _alias_map() -> dict[str, list[str]]:
+    """生活化说法 → 标签（`data/alias/interest_phrases.json`，模型离线生成一次）。
+
+    文件不存在就返回空表 —— 解析行为退回原来的纯词表匹配，不影响任何测试。
+    读一次缓存住：这是数据不是配置，进程内不会变。
+    """
+    global _ALIAS_CACHE
+    if _ALIAS_CACHE is not None:
+        return _ALIAS_CACHE
+    try:
+        import json
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "data" / "alias" / "interest_phrases.json"
+        raw = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        if not isinstance(raw, dict):
+            raw = {}
+        # 长词优先，避免"室内"抢先命中"不晒"
+        _ALIAS_CACHE = {k: v for k, v in sorted(raw.items(), key=lambda kv: (-len(kv[0]), kv[0]))
+                        if isinstance(v, list) and v}
+    except Exception:
+        _ALIAS_CACHE = {}
+    return _ALIAS_CACHE
+
+
+_ALIAS_CACHE: dict[str, list[str]] | None = None
+
+
 def _known_words(cfg: ScenarioConfig) -> list[str]:
     """可供匹配的兴趣词：场景配置的 alias 键 + 数据里出现过的所有标签。
 
@@ -159,6 +187,19 @@ def _rule_parse(text: str, cfg: ScenarioConfig | None = None) -> PlanRequest:
         else:
             interests.append(w)
 
+    # 说法归一化表（`data/alias/interest_phrases.json`，由模型**离线**生成一次）：
+    # "不晒""人少""想干饭"这类说法翻成固定标签。运行时零调用、零延迟，
+    # 所以规则模式也能听懂一部分生活化表达 —— 模型的价值被固化成了数据。
+    for phrase, tgs in _alias_map().items():
+        idx = text.find(phrase)
+        if idx < 0:
+            continue
+        prefix = text[max(0, idx - 4):idx]
+        bucket = avoid if any(n in prefix for n in NEG_WORDS) else interests
+        for t in tgs:
+            if t not in bucket and len(bucket) < 8:
+                bucket.append(t)
+
     req.interests = interests
     req.avoid = avoid
     return req
@@ -180,15 +221,27 @@ def _llm_overrides(text: str, cfg: ScenarioConfig, client) -> dict | None:
         vocab="、".join(vocab) if vocab else "（无）",
     )
     return guarded_json(client, SYSTEM_PROMPT, user, fallback=None,
-                        use_cache=True, tag="parse")
+                        use_cache=True, tag="parse",
+                        retries=0, client_kwargs={"max_tokens": 400, "timeout": 8.0})
 
 
 def _city_names() -> list[str]:
-    """候选城市名（给提示词用）。城市相关的东西只从 registry 读。"""
+    """候选地点名（给提示词用）。城市相关的东西只从 registry 读。
+
+    v1.3 起维度是「高校」：显示名（校名）+ 全部别名都进候选，
+    这样用户说「哈工大」「清华」「大连理工大学」模型都认得出。
+    """
     try:
         from data.cities import city_info, list_cities
 
-        return [city_info(k).name for k in list_cities() if city_info(k)]
+        out: list[str] = []
+        for k in list_cities():
+            info = city_info(k)
+            if not info:
+                continue
+            out.append(info.display_name)
+            out.extend(a for a in info.aliases if a not in out)
+        return out
     except Exception:  # noqa: BLE001 - 提示词里少几个候选城市不影响解析
         return []
 

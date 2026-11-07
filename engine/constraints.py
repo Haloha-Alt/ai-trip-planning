@@ -8,6 +8,7 @@
 
 违规码：BUDGET_OVER / TIME_WINDOW / CLOSED / DUPLICATE / NO_CANDIDATE / BAD_REQUEST
         ／ DEADLINE_MISS（v1.3，赶不上到达截止）／ WAYPOINT_MISS（v1.3，途经点漏排或被插队）
+        ／ ANCHOR_MISS（v1.5，约会模式：锚点未排入 / 格式非法 / 按在途时间算会迟到）
 """
 
 from __future__ import annotations
@@ -182,6 +183,86 @@ def validate_day(day: DayPlan, cfg: ScenarioConfig, req: PlanRequest | None = No
     return vs
 
 
+# ---------------------------------------------------------------- 锚点校验（约会模式 v1.5）
+
+
+def validate_anchors(req: PlanRequest, resp: PlanResponse,
+                     cfg: ScenarioConfig) -> list[Violation]:
+    """约会模式的锚点校验：格式 → 是否排入 → "从上一站出发能不能按时到场"。
+
+    放在 planner 的**跨天**核对位置（与 must_visit 同理）：锚点排在哪一天不确定，
+    day 级校验会把"排在第 2 天"误报成"没排进来"。
+
+    晚到**只告警不拒绝** —— 电影不等人，但系统也不该假装你没迟到；
+    告警写明"最多可能晚到几分钟"，前端拿它提醒用户"这段路上要抓紧"。
+    """
+    vs: list[Violation] = []
+    for k, a in enumerate(req.anchors or [], 1):
+        if not isinstance(a, dict):
+            vs.append(Violation("ANCHOR_MISS", "第 %d 个锚点格式非法（应为对象）" % k))
+            continue
+        key = str(a.get("poi") or "").strip()
+        t = str(a.get("time") or "").strip()
+        label = str(a.get("label") or "") or key
+        if not key:
+            vs.append(Violation("ANCHOR_MISS", "第 %d 个锚点未指定地点" % k))
+            continue
+        try:
+            hh, mm = t.split(":")
+            at = int(hh) * 60 + int(mm)
+            if not 0 <= at < 24 * 60:
+                raise ValueError(at)
+        except (TypeError, ValueError):
+            vs.append(Violation("ANCHOR_MISS", "锚点'%s'时刻'%s'不是合法的 HH:MM" % (label, t)))
+            continue
+
+        # 排入了哪一天、第几站
+        hit: tuple[DayPlan, int] | None = None
+        for d in resp.days:
+            idx = next((i for i, it in enumerate(d.items)
+                        if it.poi_id == key or it.name == key), None)
+            if idx is not None:
+                hit = (d, idx)
+                break
+        if hit is None:
+            known = False
+            try:
+                from data.loader import load_pois
+
+                known = any(p.poi_id == key or p.name == key
+                            for p in load_pois(cfg, req.city))
+            except Exception:
+                known = False
+            msg = ("锚点'%s'未排入行程" % label) if known else \
+                  ("锚点'%s'在数据里找不到对应地点" % label)
+            vs.append(Violation("ANCHOR_MISS", msg))
+            continue
+
+        d, idx = hit
+        it = d.items[idx]
+        if to_minutes(it.arrive) > at:            # 非 date 策略也会走到这里，如实报
+            vs.append(Violation("ANCHOR_MISS",
+                                "%s 于 %s 抵达，晚于锚点 %s" % (it.name, it.arrive, t),
+                                day_index=d.day_index, poi_id=it.poi_id))
+            continue
+
+        # 赶路校验：按"上一站的离开时刻 + 本站的在途时间"估算能不能踩点到场。
+        # 在途时间直接读行程项上已存的 transport.minutes —— 那是策略排程时用的同一条边，
+        # 校验器另算一套（矩阵/估算口径差异）只会制造 1~2 分钟的假告警。
+        if idx > 0:
+            base = to_minutes(d.items[idx - 1].leave)
+        else:                                     # 锚点是第一站：从出发时刻算起
+            base = to_minutes(req.start_time or cfg.day_start)
+        slack = at - (base + it.transport.minutes)
+        if slack < 0:
+            vs.append(Violation(
+                "ANCHOR_MISS",
+                "赶'%s'（%s）最多可能晚到 %d 分钟，建议提前出发或删掉上一站"
+                % (label, t, int(-slack)),
+                day_index=d.day_index, poi_id=it.poi_id))
+    return vs
+
+
 # ---------------------------------------------------------------- 评分
 
 
@@ -244,6 +325,33 @@ def score(resp: PlanResponse, cfg: ScenarioConfig) -> PlanMetrics:
         distance = _clamp01(1.0 - total_travel / (total_stay + total_travel))
     else:
         distance = 0.0
+
+    # --- anchor_fit（v1.6.6，仅 date 场景）：用户原话锚点贴合度 ---
+    # 锚点被排进行程且 arrive 精确命中锚点时刻才算数。命中比例并入满意度
+    # （权重 anchor_fit 从场景 [weights] 读，业务数值只进 toml），
+    # 并留痕到 meta["anchor_fit"] 供前端/测试读取。
+    if cfg.name == "date" and resp.request.anchors:
+        try:
+            from engine.strategies import _resolve_anchors
+
+            anchors = _resolve_anchors(resp.request, cfg)
+        except Exception:
+            anchors = []
+        if anchors:
+            anchor_time = {}
+            for p, at, _dur, _label in anchors:
+                anchor_time[p.poi_id] = at
+            hits = sum(
+                1 for it in items
+                if it.poi_id in anchor_time
+                and to_minutes(it.arrive) == anchor_time[it.poi_id]
+            )
+            anchor_fit = _clamp01(hits / len(anchors))
+            w_anchor = float(cfg.weights.get("anchor_fit", 0.0))
+            if w_anchor > 0:
+                satisfaction = _clamp01((1.0 - w_anchor) * satisfaction
+                                        + w_anchor * anchor_fit)
+            resp.meta["anchor_fit"] = round(anchor_fit, 4)
 
     # --- feasibility：每条违规扣 0.2，最低 0 ---
     n_bad = len(resp.warnings)

@@ -64,6 +64,7 @@ EXPECT_REQUEST_KEYS = {
     "deadline", "profile", "waypoints",            # v1.3 追加
     "end_time", "interests", "mobility", "must_visit", "origin", "pace",
     "raw_query", "seed", "start_poi_id", "start_time", "top_n", "travelers",
+    "anchors", "zone",                             # v1.5 追加（约会模式）
 }
 EXPECT_DAY_KEYS = {
     "date", "day_index", "items", "theme", "total_cost",

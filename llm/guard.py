@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -36,6 +37,38 @@ CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache" / "llm"
 # 磁盘缓存：同一个 (system, user) 只问一次模型。
 # 为什么落盘而不是放内存：Streamlit 每次交互都是新进程态，内存缓存活不过一次重跑。
 _CACHE_ENABLED = True
+
+# 鉴权熔断：一旦确认是 401/403（Key 或权限问题），短时间内所有调用直接走兜底。
+# 没有它，页面上每点一次「生成」都要白等两轮 30 秒超时，看起来就像「模型特别慢」。
+_AUTH_BLOCK_SECONDS = 60.0
+_auth_block_until = 0.0
+
+
+def _is_auth_error(msg: str) -> bool:
+    low = (msg or "").lower()
+    return any(k in low for k in ("401", "403", "invalid token", "authentication fails",
+                                  "unauthorized", "forbidden"))
+
+
+def _auth_blocked() -> bool:
+    return time.time() < _auth_block_until
+
+
+def _block_auth() -> None:
+    global _auth_block_until
+    _auth_block_until = time.time() + _AUTH_BLOCK_SECONDS
+
+
+def clear_auth_block() -> None:
+    """测试 / 换 Key 后重启服务时调用；正常流程不用管。"""
+    global _auth_block_until
+    _auth_block_until = 0.0
+
+
+def _call_kwargs(client_kwargs: dict[str, Any] | None, tag: str) -> dict[str, Any]:
+    kw = dict(client_kwargs or {})
+    kw.setdefault("task", tag)
+    return kw
 
 
 def cache_path(system: str, user: str, model: str = "") -> Path:
@@ -84,16 +117,14 @@ def guarded_json(client,
                  retries: int = 1,
                  use_cache: bool = True,
                  on_warn: Callable[[str], None] | None = None,
-                 tag: str = "llm") -> dict[str, Any] | None:
+                 tag: str = "llm",
+                 client_kwargs: dict[str, Any] | None = None) -> dict[str, Any] | None:
     """调一次模型拿 JSON；拿不到就返回 fallback。
 
     :param client:     client 对象（NullClient 会立刻走 fallback）
-    :param system/user:提示词
     :param fallback:   失败时返回什么（通常就是规则解析的结果）
-    :param retries:    额外重试次数（总尝试次数 = retries + 1）
-    :param use_cache:  是否用磁盘缓存
-    :param on_warn:    告警回调，通常传 `resp.warnings.append`
-    :return:           解析出的 dict，或 fallback（**不会抛异常**）
+    :param retries:    额外重试次数（总尝试次数 = retries + 1）；确定性失败不重试
+    :param client_kwargs: 透传给 client 的单次参数（max_tokens / timeout / model…）
     """
     def warn(msg: str) -> None:
         if on_warn:
@@ -106,6 +137,11 @@ def guarded_json(client,
         warn("未启用大模型（缺 LLM_API_KEY），直接用规则结果")
         return fallback
 
+    if _auth_blocked():
+        warn("模型鉴权失败冷却中，本次直接走规则结果（%.0f 秒后自动重试）"
+             % max(0.0, _auth_block_until - time.time()))
+        return fallback
+
     model = getattr(client, "model", "")
     p = cache_path(system, user, model)
     if use_cache:
@@ -113,12 +149,17 @@ def guarded_json(client,
         if hit is not None:
             return hit
 
+    kw = _call_kwargs(client_kwargs, tag)
     last = ""
     for attempt in range(retries + 1):
         try:
-            obj = client.json_chat(system, user, task=tag)
+            obj = client.json_chat(system, user, **kw)
         except LLMError as e:
             last = str(e)
+            if getattr(e, "fatal", False):
+                if _is_auth_error(last):
+                    _block_auth()
+                break                          # 确定性失败：重试只会再等一轮
         except Exception as e:  # noqa: BLE001 - 任何意外都算调用失败
             last = "%s: %s" % (type(e).__name__, e)
         else:
@@ -134,7 +175,8 @@ def guarded_text(client, system: str, user: str, *,
                  fallback: str = "", retries: int = 1,
                  use_cache: bool = True,
                  on_warn: Callable[[str], None] | None = None,
-                 tag: str = "llm") -> str:
+                 tag: str = "llm",
+                 client_kwargs: dict[str, Any] | None = None) -> str:
     """同上，但要的是纯文本（解说、贴士这类）。
 
     缓存 key 与 `guarded_json` 分开，避免"文本结果"被当成 JSON 读。
@@ -149,6 +191,9 @@ def guarded_text(client, system: str, user: str, *,
     if client is None or isinstance(client, NullClient) or not getattr(client, "enabled", False):
         return fallback
 
+    if _auth_blocked():
+        return fallback
+
     model = getattr(client, "model", "")
     p = cache_path("TEXT|" + system, user, model)
     if use_cache:
@@ -156,12 +201,17 @@ def guarded_text(client, system: str, user: str, *,
         if hit is not None and isinstance(hit.get("text"), str):
             return hit["text"]
 
+    kw = _call_kwargs(client_kwargs, tag)
     last = ""
     for attempt in range(retries + 1):
         try:
-            text = client.chat(system, user, task=tag)
+            text = client.chat(system, user, **kw)
         except LLMError as e:
             last = str(e)
+            if getattr(e, "fatal", False):
+                if _is_auth_error(last):
+                    _block_auth()
+                break
         except Exception as e:  # noqa: BLE001
             last = "%s: %s" % (type(e).__name__, e)
         else:

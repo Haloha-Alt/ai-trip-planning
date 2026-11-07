@@ -18,6 +18,7 @@ engine 与 ui 只认 `city` 这个字符串 key，不认任何具体城市。
     city_info(key)                    -> CityInfo | None    单个城市的元信息
     resolve_city(text)                -> str | None         任意说法 -> key（"大连市"、"dalian"、"去大连玩"）
     poi_path(city, fallback)          -> str                POI 数据文件路径（相对 data/）
+    visit_poi_path(city, fallback)    -> str                访客场景的校内点位表（v1.6）
     matrix_path(city, fallback)       -> str                交通矩阵路径（同上）
     save_city_csv(key, rows)          -> str                写入一个城市的 POI 表，返回路径
 
@@ -40,15 +41,32 @@ REGISTRY = CITY_DIR / "registry.toml"
 
 @dataclass(frozen=True)
 class CityInfo:
-    """一个城市的元信息。坐标是城市中心点，不是某个 POI。"""
+    """一个城市的元信息。坐标是城市中心点，不是某个 POI。
+
+    v1.3 起多校区扩展（docs/14）：下拉框的维度从「城市」改成「高校」——
+    - kind = "campus" 表示这是**一所高校**的数据包（哈工大、清华……），
+      没写 kind 的是城市（如北京），仍可被语义解析命中，但不再出现在高校下拉里；
+    - label 是给 UI 看的显示名（dalian 的数据里混着城市与校区两层，label 固定为校名），
+      没写 label 就用 name。
+    """
 
     key: str
     name: str = ""
+    label: str = ""
+    kind: str = ""
     aliases: tuple[str, ...] = ()
     lat: float = 0.0
     lon: float = 0.0
     poi_file: str = ""
     matrix_file: str = ""
+    # v1.6 访客多校区：访客场景专用的"校内点位表"，空 = 直接用 poi_file。
+    # 放在注册表里而不是场景配置里，才不会出现"换一所高校却读上一所的数据"。
+    visit_poi_file: str = ""
+
+    @property
+    def display_name(self) -> str:
+        """UI 显示名：优先 label（校名），退回 name。"""
+        return self.label or self.name
 
 
 # ---------------------------------------------------------------- 注册表加载
@@ -90,11 +108,14 @@ def _table() -> dict[str, CityInfo]:
             out[str(key)] = CityInfo(
                 key=str(key),
                 name=str(sec.get("name", key)),
+                label=str(sec.get("label", "") or ""),
+                kind=str(sec.get("kind", "") or ""),
                 aliases=tuple(str(a) for a in sec.get("aliases", []) or []),
                 lat=float(sec.get("lat", 0.0) or 0.0),
                 lon=float(sec.get("lon", 0.0) or 0.0),
                 poi_file=str(sec.get("poi", "") or ""),
                 matrix_file=str(sec.get("matrix", "") or ""),
+                visit_poi_file=str(sec.get("visit_poi", "") or ""),
             )
         except Exception as e:                    # noqa: BLE001 - 单个城市写错不拖垮整张表
             print("[warn] skip bad city '%s': %s" % (key, e))
@@ -117,6 +138,18 @@ def reload() -> None:
 def list_cities() -> list[str]:
     """列出所有已注册城市 key（字母序），UI 下拉框用。"""
     return sorted(_table())
+
+
+def list_campuses() -> list[str]:
+    """列出所有**高校**数据包的 key（字母序）。
+
+    v1.3 起 UI 的选择维度从「城市」换成「高校」：只返回 registry 里
+    `kind = "campus"` 的条目。整个注册表一个 campus 都没有时返回全量
+    （老 registry 不用改一字也能工作，行为与以前一致）。
+    """
+    t = _table()
+    campuses = sorted(k for k, v in t.items() if v.kind == "campus")
+    return campuses if campuses else sorted(t)
 
 
 def default_city() -> str:
@@ -181,6 +214,25 @@ def poi_path(city: str, fallback: str) -> str:
     if info is None or not info.poi_file:
         return fallback
     return info.poi_file if _exists(info.poi_file) else fallback
+
+
+def visit_poi_path(city: str, fallback: str = "") -> str:
+    """**访客场景**的点位表路径（v1.6）。
+
+    与 `poi_path` 的区别：访客只在校区内活动，所以优先读注册表里的
+    `visit_poi`（校内点位表）；没配就退回 `poi`（高校包本身就是校内点）；
+    两级都缺或文件不存在才返回 `fallback`。
+
+    这条路是"高校注册表说了算"：`visit` 场景不再持有任何一所学校的具体路径，
+    新增高校只要在注册表登记，访客行程自动跟着换数据。
+    """
+    info = city_info(city)
+    if info is None:
+        return fallback
+    for rel in (info.visit_poi_file, info.poi_file):
+        if _exists(rel):
+            return rel
+    return fallback
 
 
 def matrix_path(city: str, fallback: str) -> str:

@@ -1,0 +1,18 @@
+{
+  "key": "zju",
+  "name": "浙江大学（紫金港校区）",
+  "city": "hangzhou",
+  "level": "L0",
+  "gates": ["南一门（主校门，地铁5号线浙大紫金港站A口）"],
+  "alt_campuses": ["玉泉", "西溪", "华家池", "之江", "舟山", "海宁"],
+  "visitor_difficulty": 3,
+  "guide_doc": "docs/23-C9高校访客参观指南/05-浙江大学.md",
+  "sources": [
+    {"kind": "research", "what": "浙大通预约+紫金港动线调研", "via": "浙大官网《社会公众进校预约流程》PDF、校方2025五一指南、浙江在线2026-05-15", "date": "2026-11-04"}
+  ],
+  "next_steps": [
+    "L1: tools/new_city.py --scaffold zju，按指南 2.3 点位表抓高德 POI（≥30）",
+    "L2: tools.amap_matrix 实测步行矩阵（≥80 边）",
+    "事实层: visitor_guide.json（开放时段有两个官方口径并存，两条都要收录）"
+  ]
+}

@@ -16,6 +16,9 @@
     city 传了且注册表里有 → 读 data/cities/<key>/pois.csv；
     city 为空 / 未注册 / 文件缺失 → 回退到场景配置里的 poi_file。
     所以存量调用（不传 city）的行为与改造前**逐字一致**，零回归。
+
+v1.6 访客多校区：`poi_routing = "campus_visit"` 的场景（visit.toml）改由
+**高校注册表的 visit_poi** 决定读哪份校内点位表，场景里的路径只兜底。
 """
 
 from __future__ import annotations
@@ -23,10 +26,12 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from data.cities import city_info as _city_info
 from data.cities import matrix_path as _city_matrix_path
 from data.cities import poi_path as _city_poi_path
 from data.cities import resolve_city as _resolve_city
 from data.cities import has_matrix as _city_has_matrix
+from data.cities import visit_poi_path as _visit_poi_path
 from engine.config import ScenarioConfig, load_scenario
 from engine.models import POI, Transport, TravelEdge
 
@@ -47,6 +52,8 @@ def clear_cache() -> None:
     """清空缓存。改了 CSV 之后调用它。"""
     _POI_CACHE.clear()
     _MATRIX_CACHE.clear()
+    _LM_CACHE.clear()
+    _LT_CACHE.clear()
 
 
 def _resolve(cfg: ScenarioConfig | None) -> ScenarioConfig:
@@ -54,7 +61,43 @@ def _resolve(cfg: ScenarioConfig | None) -> ScenarioConfig:
 
 
 def _poi_file_for(city: str, cfg: ScenarioConfig) -> str:
-    """按城市挑 POI 文件；城市未知时提醒一次并回退。"""
+    """按城市挑 POI 文件；城市未知时提醒一次并回退。
+
+    优先级（v1.6.3 起）：
+    **城市约会表（仅 city_date 场景）> 高校访客表（仅 campus_visit 场景）
+    > 场景显式指定 > 城市注册表 > 内置默认**
+
+    v1.6.3 约会模式独立化：`poi_routing = "city_date"` 的场景（date）以
+    **城市**为地点，读每个城市自己的 `cities/<key>/pois_date.csv`。
+    该城市没建约会数据包时**不借别人的**（与矩阵同一口径：宁缺毋假），
+    返回一个不存在的路径让 load_pois 得到空表，由上层如实说"暂无约会数据"。
+    这里场景里写的路径退居"未注册城市 / 老调用（不传 city）"的兜底。
+
+    `poi_routing = "campus_visit"` 的语义（v1.6）不变：visit 场景让**高校注册表**
+    说了算，否则选哈工大 / 清华也会读到大连的点位 —— 换学校等于没换数据。
+    """
+    routing = getattr(cfg, "poi_routing", "")
+    if routing == "city_date" and city:
+        info = _city_info(city)
+        if info is not None:
+            rel = "cities/%s/pois_date.csv" % info.key
+            if (DATA_DIR / rel).exists():
+                return rel
+            if city not in _UNKNOWN_CITY_WARNED:
+                _UNKNOWN_CITY_WARNED.add(city)
+                print("[warn] 城市 '%s' 没有自己的约会数据包（%s），候选池为空"
+                      % (city, rel))
+            return rel                      # 不存在 → _read_csv 返回空表
+
+    if routing == "campus_visit" and city:
+        info = _city_info(city)
+        if info is not None and info.kind == "campus":
+            rel = _visit_poi_path(city, "")
+            if rel and (DATA_DIR / rel).exists():
+                return rel
+
+    if cfg.poi_file and cfg.poi_file != "pois.csv" and (DATA_DIR / cfg.poi_file).exists():
+        return cfg.poi_file
     resolved = _city_poi_path(city, cfg.poi_file)
     if city and resolved == cfg.poi_file and _resolve_city(city) is None:
         if city not in _UNKNOWN_CITY_WARNED:
@@ -236,3 +279,40 @@ def get_matrix_edge(a_id: str, b_id: str, cfg: ScenarioConfig | None = None,
                 cost=e.cost,
             )
     return None
+
+
+# ---------------------------------------------------------------- v1.6.5 城市补充数据
+# 地标（出发/返回锚点）与末班时刻表：都是 data/cities/<key>/ 下的可选小表，
+# 没建就返回空 —— 引擎与导出层如实说"没有这份资料"，绝不编。
+
+_LM_CACHE: dict[str, list[dict]] = {}
+_LT_CACHE: dict[str, list[dict]] = {}
+
+
+def _city_table(city: str, filename: str, cache: dict) -> list[dict]:
+    """读 data/cities/<key>/<filename>；城市未注册或文件缺失 → 空表（不提醒刷屏）。"""
+    if not city:
+        return []
+    info = _city_info(city)
+    key = (info.key if info else str(city).strip().lower()) + "/" + filename
+    if key in cache:
+        return cache[key]
+    path = DATA_DIR / "cities" / (info.key if info else str(city).strip()) / filename
+    rows = _read_csv(str(path.relative_to(DATA_DIR))) if path.exists() else []
+    out: list[dict] = []
+    for row in rows:
+        d = {k: (v.strip() if isinstance(v, str) else v) for k, v in row.items() if not _is_empty(v)}
+        if d:
+            out.append(d)
+    cache[key] = out
+    return out
+
+
+def load_landmarks(cfg: ScenarioConfig | None = None, city: str = "") -> list[dict]:
+    """城市地标表（出发/返回锚点）：name/lat/lon/note/source_date。缺失返回空表。"""
+    return _city_table(city, "landmarks.csv", _LM_CACHE)
+
+
+def load_last_trains(cfg: ScenarioConfig | None = None, city: str = "") -> list[dict]:
+    """城市末班时刻表：kind/line/direction/station/last_time/source_date。缺失返回空表。"""
+    return _city_table(city, "last_trains.csv", _LT_CACHE)

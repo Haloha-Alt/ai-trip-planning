@@ -1,0 +1,53 @@
+# systemd 单元：不用 Docker 时用这个（Ubuntu / Debian / 阿里云 ECS 通用）
+#
+# 安装：
+#   sudo cp deploy/trip.service /etc/systemd/system/ai-trip.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ai-trip
+#   sudo systemctl status ai-trip
+#
+# 为什么不用 nohup：
+#   SSH 一断或服务器重启，nohup 起来的进程就没了；systemd 能自动拉起、开机自启、统一收日志。
+#
+# 三处要按实际改：User、WorkingDirectory、ExecStart 里的 python 路径。
+
+[Unit]
+Description=AI trip planner (api.server)
+Documentation=file:///opt/ai-trip-planner/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/ai-trip-planner
+
+# .env 由程序自己读（service.bootstrap.load_dotenv），这里不用 EnvironmentFile；
+# 如果想让 systemd 也看到，取消下面这行注释即可（注意 .env 里不能有 export）
+# EnvironmentFile=/opt/ai-trip-planner/.env
+
+# 只监听本机，对外交给 Nginx —— 别在这里写 0.0.0.0，否则绕过 HTTPS
+Environment=WEB_HOST=127.0.0.1
+Environment=PYTHONIOENCODING=utf-8
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/opt/ai-trip-planner/.venv/bin/python -m api.server
+
+# 挂了自动拉起：大模型超时、OOM 都不会让网站一直黑着
+Restart=always
+RestartSec=3
+StartLimitBurst=10
+
+# 基本加固：只允许写自己的目录
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/ai-trip-planner/.cache /opt/ai-trip-planner/outputs
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

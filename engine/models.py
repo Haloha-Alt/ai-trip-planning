@@ -12,6 +12,14 @@ v1.2 的边界（2026-10-27）：只在每个 dataclass **末尾**追加带默�
 用于承载多城市 / 实时数据 / LLM 解说 / 导出这几件事，`CONTRACT_VERSION` 因此仍为 "v1"。
 `PlanMetrics` 一个字段都没动 —— 保证 AC-31 的历史评分口径可比。
 
+v1.5（2026-11-04，约会模式）：继续沿用同一规则 —— 末尾追加 `PlanRequest.zone/anchors`
+与 `POI.zone`，全部带默认值；旧 JSON/旧 CSV 逐字节不受影响。
+
+v1.6（2026-11-07，详细行程单）：`POI` 末尾追加 `tips`（数据层的"这站怎么玩"文案，
+如拍照机位、点单建议），由引擎复制进 `ItineraryItem.tips`；LLM narrate 侧保持
+"已有 tips 不覆盖"（`it.tips or ...`），即**数据事实优先、模型只补空位**。
+`CONTRACT_VERSION` 仍为 "v1"。
+
 本文件只允许 import 标准库，保证零依赖。
 """
 
@@ -58,6 +66,14 @@ class PlanRequest:
     waypoints: list[str] = field(default_factory=list)   # 途经点（名称或 poi_id），按给出的先后强制顺序
     profile: str = ""                     # 权重档位：save | fast | comfort；空 = 用场景 [weights]
 
+    # ---- v1.5 追加（约会模式；全部带默认值，旧 JSON 不受影响）----
+    zone: str = ""                        # 商圈/分区（如"西安路"）：候选池按此过滤，空 = 不过滤
+    anchors: list[dict] = field(default_factory=list)
+    # 锚点/预订约束：[{"poi": "名称或poi_id", "time": "HH:MM",
+    #                "duration_min": 120, "label": "电影开场"}]
+    # 语义：到点必须"已经开始的事"（电影/订座），晚到**只告警不拒绝** —— 与全项目
+    # "违规进 warnings" 的哲学一致。排程由 date 策略按锚点切段。
+
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "PlanRequest":
         """只取认识的字段，未知的忽略 —— 保证旧 JSON 不会被新字段搞崩。"""
@@ -98,6 +114,12 @@ class POI:
     # ---- v1.4 追加 ----
     cost_unit: str = "per_person"         # 计价单位：per_person 人均 | per_trip 单次 | per_night 每晚
     source_date: str = ""                 # 来源适用/核对日期 "YYYY-MM-DD"；空 = 尚未核实（进待确认清单）
+
+    # ---- v1.5 追加 ----
+    zone: str = ""                        # 商圈/分区（约会模式用）；空 = 不属于任何分区（旧数据自动为空）
+
+    # ---- v1.6 追加 ----
+    tips: str = ""                        # 这站怎么玩（数据层事实文案：机位/点单/进场建议）；空 = 无
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "POI":

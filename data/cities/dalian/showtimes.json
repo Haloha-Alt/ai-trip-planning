@@ -1,0 +1,27 @@
+{
+  "_note": "电影场次为【演示数据】：结构对接真实票务接口时只需替换本文件，引擎与前端零改动。场次时间均为虚构，演示时请以'演示数据'口径说明。",
+  "source": "demo",
+  "updated": "2026-11-04",
+  "cinemas": {
+    "DL205": [
+      { "time": "11:20", "title": "演示影片A", "hall": "3号厅", "price": 45 },
+      { "time": "14:30", "title": "演示影片A", "hall": "IMAX厅", "price": 68 },
+      { "time": "17:00", "title": "演示影片B", "hall": "5号厅", "price": 45 },
+      { "time": "19:40", "title": "演示影片C", "hall": "IMAX厅", "price": 68 },
+      { "time": "21:30", "title": "演示影片C", "hall": "2号厅", "price": 45 }
+    ],
+    "DL206": [
+      { "time": "10:40", "title": "演示影片B", "hall": "1号厅", "price": 40 },
+      { "time": "13:50", "title": "演示影片A", "hall": "2号厅", "price": 52 },
+      { "time": "16:40", "title": "演示影片C", "hall": "1号厅", "price": 52 },
+      { "time": "20:10", "title": "演示影片A", "hall": "3号厅", "price": 52 }
+    ],
+    "DL230": [
+      { "time": "11:00", "title": "演示影片C", "hall": "6号厅", "price": 48 },
+      { "time": "14:10", "title": "演示影片B", "hall": "IMAX厅", "price": 72 },
+      { "time": "17:20", "title": "演示影片A", "hall": "4号厅", "price": 48 },
+      { "time": "20:00", "title": "演示影片B", "hall": "IMAX厅", "price": 72 },
+      { "time": "22:10", "title": "演示影片C", "hall": "6号厅", "price": 48 }
+    ]
+  }
+}

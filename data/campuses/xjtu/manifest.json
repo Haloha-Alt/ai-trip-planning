@@ -1,0 +1,18 @@
+{
+  "key": "xjtu",
+  "name": "西安交通大学（兴庆校区）",
+  "city": "xian",
+  "level": "L0",
+  "gates": ["兴庆校区北门（咸宁西路28号，地铁6号线交通大学·兴庆宫站B口）"],
+  "alt_campuses": ["雁塔（医学北门）", "创新港（思源环南路风帆广场）"],
+  "visitor_difficulty": 3,
+  "guide_doc": "docs/23-C9高校访客参观指南/09-西安交通大学.md",
+  "sources": [
+    {"kind": "research", "what": "保卫处公众号预约+樱花节+西迁博物馆调研", "via": "西交大保卫处参观须知（腾讯新闻2025-04转载）、校OA公告2025-10-28", "date": "2026-11-04"}
+  ],
+  "next_steps": [
+    "L1: tools/new_city.py --scaffold xjtu，按指南 2.3 点位表抓高德 POI（≥30）",
+    "L2: tools.amap_matrix 实测步行矩阵（≥80 边）",
+    "事实层: visitor_guide.json（每日18:00放号、90天1次；西迁博物馆开馆时间与个人参观时段错位是关键待核实项）"
+  ]
+}

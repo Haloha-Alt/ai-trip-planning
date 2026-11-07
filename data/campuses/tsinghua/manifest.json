@@ -1,0 +1,21 @@
+{
+  "key": "tsinghua",
+  "name": "清华大学",
+  "city": "beijing",
+  "level": "L1",
+  "poi_file": "pois.csv",
+  "poi_count": 88,
+  "poi_source": "amap place/text，2026-11-04 抓取，tools/trim_campus_pois 半径1.5km+黑名单裁剪",
+  "matrix_file": "",
+  "gates": ["西门（个人参观专用通道）", "艺术博物馆东侧专用通道", "东侧门（团队）"],
+  "visitor_difficulty": 4,
+  "guide_doc": "docs/23-C9高校访客参观指南/01-清华大学.md",
+  "sources": [
+    {"kind": "research", "what": "入校预约政策+校园动线调研", "via": "清华保卫部参观须知、2025暑期/国庆官方通告、新京报2025-07-09", "date": "2026-11-04"},
+    {"kind": "amap", "what": "校内 POI 88 个", "via": "高德 place/text", "date": "2026-11-04"}
+  ],
+  "next_steps": [
+    "L2: tools.amap_matrix --city tsinghua --mode walk（≥80 边）",
+    "事实层已建：visitor_guide.json（抽签+即时双轨、180天1次，按指南第一、五节结构化）"
+  ]
+}

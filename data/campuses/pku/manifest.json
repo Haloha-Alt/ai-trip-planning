@@ -1,0 +1,17 @@
+{
+  "key": "pku",
+  "name": "北京大学",
+  "city": "beijing",
+  "level": "L0",
+  "gates": ["东侧门（唯一参观入口）", "西门/校友门（出校打卡）"],
+  "visitor_difficulty": 4,
+  "guide_doc": "docs/23-C9高校访客参观指南/02-北京大学.md",
+  "sources": [
+    {"kind": "research", "what": "入校预约政策+校园动线调研", "via": "北大保卫部《个人预约/参观须知》2025-06-26、北京日报2026-07-13", "date": "2026-11-04"}
+  ],
+  "next_steps": [
+    "L1: tools/new_city.py --scaffold pku，按指南 2.3 点位表抓高德 POI（≥30）",
+    "L2: tools.amap_matrix 实测步行矩阵（≥80 边）",
+    "事实层: visitor_guide.json（食堂对访客开放 5 处，是 C9 中最明确的一所）"
+  ]
+}
