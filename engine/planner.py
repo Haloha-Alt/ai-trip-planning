@@ -231,6 +231,18 @@ def plan(req: PlanRequest,
     except Exception:                       # 数据层异常不能连累主结果
         pass
 
+    # E3 碎片时间任务：把移动片（在途 5-20 分钟）与等待片（等开门）利用起来，
+    # 不动 POI 序列；缺 tasks.csv 的城市零影响；异常静默不连累主结果。
+    try:
+        from data.loader import load_tasks
+        from engine.tasks import attach_tasks
+
+        trows = load_tasks(cfg, getattr(req, "city", "") or "")
+        if trows:
+            resp.meta["task_usage"] = attach_tasks(resp, trows)
+    except Exception:
+        pass
+
     # 实时数据：只在这里统一生效一次，策略内部一律不碰它
     if ctx is not None and getattr(ctx, "snapshot", None) is not None:
         try:

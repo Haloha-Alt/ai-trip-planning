@@ -12,7 +12,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 from typing import Any, Callable
 
 from service import exporters
@@ -503,10 +505,74 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("POST", "/api/extras", post_extras),
     ("POST", "/api/export", post_export),
     ("POST", "/api/reload", post_reload),
+    ("GET", "/api/metrics", lambda req: get_metrics(req)),
     ("GET", "/api/date/info", get_date_info),
     ("POST", "/api/date/locate", post_date_locate),
     ("POST", "/api/date/brief", post_date_brief),
 ]
+
+
+# ---------------------------------------------------------------- C5 结构化日志与指标
+
+_LOG_PATH = Path(__file__).resolve().parent.parent / "logs" / "requests.log"
+_LATENCIES: list[float] = []          # 内存滚动窗口（最近 500 次），/api/metrics 用
+
+
+def _metrics_middleware(method: str, path: str, query: dict, body: dict
+                        ) -> tuple[int, dict[str, Any]]:
+    """包一层 dispatch：一行 JSON 日志 + 延迟采样。失败不连累业务结果。"""
+    import time
+    t0 = time.perf_counter()
+    status, payload = 500, {"ok": False, "error": "internal"}
+    try:
+        status, payload = dispatch(method, path, query, body)
+        return status, payload
+    finally:
+        elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
+        try:
+            _LATENCIES.append(elapsed_ms)
+            if len(_LATENCIES) > 500:
+                del _LATENCIES[:-500]
+            line = json.dumps({
+                "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "method": method, "path": path,
+                "status": status,
+                "elapsed_ms": elapsed_ms,
+            }, ensure_ascii=False)
+            try:
+                _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+                with open(_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(line + "\n")
+            except OSError:
+                pass        # 日志写不进去（只读盘等）不影响服务
+            print(line, flush=True)
+        except Exception:
+            pass
+
+
+def get_metrics(_req: HttpRequest) -> tuple[int, dict[str, Any]]:
+    """C5：延迟分位数与请求数（内存滚动窗口，重启清零）。"""
+    xs = sorted(_LATENCIES)
+
+    def _pct(p: float) -> float:
+        if not xs:
+            return 0.0
+        i = min(len(xs) - 1, max(0, int(round(p * (len(xs) - 1)))))
+        return xs[i]
+
+    return _ok({
+        "requests": len(xs),
+        "p50_ms": _pct(0.50),
+        "p95_ms": _pct(0.95),
+        "window": 500,
+        "log_path": str(_LOG_PATH),
+    })
+
+
+def dispatch_logged(method: str, path: str, query: dict[str, Any] | None,
+                    body: dict[str, Any] | None) -> tuple[int, dict[str, Any]]:
+    """带日志/指标的 dispatch —— server.py 用这个，测试可以直接用 dispatch。"""
+    return _metrics_middleware(method, path, query or {}, body or {})
 
 
 def _gate(query: dict[str, Any]) -> tuple[int, dict[str, Any]] | None:

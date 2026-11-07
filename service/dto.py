@@ -45,6 +45,8 @@ def item_to_api(it) -> dict[str, Any]:
         "tips": it.tips,
         "flags": list(it.flags),
         "url": it.url,
+        "wait_min": it.wait_min,          # v1.1(B2)
+        "tasks": list(it.tasks),          # v1.1(E3)
     }
 
 
@@ -59,6 +61,7 @@ def day_to_api(day: DayPlan) -> dict[str, Any]:
         "total_stay_min": day.total_stay_min,
         "total_travel_min": day.total_travel_min,
         "total_distance_km": day.total_distance_km,
+        "task_min": day.task_min,         # v1.1(E3)
         "items": [item_to_api(it) for it in day.items],
     }
 

@@ -415,6 +415,9 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
             break
         if _closed_on(p, weekday) or _closes_before(p, leave):
             continue                            # 今天关门 / 来不及：跳过这一站，接着排下一站
+        wait = arrive - (clock + int(round(edge.minutes)))
+        if wait < 0:
+            wait = 0
 
         day.items.append(ItineraryItem(
             seq=len(day.items) + 1,
@@ -428,15 +431,15 @@ def _fill_day(picked: list[POI], req: PlanRequest, cfg: ScenarioConfig,
             cost=p.cost,
             transport=edge,
             reason=_reason(p, wanted) + (
-                "；到早了等开门 %d 分钟" % (arrive - (clock + int(round(edge.minutes))))
-                if arrive > clock + int(round(edge.minutes)) else ""),
-            flags=["wait_open"] if arrive > clock + int(round(edge.minutes)) else [],
+                "；到早了等开门 %d 分钟" % wait if wait else ""),
+            flags=["wait_open"] if wait else [],
             # 分类/地址跟着复制：前端要按分类上色、解说要按分类起标题，
             # 让 UI 直连 data/ 去查又违反分层（UI 只允许 import engine）
             category=p.category,
             address=p.address,
             url=p.url,
             tips=p.tips,   # v1.6：数据层"怎么玩"随行；narrate 对已有 tips 不覆盖
+            wait_min=wait,  # v1.1(B2)：等待段单独计时，不计入停留
         ))
         clock, prev = leave, p
 
@@ -867,6 +870,9 @@ def date_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
 
     def emit(p: POI, e: Transport, arrive: int, leave: int, reason: str,
              stay: int | None = None) -> None:
+        wait = arrive - (state["clock"] + int(round(e.minutes)))
+        if wait < 0:
+            wait = 0
         day.items.append(ItineraryItem(
             seq=len(day.items) + 1,
             poi_id=p.poi_id,
@@ -877,8 +883,10 @@ def date_plan(req: PlanRequest, cfg: ScenarioConfig) -> PlanResponse:
             cost=p.cost,
             transport=e,
             reason=reason[:120],
+            flags=["wait_open"] if wait else [],
             category=p.category, address=p.address, url=p.url,
             tips=p.tips,   # v1.6：数据层"怎么玩"随行（约会/日常两条排程路径都要带上）
+            wait_min=wait, # v1.1(B2)：等待段单独计时，不计入停留
         ))
         state["clock"], state["prev"] = leave, p
         state["spent"] += p.cost + e.cost

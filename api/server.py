@@ -19,7 +19,7 @@ import json
 from pathlib import Path
 
 from service.bootstrap import WEB_DIR, load_dotenv
-from api.routes import dispatch
+from api.routes import dispatch_logged as dispatch
 
 ROOT = Path(__file__).resolve().parent.parent
 

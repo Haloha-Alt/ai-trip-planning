@@ -54,6 +54,7 @@ def clear_cache() -> None:
     _MATRIX_CACHE.clear()
     _LM_CACHE.clear()
     _LT_CACHE.clear()
+    _TASK_CACHE.clear()
 
 
 def _resolve(cfg: ScenarioConfig | None) -> ScenarioConfig:
@@ -287,6 +288,7 @@ def get_matrix_edge(a_id: str, b_id: str, cfg: ScenarioConfig | None = None,
 
 _LM_CACHE: dict[str, list[dict]] = {}
 _LT_CACHE: dict[str, list[dict]] = {}
+_TASK_CACHE: dict[str, list[dict]] = {}
 
 
 def _city_table(city: str, filename: str, cache: dict) -> list[dict]:
@@ -316,3 +318,8 @@ def load_landmarks(cfg: ScenarioConfig | None = None, city: str = "") -> list[di
 def load_last_trains(cfg: ScenarioConfig | None = None, city: str = "") -> list[dict]:
     """城市末班时刻表：kind/line/direction/station/last_time/source_date。缺失返回空表。"""
     return _city_table(city, "last_trains.csv", _LT_CACHE)
+
+
+def load_tasks(cfg: ScenarioConfig | None = None, city: str = "") -> list[dict]:
+    """城市碎片任务表（E3）：task_id/name/duration_min/consumes/tags/desc。缺失返回空表。"""
+    return _city_table(city, "tasks.csv", _TASK_CACHE)

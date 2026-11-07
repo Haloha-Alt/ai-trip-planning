@@ -335,6 +335,26 @@ def to_markdown(resp: PlanResponse) -> str:
                                                       req.deadline or req.end_time))
         out.append("")
 
+    # ---- 5.4) 碎片时间建议（E3）：有任务被装填才写这一节，没有就不写 ----
+    task_usage = resp.meta.get("task_usage") or {}
+    task_items = [(it, t) for d in resp.days for it in d.items
+                  for t in (it.tasks or [])]
+    if task_items:
+        out.append("## 碎片时间建议")
+        out.append("")
+        out.append("> 口径：只在移动片（在途 5-20 分钟）与等待片（等开门）里装"
+                   "「不占手不占眼」的事，不占地点停留；有效利用时间占比 %.0f%%。"
+                   % (100.0 * (task_usage.get("usage") or 0)))
+        for it, t in task_items:
+            where = ("在途 %s→%s" % ("上一站", it.name)
+                     if it.transport.mode != "start" else "出发段")
+            if it.wait_min:
+                where = "%s（等开门 %d 分钟）" % (it.name, it.wait_min)
+            out.append("- %s（约 %d 分钟）：**%s**——%s"
+                       % (where, t.get("duration_min") or 0,
+                          t.get("name") or "", t.get("desc") or ""))
+        out.append("")
+
     # ---- 5.5) Plan B 速查：引擎从候选池推导的室内备选，查不到就不写这一节 ----
     plan_b = resp.meta.get("plan_b") or []
     if plan_b:
@@ -396,6 +416,129 @@ def to_csv(resp: PlanResponse) -> str:
     return buf.getvalue()
 
 
+def to_ics(resp: PlanResponse) -> str:
+    """v1.1(B1)：iCalendar，可直接导进日历（Google/Outlook/手机日历）。"""
+    def _dt(date: str, hhmm: str) -> str:
+        d = (date or "19700101").replace("-", "")
+        return "%sT%s00" % (d, (hhmm or "00:00").replace(":", ""))
+
+    now = _dt("19700101", "00:00")
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0",
+             "PRODID:-//ai-trip-planner//v1.1//CN", "CALSCALE:GREGORIAN"]
+    for d in resp.days:
+        # day.date 引擎不一定填（黄金基线锁死），导出层兜底用请求日期
+        day_date = d.date or getattr(resp.request, "date", "") or ""
+        for it in d.items:
+            summary = it.name + ("（%s）" % it.category if it.category else "")
+            desc_parts = []
+            if it.reason:
+                desc_parts.append("为什么排这：%s" % it.reason)
+            if it.tips:
+                desc_parts.append("怎么玩：%s" % it.tips)
+            if it.wait_min:
+                desc_parts.append("含等开门 %d 分钟" % it.wait_min)
+            lines += [
+                "BEGIN:VEVENT",
+                "UID:%s-%d-%d@ai-trip-planner" % (day_date or "na", d.day_index, it.seq),
+                "DTSTAMP:%s" % now,
+                "DTSTART:%s" % _dt(day_date, it.arrive),
+                "DTEND:%s" % _dt(day_date, it.leave),
+                "SUMMARY:%s" % summary.replace(",", "\\,"),
+                "LOCATION:%s" % (it.address or "").replace(",", "\\,"),
+                "DESCRIPTION:%s" % "；".join(desc_parts).replace(",", "\\,"),
+                "END:VEVENT",
+            ]
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines) + "\r\n"
+
+
+def to_geojson(resp: PlanResponse) -> str:
+    """v1.1(B1)：GeoJSON FeatureCollection，能直接贴进地图工具看点位与顺序。"""
+    features = []
+    for d in resp.days:
+        for it in d.items:
+            if not it.lat and not it.lon:
+                continue
+            features.append({
+                "type": "Feature",
+                "geometry": {"type": "Point",
+                             "coordinates": [it.lon, it.lat]},  # GeoJSON 是 [经度,纬度]
+                "properties": {
+                    "day": d.day_index, "seq": it.seq, "name": it.name,
+                    "arrive": it.arrive, "leave": it.leave,
+                    "category": it.category, "cost": it.cost,
+                    "mode": it.transport.mode,
+                },
+            })
+    return _json_safe({"type": "FeatureCollection", "features": features})
+
+
+def _md_inline_html(md: str) -> str:
+    """极简 md→HTML（标题/表格/列表/粗体），零依赖，只为单文件行程单够用。"""
+    import re
+    out: list[str] = []
+    in_table = False
+    for raw in md.splitlines():
+        line = raw.rstrip()
+        esc = (line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+        esc = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", esc)
+        if line.startswith("|") and line.endswith("|"):
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if all(set(c) <= set("-: ") and c for c in cells):
+                continue  # 表头分隔行
+            if not in_table:
+                out.append("<table>")
+                in_table = True
+                out.append("<tr>" + "".join("<th>%s</th>" % c for c in cells) + "</tr>")
+            else:
+                out.append("<tr>" + "".join("<td>%s</td>" % c for c in cells) + "</tr>")
+            continue
+        if in_table:
+            out.append("</table>")
+            in_table = False
+        if line.startswith("### "):
+            out.append("<h3>%s</h3>" % esc[4:])
+        elif line.startswith("## "):
+            out.append("<h2>%s</h2>" % esc[3:])
+        elif line.startswith("# "):
+            out.append("<h1>%s</h1>" % esc[2:])
+        elif line.startswith("- "):
+            out.append("<li>%s</li>" % esc[2:])
+        elif line.startswith("  - "):
+            out.append('<li class="sub">%s</li>' % esc[4:])
+        elif line.startswith("> "):
+            out.append("<blockquote>%s</blockquote>" % esc[2:])
+        elif not line:
+            continue
+        else:
+            out.append("<p>%s</p>" % esc)
+    if in_table:
+        out.append("</table>")
+    return "\n".join(out)
+
+
+def to_html_single(resp: PlanResponse) -> str:
+    """v1.1(B1)：单文件离线 HTML 行程单——零外部依赖，断网双击就能打开。"""
+    body = _md_inline_html(to_markdown(resp))
+    return (
+        "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+        "<title>行程单</title>\n<style>\n"
+        "body{font-family:'Microsoft YaHei',sans-serif;max-width:860px;margin:0 auto;"
+        "padding:16px;line-height:1.6;color:#222;background:#fafafa}\n"
+        "table{border-collapse:collapse;width:100%;margin:8px 0;font-size:14px}\n"
+        "th,td{border:1px solid #ccc;padding:5px 8px;text-align:left}\n"
+        "th{background:#f0f0f0}\nblockquote{border-left:4px solid #8ab;"
+        "margin:8px 0;padding:4px 12px;color:#555;background:#f4f8fa}\n"
+        "li{margin:3px 0}li.sub{list-style:circle;margin-left:20px}\n"
+        "h1{font-size:22px}h2{font-size:18px;border-bottom:1px solid #ddd;"
+        "padding-bottom:4px}h3{font-size:16px}\n"
+        "</style>\n</head>\n<body>\n" + body + "\n"
+        "<hr><p style=\"color:#999;font-size:12px\">由 ai-trip-planner 生成 · "
+        "单文件离线版 · 数据口径见文末</p>\n</body>\n</html>\n"
+    )
+
+
 def export(resp: PlanResponse, fmt: str = "json") -> str:
     """按格式导出；未知格式回退 json（不抛异常，页面不能因为导出崩掉）。"""
     fmt = (fmt or "json").lower()
@@ -403,6 +546,12 @@ def export(resp: PlanResponse, fmt: str = "json") -> str:
         return to_markdown(resp)
     if fmt == "csv":
         return to_csv(resp)
+    if fmt == "ics":
+        return to_ics(resp)
+    if fmt == "geojson":
+        return to_geojson(resp)
+    if fmt == "html":
+        return to_html_single(resp)
     if fmt == "json":
         return to_json(resp)
     return to_json(resp)

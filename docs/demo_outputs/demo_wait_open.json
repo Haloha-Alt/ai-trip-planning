@@ -18,7 +18,7 @@
       "contract": "v1",
       "strategy": "stub",
       "scenario": "daily",
-      "generated_at": "2026-10-30T22:22:12",
+      "generated_at": "2026-11-07T22:00:37",
       "city": "dalian",
       "request": {
         "city": "dalian",
@@ -29,7 +29,11 @@
         "interests": [
           "图书馆",
           "吃饭",
-          "自习"
+          "自习",
+          "食堂",
+          "餐饮",
+          "交通",
+          "校车"
         ],
         "avoid": [],
         "pace": "normal",
@@ -45,7 +49,9 @@
         "seed": null,
         "deadline": "",
         "waypoints": [],
-        "profile": ""
+        "profile": "",
+        "zone": "",
+        "anchors": []
       },
       "days": [
         {
@@ -136,12 +142,12 @@
         "[narrate] 未启用大模型（缺 LLM_API_KEY），直接用规则结果"
       ],
       "metrics": {
-        "satisfaction": 0.5,
+        "satisfaction": 0.3333,
         "cost": 0.8,
         "time": 0.2979,
         "distance": 0.9573,
         "feasibility": 1.0,
-        "overall": 0.5803
+        "overall": 0.5053
       },
       "meta": {
         "data": {
@@ -158,12 +164,16 @@
           "distance": 0.1
         },
         "pending": [
-          "令希图书馆（图书馆，per_person）",
-          "伯川图书馆（图书馆，per_person）",
           "第一食堂（食堂，per_person）"
         ],
+        "task_usage": {
+          "filled_min": 5,
+          "total_min": 362,
+          "usage": 0.0138,
+          "tasks_available": 5
+        },
         "narrative": {
-          "summary": "1 天 3 站，总花费 12 元，满意度 0.50、可行性 1.00，总分 0.5803。",
+          "summary": "1 天 3 站，总花费 12 元，满意度 0.33、可行性 1.00，总分 0.5053。",
           "days": [
             {
               "day": 1,

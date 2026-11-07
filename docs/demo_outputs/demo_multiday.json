@@ -18,7 +18,7 @@
       "contract": "v1",
       "strategy": "stub",
       "scenario": "daily",
-      "generated_at": "2026-10-30T22:22:12",
+      "generated_at": "2026-11-07T22:00:37",
       "city": "dalian",
       "request": {
         "city": "dalian",
@@ -28,7 +28,10 @@
         "daily_budget": 60.0,
         "interests": [
           "吃饭",
-          "自习"
+          "自习",
+          "食堂",
+          "餐饮",
+          "图书馆"
         ],
         "avoid": [],
         "pace": "normal",
@@ -44,7 +47,9 @@
         "seed": null,
         "deadline": "",
         "waypoints": [],
-        "profile": ""
+        "profile": "",
+        "zone": "",
+        "anchors": []
       },
       "days": [
         {
@@ -238,13 +243,17 @@
           "distance": 0.1
         },
         "pending": [
-          "令希图书馆（图书馆，per_person）",
-          "伯川图书馆（图书馆，per_person）",
           "第一食堂（食堂，per_person）",
           "第三食堂（食堂，per_person）",
           "第二食堂（食堂，per_person）",
           "第四食堂（食堂，per_person）"
         ],
+        "task_usage": {
+          "filled_min": 5,
+          "total_min": 450,
+          "usage": 0.0111,
+          "tasks_available": 5
+        },
         "narrative": {
           "summary": "2 天 6 站，总花费 45 元，满意度 0.50、可行性 1.00，总分 0.5209。",
           "days": [

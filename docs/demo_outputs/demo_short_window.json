@@ -18,7 +18,7 @@
       "contract": "v1",
       "strategy": "stub",
       "scenario": "daily",
-      "generated_at": "2026-10-30T22:22:12",
+      "generated_at": "2026-11-07T22:00:37",
       "city": "dalian",
       "request": {
         "city": "dalian",
@@ -41,7 +41,9 @@
         "seed": null,
         "deadline": "",
         "waypoints": [],
-        "profile": ""
+        "profile": "",
+        "zone": "",
+        "anchors": []
       },
       "days": [
         {
@@ -81,6 +83,12 @@
           "cost": 0.25,
           "time": 0.2,
           "distance": 0.1
+        },
+        "task_usage": {
+          "filled_min": 0,
+          "total_min": 0,
+          "usage": 0.0,
+          "tasks_available": 5
         },
         "narrative": {
           "summary": "1 天 0 站，总花费 0 元，满意度 0.00、可行性 0.00，总分 0.0000。",

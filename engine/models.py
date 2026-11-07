@@ -200,6 +200,12 @@ class ItineraryItem:
     flags: list[str] = field(default_factory=list)   # 风险标记：rain_risk / closed_today / queue_long
     url: str = ""                         # 详情链接
 
+    # ---- v1.1(B2) 追加：等开门单独计时，不计入停留 ----
+    wait_min: int = 0                     # arrive 比「到站时刻」多等了几分钟（开门时间约束）
+
+    # ---- v1.1(E3) 追加：碎片时间任务（移动片/等待片里能做的事）----
+    tasks: list[dict] = field(default_factory=list)   # [{task_id,name,duration_min,consumes,desc}]
+
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "ItineraryItem":
         d = dict(d or {})
@@ -225,6 +231,9 @@ class DayPlan:
     date: str = ""                        # "YYYY-MM-DD"
     weather: str = ""                     # 天气摘要，人类可读
     theme: str = ""                       # 当天主题（如"老城漫步"）
+
+    # ---- v1.1(E3) 追加 ----
+    task_min: int = 0                     # 当天被碎片任务占用的分钟数（不占地点停留）
 
     def refresh_stats(self) -> None:
         """由 items 汇总当天统计。引擎生成完必须调一次。"""

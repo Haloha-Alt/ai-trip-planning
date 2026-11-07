@@ -18,7 +18,7 @@
       "contract": "v1",
       "strategy": "stub",
       "scenario": "daily",
-      "generated_at": "2026-10-30T22:22:12",
+      "generated_at": "2026-11-07T22:00:37",
       "city": "beijing",
       "request": {
         "city": "beijing",
@@ -43,7 +43,9 @@
         "seed": null,
         "deadline": "",
         "waypoints": [],
-        "profile": ""
+        "profile": "",
+        "zone": "",
+        "anchors": []
       },
       "days": [
         {

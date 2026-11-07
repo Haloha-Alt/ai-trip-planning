@@ -1,0 +1,39 @@
+# C1（docs/07 v2.0 路线图）：CI 三段全绿才允许合并。
+# 项目零第三方依赖，纯标准库，所以这里只需要装 coverage（D5 覆盖率报告）。
+# 缓存 pip；目标总时长 <3 分钟。
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install coverage (D5)
+        run: pip install coverage
+      - name: Run all tests with coverage
+        run: |
+          coverage run --source=engine,service,data,llm,api -m unittest discover -s tests -t .
+          coverage report --fail-under=70
+          coverage json -o coverage.json
+      - name: Determinism check (tools.make_demo_outputs --verify)
+        run: |
+          python -m tools.make_demo_outputs
+          python -m tools.make_demo_outputs --verify
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Render check (15 assertions, no browser needed)
+        run: node _render_check.js

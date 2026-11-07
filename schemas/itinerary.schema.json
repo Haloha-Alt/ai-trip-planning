@@ -62,7 +62,8 @@
           "total_distance_km": { "type": "number" },
           "date": { "type": "string", "description": "v1.2 YYYY-MM-DD" },
           "weather": { "type": "string", "description": "v1.2 天气摘要" },
-          "theme": { "type": "string", "description": "v1.2 当天主题" }
+          "theme": { "type": "string", "description": "v1.2 当天主题" },
+          "task_min": { "type": "integer", "minimum": 0, "description": "v1.1(E3) 当天碎片任务占用的分钟数" }
         }
       }
     },
@@ -108,7 +109,9 @@
         "address": { "type": "string", "description": "v1.2 地址" },
         "tips": { "type": "string", "description": "v1.2 解说/贴士，可为空" },
         "flags": { "type": "array", "items": { "type": "string" }, "description": "v1.2 风险标记" },
-        "url": { "type": "string", "description": "v1.2 详情链接" }
+        "url": { "type": "string", "description": "v1.2 详情链接" },
+        "wait_min": { "type": "integer", "minimum": 0, "description": "v1.1(B2) 等开门分钟数，单独计时不计入停留" },
+        "tasks": { "type": "array", "items": { "type": "object" }, "description": "v1.1(E3) 本段时间片里可做的碎片任务" }
       }
     },
     "Transport": {

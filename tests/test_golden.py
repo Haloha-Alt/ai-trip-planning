@@ -69,10 +69,12 @@ EXPECT_REQUEST_KEYS = {
 EXPECT_DAY_KEYS = {
     "date", "day_index", "items", "theme", "total_cost",
     "total_distance_km", "total_stay_min", "total_travel_min", "weather",
+    "task_min",
 }
 EXPECT_ITEM_KEYS = {
     "address", "arrive", "category", "cost", "flags", "lat", "leave", "lon",
     "name", "poi_id", "reason", "seq", "stay_min", "tips", "transport", "url",
+    "wait_min", "tasks",
 }
 
 
