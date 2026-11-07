@@ -241,23 +241,40 @@ def post_adjust(req: HttpRequest) -> tuple[int, dict[str, Any]]:
             history = []
         new = base
         notes: list[str] = []
-        for t in texts:
+        # v1.2(A2) 防双应用：前端会把全部历史指令一起重放，而会话里的上一版
+        # 已经应用过前缀 —— 历史是 texts 的前缀时只应用多出来的尾巴；
+        # 长度相同但内容不同（直接调 API 发新指令）时保守地只应用最后一条。
+        if sess and history:
+            if texts[:len(history)] == history:
+                apply_texts = texts[len(history):]
+            elif texts and texts[-1] != history[-1]:
+                apply_texts = [texts[-1]]
+            else:
+                apply_texts = []
+        else:
+            apply_texts = texts
+        for t in apply_texts:
             new = adjust_plan(new, t)
             n = (new.meta.get("adjust") or {}).get("note", "")
             if n:
                 notes.append(n)
+        if sess and history and not apply_texts:
+            notes = ["指令已生效（会话幂等重放，行程未变）"]
     except KeyError as e:
         return _err(str(e).strip('"'), 400)
     except Exception as e:                      # noqa: BLE001
         return _err("调整失败：%s" % e, 500)
 
-    # 调整结果写回会话：下一轮拿到的就是这一版
+    # 调整结果写回会话：下一轮拿到的就是这一版。
+    # 注意记 history + apply_texts（不是 +texts）：texts 可能是前端的完整重放，
+    # 会话历史必须与"真正应用过的指令"逐位对齐，防双应用才不会错位。
     if sid:
         try:
             from service import session as _session
 
             _session.save(sid, body=(sess or {}).get("body") or body,
-                          plan=to_api_dict(new), instructions=history + texts)
+                          plan=to_api_dict(new),
+                          instructions=history + apply_texts)
         except Exception:                       # noqa: BLE001
             pass
 

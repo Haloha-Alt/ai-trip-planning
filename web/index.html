@@ -1164,6 +1164,16 @@ html[data-theme="paper"] #menubar .mb.on{color:#fffdf7}
       <p class="muted" id="adjNote" style="margin:8px 0 0"></p>
     </div>
 
+    <div class="card" id="ragBar" style="margin-bottom:14px">
+      <h2>知识速查 <span class="muted" style="font-size:12px;font-weight:normal">（本地 BM25 检索，不调模型）</span></h2>
+      <div class="row" style="grid-template-columns:1fr auto;align-items:end">
+        <div><label>问一句，比如「晚上想听音乐会」「哪里能自习」</label>
+          <input id="ragQ" placeholder="在数据包里检索地点/玩法/可达性证据"></div>
+        <button id="ragGo" style="margin:0;width:auto;padding:9px 16px">检索</button>
+      </div>
+      <p class="muted" id="ragOut" style="margin:8px 0 0"></p>
+    </div>
+
     <nav class="tabs" id="tabs" hidden>
       <button class="tab active" data-tab="detail">详细行程</button>
       <button class="tab" data-tab="list">行程表</button>
@@ -1308,6 +1318,7 @@ let JS_KEY = '';        // 高德 Web端(JS API) Key：为空则地图保持离�
 let SEC_CODE = '';      // 同上那把 Key 的安全密钥（2.0 SDK 必配，否则 INVALID_USER_SCODE）
 let ADJ = [];           // 本份行程已经下过的调整指令，按顺序重放
 let LAST_BRIEF = null;  // 约会模式的简报（/api/date/brief 返回），daily/visit 下恒为 null
+let SESSION_ID = null;  // v1.2(A2) 多轮会话：/api/plan 签发，/api/adjust 带上它=在上一版上继续改
 let DATE_INFO = null;   // /api/date/info 的返回：商圈 / 影院 / 场次（切进约会模式才拉）
 
 /* 所有拼进 innerHTML 的外部文本都要过一遍 —— 站点名里出现 & 或 < 时页面不能崩 */
@@ -1412,6 +1423,15 @@ async function loadLlmPanel() {
                 : d.router_mode === 'rules' ? '仅规则' : '不分流';
   line.textContent = '已启用 · 默认 ' + d.model + ' · 路由：' + modeTxt;
 
+  // v1.2(A1) 自适应路由健康：哪个模型最近失败率高、被自动绕开，直接说破
+  const h = d.health || {};
+  const bad = Object.keys(h).filter(k => h[k] && h[k].degraded);
+  if (bad.length) {
+    line.innerHTML += ' <b style="color:#a32d2d">⚠ 已降级绕开：'
+      + esc(bad.map(k => k + '（失败率 ' + Math.round(h[k].fail_rate * 100) + '%）').join('、'))
+      + '</b>';
+  }
+
   const rs = d.recent || [];
   if (!rs.length) {
     list.innerHTML = '还没有调用记录 —— 同一个输入第二次会命中缓存、不再重复调模型；换个说法再试。';
@@ -1423,6 +1443,35 @@ async function loadLlmPanel() {
     return '· ' + esc(r.time) + ' ' + esc(r.task) + ' → ' + esc(r.model)
          + ' [' + esc(r.source) + '] ' + r.ms + 'ms' + pct + hint;
   }).join('<br>');
+}
+
+/* v1.2(A3) 知识速查：/api/search 的本地 BM25 检索。
+ * 语料是数据包里 POI 的事实文案（名称/分类/标签/玩法/地址）——
+ * 没有 LLM Key 也一样能用，给"哪里能自习""晚上听什么"这类问题一个事实层出口。 */
+async function ragSearch(){
+  const q = $('ragQ').value.trim();
+  const out = $('ragOut');
+  if (!q) { out.textContent = '先写要查什么，例如「哪里能自习」。'; return; }
+  out.textContent = '检索中…';
+  const city = ($('city') && $('city').value) || '';
+  let d;
+  try {
+    d = await api('/api/search?q=' + encodeURIComponent(q)
+                 + (city ? '&city=' + encodeURIComponent(city) : ''));
+  } catch (e) {
+    out.textContent = '检索失败：' + (e.message || e);
+    return;
+  }
+  if (!d.ok) { out.textContent = d.error || '检索失败'; return; }
+  const hits = d.hits || [];
+  if (!hits.length) {
+    out.textContent = '没查到 —— 换个说法试试，或者这个数据包里确实没有。';
+    return;
+  }
+  out.innerHTML = hits.map(h =>
+    '· <b>' + esc(h.name) + '</b>（' + esc(h.category || '') + '，相关度 '
+    + h.score + '）' + (h.text ? '<br>　' + esc(h.text) : '')
+  ).join('<br>');
 }
 
 async function boot() {
@@ -1438,6 +1487,8 @@ async function boot() {
   }
   loadLlmPanel();
   if ($('llmRefresh')) $('llmRefresh').onclick = () => loadLlmPanel();
+  if ($('ragGo')) $('ragGo').onclick = ragSearch;
+  if ($('ragQ')) $('ragQ').addEventListener('keydown', e => { if (e.key === 'Enter') ragSearch(); });
   try {
     const o = await api('/api/options');
     OPTS = o;
@@ -1562,6 +1613,7 @@ async function plan() {
   PTS = res.map || [];
   LAST_REV = res.reverse || null;
   ADJ = [];                    // 新行程 = 调整历史的新起点
+  SESSION_ID = res.session_id || SESSION_ID;   // v1.2(A2)：会话随新行程重开
   noteModel(PLAN);
   renderPlan();
   /* 详细行程是默认视图：用户第一眼要看到逐站说明，而不是一张光秃秃的表 */
@@ -1580,12 +1632,26 @@ function noteModel(plan){
     : (sel ? '自动路由' : '');
 }
 
+/* v1.2(A6) 决策链上屏：meta.trace 里这次请求的每一次模型调用。
+ * 没开模型（no_llm / 无 Key / 规则全包）时 calls 为空 → 整行不出现，不占地方。 */
+function traceHtml(plan){
+  const t = (plan && plan.meta && plan.meta.trace) || null;
+  const calls = (t && t.calls) || [];
+  if (!calls.length) return '';
+  const items = calls.map(c =>
+    '· ' + esc(c.task) + ' → ' + esc(c.model) + ' [' + esc(c.source) + '] '
+    + c.ms + 'ms' + (c.ok ? ' ✓' : ' <b style="color:#a32d2d">✗ ' + esc(c.error || '失败') + '</b>'));
+  return '<div class="muted" style="font-size:12px;margin-top:8px"><b>模型调用链</b>（路由：'
+    + esc(t.router_mode || 'off') + '，' + calls.length + ' 次）<br>' + items.join('<br>') + '</div>';
+}
+
 function renderPlan(){
   $('tabs').hidden = false;
   $('adjustBar').hidden = false;  $('summary').innerHTML = (LAST_BRIEF ? briefCard(LAST_BRIEF) : '')
                          + '<div class="card">' + narrativeHtml(PLAN) + metricsHtml(PLAN)
                          + metaLine(PLAN) + realtimeNote(PLAN) + dataNote(PLAN)
                          + dateQueryNote(PLAN) + budgetHtml(PLAN) + planBHtml(PLAN)
+                         + traceHtml(PLAN)
                          + warningsHtml(PLAN) + pendingHtml(PLAN) + exportBar() + '</div>';
   $('pane-detail').innerHTML = detailHtml(PLAN);
   $('pane-list').innerHTML = listHtml(PLAN);
@@ -2405,7 +2471,10 @@ async function adjustPlan(){
     + (ADJ.length > 1 ? '（连同前面 ' + (ADJ.length - 1) + ' 次一并在新行程上重放）' : '') + '…';
   let res;
   try {
-    res = await api('/api/adjust', Object.assign({}, LAST, {instructions: ADJ.slice()}));
+    // v1.2(A2)：带上会话 id —— 后端有会话时直接在上一版行程上打补丁（不重排），
+    // 没有就自动退回"重放全部指令"的老路径，两种情况都用同一份 ADJ 历史。
+    res = await api('/api/adjust', Object.assign({}, LAST,
+      {instructions: ADJ.slice(), session_id: SESSION_ID || undefined}));
   } catch (e) {
     ADJ.pop();
     $('adjNote').textContent = '请求失败：' + (e.message || e);
@@ -2420,10 +2489,11 @@ async function adjustPlan(){
   renderPlan();
   showTab('list');
   const a = res.adjust || {};
+  const viaSession = a.from_session ? '（多轮：基于上一版，不重排）' : '';
   $('adjNote').textContent = a.changed_days
     ? ('已调整：' + (a.note || a.instruction)
-       + '（第 ' + ADJ.length + ' 次，改了 ' + a.changed_days + ' 天的行程；前几次的结果已保留）')
-    : ('没有改动：' + (a.note || '没听懂要改什么'));
+       + '（第 ' + ADJ.length + ' 次，改了 ' + a.changed_days + ' 天的行程；前几次的结果已保留）' + viaSession)
+    : ('没有改动：' + (a.note || '没听懂要改什么') + viaSession);
   $('adjText').value = '';
 }
 

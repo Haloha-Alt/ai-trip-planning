@@ -157,6 +157,50 @@ class TestSession(unittest.TestCase):
         self.assertEqual(session_store.load(sid)["instructions"],
                          ["太赶了", "太松了"])
 
+    def test_adjust_no_double_apply(self):
+        """前端会把全部历史指令一起重放；会话模式下前缀只能生效一次。"""
+        body = {"query": "去图书馆自习，中午食堂吃饭", "scenario": "daily",
+                "strategy": "stub", "no_llm": True}
+        _, p1 = dispatch("POST", "/api/plan", {}, body)
+        sid = p1["session_id"]
+        dispatch("POST", "/api/adjust", {},
+                 {"session_id": sid, "instruction": "太赶了"})
+
+        # 第二轮：前端重放 ["太赶了", "太松了"] —— 会话里「太赶了」已生效，
+        # 只允许应用新增的「太松了」
+        st, p2 = dispatch("POST", "/api/adjust", {},
+                          {"session_id": sid,
+                           "instructions": ["太赶了", "太松了"]})
+        self.assertEqual(st, 200)
+        self.assertTrue(p2["adjust"].get("from_session"))
+        # 「太松了」命中偏松规则，note 是规则措辞而非原文回显
+        self.assertIn("偏松", p2["adjust"]["note"])
+        # 会话历史与前端 ADJ 逐位对齐（不是 +texts 的 3 条）
+        self.assertEqual(session_store.load(sid)["instructions"],
+                         ["太赶了", "太松了"])
+
+        # 第三轮：原样重放全部历史 → 幂等，行程不再变化
+        st3, p3 = dispatch("POST", "/api/adjust", {},
+                           {"session_id": sid,
+                            "instructions": ["太赶了", "太松了"]})
+        self.assertEqual(st3, 200)
+        self.assertIn("幂等重放", p3["adjust"]["note"])
+        self.assertEqual(session_store.load(sid)["instructions"],
+                         ["太赶了", "太松了"])
+
+    def test_adjust_direct_new_instruction(self):
+        """直接调 API（不重放历史）：等长但内容不同的新指令必须能生效。"""
+        body = {"query": "去图书馆自习，中午食堂吃饭", "scenario": "daily",
+                "strategy": "stub", "no_llm": True}
+        _, p1 = dispatch("POST", "/api/plan", {}, body)
+        sid = p1["session_id"]
+        dispatch("POST", "/api/adjust", {},
+                 {"session_id": sid, "instruction": "太赶了"})
+        st, p2 = dispatch("POST", "/api/adjust", {},
+                          {"session_id": sid, "instruction": "太松了"})
+        self.assertEqual(st, 200)
+        self.assertIn("偏松", p2["adjust"]["note"])
+
     def test_bad_session_falls_back(self):
         import uuid
 
